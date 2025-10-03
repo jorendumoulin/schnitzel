@@ -2,8 +2,8 @@ name: Continuous Integration
 
 on:
   push:
-    tags: ['*']
-    branches: ['main']
+    tags: ["*"]
+    branches: ["main"]
   pull_request:
   workflow_dispatch:
 
@@ -22,12 +22,9 @@ jobs:
         uses: coursier/setup-action@v1
         with:
           jvm: adopt:11
-          apps: sbt
       - name: Setup Dependencies
         run: |
           sudo apt-get install verilator
           verilator --version
-      - name: SBT Test
-        run: sbt test
       - name: mill Test
         run: ./mill _.test
