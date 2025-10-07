@@ -6,25 +6,32 @@ import chisel3.util._
 /** Generic Bus interface for memory access using DecoupledIO. This can be
   * extended or replaced with a specific protocol as needed.
   */
-class BusReq extends Bundle {
-  val addr = UInt(64.W)
-  val wdata = UInt(64.W)
+class BusReq(addrWidth: Int, dataWidth: Int) extends Bundle {
+  val addr = UInt(addrWidth.W)
+  val wdata = UInt(dataWidth.W)
   val wen = Bool()
   val ren = Bool()
 }
 
-class BusIO extends Bundle {
-  val req = Decoupled(new BusReq) // .valid, .ready, .bits
-  val rdata = Input(UInt(64.W))
+class BusRsp(dataWidth: Int) extends Bundle {
+  val data = UInt(dataWidth.W)
 }
 
-/** Example stub for a Bus-connected memory using DecoupledIO. Replace or extend
-  * with actual memory or peripheral logic.
+/** Standard Bus: on a valid request, the data is available in that cycle.
   */
-class BusMemoryStub extends Module {
-  val io = IO(new BusIO)
+class BusIO(addrWidth: Int, dataWidth: Int) extends Bundle {
+  val req = Decoupled(new BusReq(addrWidth, dataWidth))
+  val rsp = Flipped(new BusRsp(dataWidth))
+}
 
-  // Simple stub: always ready, returns zero data
-  io.req.ready := true.B
-  io.rdata := 0.U
+/** Decoupled Bus: on a valid request, the receiver makes a promise to handle
+  * this request. A response is generated on the response signal. This may occur
+  * in the next cycle or later. The producer should be ready to accept this
+  * response. It is up to the receiver to decide what to do when the producer of
+  * the request is not ready for this response. It is up to the producer to keep
+  * track of its own requests and which response corresponds to which request.
+  */
+class DecoupledBusIO(addrWidth: Int, dataWidth: Int) extends Bundle {
+  val req = Decoupled(new BusReq(addrWidth, dataWidth))
+  val rsp = Flipped(Decoupled(new BusRsp(dataWidth)))
 }

@@ -11,9 +11,9 @@ import core.Opcodes._
 class ALU extends Module {
   val io = IO(new Bundle {
     val op = Input(UInt(6.W)) // ALU operation selector
-    val srcA = Input(UInt(64.W)) // First operand
-    val srcB = Input(UInt(64.W)) // Second operand
-    val result = Output(UInt(64.W)) // ALU result
+    val srcA = Input(UInt(CoreConfig.dataWidth.W)) // First operand
+    val srcB = Input(UInt(CoreConfig.dataWidth.W)) // Second operand
+    val result = Output(UInt(CoreConfig.dataWidth.W)) // ALU result
     val cmpOut = Output(Bool()) // Comparison result (for branches)
   })
 
