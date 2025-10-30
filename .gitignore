@@ -2,6 +2,13 @@
 test_run_dir/*
 .bloop
 .metals
+
+# Spitchel build artifacts
+generated/
+verilated/
+spitchel/build/
+spitchel/bin/
+
 ### XilinxISE template
 # intermediate build files
 *.bgn
