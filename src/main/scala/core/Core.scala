@@ -15,9 +15,6 @@ class Core extends Module {
   // === Module Instantiation ===
   // ============================
 
-  // Stall signal
-  val stall = Bool()
-
   // === Instruction Fetch ===
   val pc = RegInit(0.U(CoreConfig.addrWidth.W))
   val fetch = Module(new InstructionFetch)
@@ -69,5 +66,10 @@ class Core extends Module {
   csr.io.wen := decoder.io.csrEn && decoder.io.memWriteEn
   csr.io.ren := decoder.io.csrEn && !decoder.io.memWriteEn
   writeBack.io.csrResult := csr.io.rdata
+
+  // === PC Update ===
+  when(!fetch.io.stall) {
+    pc := pc + 4.U
+  }
 
 }
