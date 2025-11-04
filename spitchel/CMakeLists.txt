@@ -44,7 +44,6 @@ add_custom_target(verilate ALL DEPENDS ${VERILATED_DIR}/VCore__ALL.a)
 add_executable(spitchel
   src/main.cpp
   src/spitchel.cpp
-  src/memory.cpp
 )
 
 add_dependencies(spitchel verilate)
@@ -63,4 +62,5 @@ target_link_libraries(spitchel PRIVATE
 
 target_sources(spitchel PRIVATE
   ${VERILATOR_ROOT}/include/verilated.cpp
+  ${VERILATOR_ROOT}/include/verilated_threads.cpp
 )

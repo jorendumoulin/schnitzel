@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <fesvr/htif.h>
 #include <fesvr/memif.h>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -29,12 +28,6 @@ class VerilatedVcdC;
  */
 class spitchel_t : public htif_t {
 public:
-  /** Constructor
-   * @param argc Command line argument count
-   * @param argv Command line arguments
-   */
-  spitchel_t(int argc, char **argv);
-
   /** Constructor with vector of arguments
    * @param args Command line arguments
    */
