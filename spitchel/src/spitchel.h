@@ -12,9 +12,7 @@
 // Forward declarations for Verilator
 class VCore;
 class VerilatedContext;
-#ifdef ENABLE_TRACE
 class VerilatedVcdC;
-#endif
 
 /** spitchel_t: RISC-V simulator using verilated Schnitzel core
  *
@@ -100,10 +98,8 @@ private:
   /** Verilator context */
   VerilatedContext *context;
 
-#ifdef ENABLE_TRACE
   /** VCD trace file */
   VerilatedVcdC *trace;
-#endif
 
   // ========================================
   // Memory subsystem

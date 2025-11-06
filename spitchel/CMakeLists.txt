@@ -63,5 +63,6 @@ target_link_libraries(spitchel PRIVATE
 
 target_sources(spitchel PRIVATE
   ${VERILATOR_ROOT}/include/verilated.cpp
+  ${VERILATOR_ROOT}/include/verilated_vcd_c.cpp
   ${VERILATOR_ROOT}/include/verilated_threads.cpp
 )

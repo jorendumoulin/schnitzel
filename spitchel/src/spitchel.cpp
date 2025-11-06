@@ -8,9 +8,9 @@
 #include <verilated_vcd_c.h>
 
 spitchel_t::spitchel_t(const std::vector<std::string> &args)
-    : htif_t(args), core(nullptr), context(nullptr), mem_base(0x10000),
-      mem_size(128 * 1024 * 1024), cycle_count(0), max_cycles(0),
-      instr_count(0), verbose(false), sim_finished(false),
+    : htif_t(args), core(nullptr), context(nullptr), trace(nullptr),
+      mem_base(0x10000), mem_size(128 * 1024 * 1024), cycle_count(0),
+      max_cycles(0), instr_count(0), verbose(false), sim_finished(false),
       imem_req_pending(false), dmem_req_pending(false) {
 
   mem.resize(mem_size, 0);
@@ -105,10 +105,21 @@ void spitchel_t::clear_chunk(addr_t taddr, size_t len) {
 }
 
 void spitchel_t::tick() {
+  // Drive low phase
   core->clock = 0;
   core->eval();
+  if (trace) {
+    trace->dump(context->time());
+  }
+  context->timeInc(1);
+
+  // Drive high phase
   core->clock = 1;
   core->eval();
+  if (trace) {
+    trace->dump(context->time());
+  }
+  context->timeInc(1);
 
   cycle_count++;
 }
@@ -227,6 +238,15 @@ int spitchel_t::run() {
     }
   }
 
+  if (trace) {
+    if (verbose) {
+      fprintf(stderr, "Closing VCD trace\n");
+    }
+    trace->close();
+    delete trace;
+    trace = nullptr;
+  }
+
   if (verbose) {
     fprintf(stderr, "Simulation finished after %lu cycles\n", cycle_count);
   }
@@ -235,7 +255,14 @@ int spitchel_t::run() {
 }
 
 void spitchel_t::enable_trace(const char *filename) {
-  // Tracing support not implemented yet
+  if (verbose) {
+    fprintf(stderr, "Enabling VCD tracing to %s\n", filename);
+  }
+  context->traceEverOn(true);
+  trace = new VerilatedVcdC;
+  core->trace(trace, 99);
+  trace->open(filename);
+  trace->dump(context->time());
 }
 
 void spitchel_t::log(const char *format, ...) {
