@@ -5,9 +5,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <verilated.h>
+#include <verilated_vcd_c.h>
 
 spitchel_t::spitchel_t(const std::vector<std::string> &args)
-    : htif_t(args), core(nullptr), context(nullptr), mem_base(0x80000000),
+    : htif_t(args), core(nullptr), context(nullptr), mem_base(0x10000),
       mem_size(128 * 1024 * 1024), cycle_count(0), max_cycles(0),
       instr_count(0), verbose(false), sim_finished(false),
       imem_req_pending(false), dmem_req_pending(false) {
@@ -79,7 +80,14 @@ void spitchel_t::read_chunk(addr_t taddr, size_t len, void *dst) {
 }
 
 void spitchel_t::write_chunk(addr_t taddr, size_t len, const void *src) {
+  if (verbose) {
+    log("WRITE CHUNK: addr=0x%lx len=%lu\n", taddr, len);
+  }
+
   if (!is_valid_addr(taddr, len)) {
+    if (verbose) {
+      log("  Invalid address, write ignored\n");
+    }
     return;
   }
 
@@ -228,7 +236,6 @@ int spitchel_t::run() {
 
 void spitchel_t::enable_trace(const char *filename) {
   // Tracing support not implemented yet
-  fprintf(stderr, "Warning: VCD tracing not yet implemented\n");
 }
 
 void spitchel_t::log(const char *format, ...) {

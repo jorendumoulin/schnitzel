@@ -31,6 +31,7 @@ add_custom_command(
   COMMAND verilator --cc --build -O3
     --top-module Core
     -Mdir ${VERILATED_DIR}
+    --trace
     --prefix VCore
     ${GENERATED_DIR}/*.sv
   DEPENDS ${GENERATED_DIR}/Core.sv
