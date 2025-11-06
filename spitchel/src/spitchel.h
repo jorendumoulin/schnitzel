@@ -157,6 +157,9 @@ private:
   // Core interaction methods
   // ========================================
 
+  /** Load bootrom into memory */
+  void load_bootrom();
+
   /** Advance simulation by one clock cycle */
   void tick();
 

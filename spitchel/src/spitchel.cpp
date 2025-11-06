@@ -9,7 +9,7 @@
 
 spitchel_t::spitchel_t(const std::vector<std::string> &args)
     : htif_t(args), core(nullptr), context(nullptr), trace(nullptr),
-      mem_base(0x10000), mem_size(128 * 1024 * 1024), cycle_count(0),
+      mem_base(0x1000), mem_size(128 * 1024 * 1024), cycle_count(0),
       max_cycles(0), instr_count(0), verbose(false), sim_finished(false),
       imem_req_pending(false), dmem_req_pending(false) {
 
@@ -193,13 +193,30 @@ void spitchel_t::idle() {
   // Could add progress updates here
 }
 
+// Bootloader binary provided by cmake build process
+extern unsigned char bootrom_data[];
+extern unsigned int bootrom_data_len;
+
+void spitchel_t::load_bootrom() {
+  write_chunk(0x1000, bootrom_data_len, bootrom_data);
+}
+
 int spitchel_t::run() {
+
   if (verbose) {
     fprintf(stderr, "Loading program...\n");
   }
 
+  // Load the bootloader and program into memory
+  load_bootrom();
+
   // Load the program via htif
   load_program();
+
+  if (verbose) {
+    uint32_t e = get_entry_point();
+    log("Entry point at 0x%x\n", e);
+  }
 
   if (verbose) {
     fprintf(stderr, "Resetting core...\n");

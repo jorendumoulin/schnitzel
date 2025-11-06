@@ -1,6 +1,3 @@
-cmake_minimum_required(VERSION 3.12)
-project(spitchel CXX)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -9,10 +6,7 @@ find_package(verilator HINTS $ENV{VERILATOR_ROOT})
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FESVR REQUIRED riscv-fesvr)
 
-# Paths
-set(SCHNITZEL_ROOT ${CMAKE_SOURCE_DIR}/..)
-set(GENERATED_DIR ${SCHNITZEL_ROOT}/generated)
-set(VERILATED_DIR ${SCHNITZEL_ROOT}/verilated)
+message(STATUS "PROJECT_ROOT in root subdir: ${GENERATED_DIR}")
 
 file(MAKE_DIRECTORY ${GENERATED_DIR})
 file(MAKE_DIRECTORY ${VERILATED_DIR})
@@ -20,8 +14,8 @@ file(MAKE_DIRECTORY ${VERILATED_DIR})
 # Generate Verilog from Chisel
 add_custom_command(
   OUTPUT ${GENERATED_DIR}/Core.sv
-  COMMAND ${SCHNITZEL_ROOT}/mill schnitzel.runMain spitchel.EmitVerilog
-  WORKING_DIRECTORY ${SCHNITZEL_ROOT}
+  COMMAND ${PROJECT_ROOT}/mill schnitzel.runMain spitchel.EmitVerilog
+  WORKING_DIRECTORY ${PROJECT_ROOT}
   COMMENT "Generating Verilog from Chisel..."
 )
 
@@ -35,11 +29,15 @@ add_custom_command(
     --prefix VCore
     ${GENERATED_DIR}/*.sv
   DEPENDS ${GENERATED_DIR}/Core.sv
-  WORKING_DIRECTORY ${SCHNITZEL_ROOT}
+  WORKING_DIRECTORY ${PROJECT_ROOT}
   COMMENT "Verilating Core..."
 )
 
 add_custom_target(verilate ALL DEPENDS ${VERILATED_DIR}/VCore__ALL.a)
+
+# RISC-V Bootrom
+add_library(bootrom_data STATIC ${CMAKE_BINARY_DIR}/sw/bootrom/bootrom.c)
+add_dependencies(bootrom_data bootrom)
 
 # Spitchel executable
 add_executable(spitchel
@@ -59,6 +57,7 @@ target_include_directories(spitchel PRIVATE
 target_link_libraries(spitchel PRIVATE
   ${VERILATED_DIR}/VCore__ALL.a
   ${FESVR_LIBRARIES}
+  bootrom_data
 )
 
 target_sources(spitchel PRIVATE

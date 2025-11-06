@@ -16,7 +16,7 @@ class Core extends Module {
   // ============================
 
   // === Instruction Fetch ===
-  val pc_start: Int = 0x00010000
+  val pc_start: Int = 0x1000
   val pc = RegInit(pc_start.U(CoreConfig.addrWidth.W))
   val fetch = Module(new InstructionFetch)
   fetch.io.pc := pc
