@@ -198,7 +198,16 @@ extern unsigned char bootrom_data[];
 extern unsigned int bootrom_data_len;
 
 void spitchel_t::load_bootrom() {
+  // Load bootrom at starting address 0x1000
   write_chunk(0x1000, bootrom_data_len, bootrom_data);
+
+  // Overwrite starting address with entry point of binary
+  uint32_t e = get_entry_point();
+  write_chunk(0x1000 + bootrom_data_len - 4, 4, &e);
+
+  if (verbose) {
+    log("Finished loading program\n", e);
+  }
 }
 
 int spitchel_t::run() {
@@ -207,11 +216,11 @@ int spitchel_t::run() {
     fprintf(stderr, "Loading program...\n");
   }
 
-  // Load the bootloader and program into memory
-  load_bootrom();
-
   // Load the program via htif
   load_program();
+
+  // Load the bootloader into memory
+  load_bootrom();
 
   if (verbose) {
     uint32_t e = get_entry_point();

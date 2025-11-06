@@ -36,6 +36,13 @@ add_custom_command(
 add_custom_target(verilate ALL DEPENDS ${VERILATED_DIR}/VCore__ALL.a)
 
 # RISC-V Bootrom
+# Convert bootrom binary into C array to be embedded in simulator
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/sw/bootrom/bootrom.c
+    COMMAND xxd -i -n bootrom_data ${CMAKE_BINARY_DIR}/sw/bootrom/bootrom.bin > ${CMAKE_BINARY_DIR}/sw/bootrom/bootrom.c
+    DEPENDS ${CMAKE_BINARY_DIR}/sw/bootrom/bootrom.bin
+)
+# Compile as library
 add_library(bootrom_data STATIC ${CMAKE_BINARY_DIR}/sw/bootrom/bootrom.c)
 add_dependencies(bootrom_data bootrom)
 
