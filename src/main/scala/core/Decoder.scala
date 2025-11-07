@@ -23,7 +23,9 @@ class DecoderIO extends Bundle {
   val memWriteEn = Output(Bool()) // Memory write enable
   val csrEn = Output(Bool()) // CSR operation enable
   val csrOpSel = Output(UInt(3.W)) // CSR operation selector
-  val immValue = Output(UInt(12.W)) // Immediate value
+  val immValue = Output(
+    UInt(32.W)
+  ) // Immediate value (32-bit to handle U-type immediates)
   val rdEn = Output(Bool()) // Register write enable
 }
 
@@ -58,10 +60,12 @@ class Decoder extends Module {
     is(OP_LUI) {
       io.aluOp := ALU_COPY_B
       io.rdEn := true.B
+      io.immValue := instr(31, 12) << 12
     }
     is(OP_AUIPC) {
       io.aluOp := ALU_ADD
       io.rdEn := true.B
+      io.immValue := instr(31, 12) << 12
     }
     is(OP_JAL) {
       io.aluOp := ALU_ADD

@@ -15,6 +15,8 @@ class DecoderSpec extends AnyFreeSpec with Matchers with ChiselSim {
       d.io.rd.peek().litValue mustBe 1
       d.io.aluOp.peek().litValue mustBe core.Opcodes.ALU_COPY_B.litValue
       d.io.rdEn.peek().litToBoolean mustBe true
+      // Check that immediate is properly extracted (0x12345 << 12 = 0x12345000)
+      d.io.immValue.peek().litValue mustBe 0x12345000L
       // d.io.memEn.peek().litToBoolean mustBe false
       d.io.csrEn.peek().litToBoolean mustBe false
     }
@@ -94,6 +96,22 @@ class DecoderSpec extends AnyFreeSpec with Matchers with ChiselSim {
       // d.io.csrOp.peek().litValue mustBe core.Opcodes.CSR_RW.litValue
       // d.io.csrAddr.peek().litValue mustBe 0x300
       d.io.rdEn.peek().litToBoolean mustBe true
+    }
+  }
+
+  "Decoder should decode AUIPC instruction" in {
+    simulate(new Decoder) { d =>
+      // AUIPC x1, 0x12345 (instruction: 0x12345097)
+      val instr = "h12345097".U(32.W)
+      d.io.instr.poke(instr)
+      d.clock.step()
+      d.io.opcode.peek().litValue mustBe 0x17
+      d.io.rd.peek().litValue mustBe 1
+      d.io.aluOp.peek().litValue mustBe core.Opcodes.ALU_ADD.litValue
+      d.io.rdEn.peek().litToBoolean mustBe true
+      // Check that immediate is properly extracted (0x12345 << 12 = 0x12345000)
+      d.io.immValue.peek().litValue mustBe 0x12345000L
+      d.io.csrEn.peek().litToBoolean mustBe false
     }
   }
 }

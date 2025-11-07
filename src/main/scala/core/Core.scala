@@ -36,9 +36,13 @@ class Core extends Module {
   // === Execute ===
   val alu = Module(new ALU)
   alu.io.op := decoder.io.aluOp
-  alu.io.srcA := regFile.io.rs1Data
+  alu.io.srcA := Mux( // PC for AUIPC, else rs1
+    decoder.io.opcode === Opcodes.OP_AUIPC,
+    pc,
+    regFile.io.rs1Data
+  )
   alu.io.srcB := Mux( // imm value on mem acess or csr, else rs2
-    decoder.io.memAccessEn || decoder.io.csrEn,
+    decoder.io.memAccessEn || decoder.io.csrEn || decoder.io.opcode === Opcodes.OP_AUIPC,
     decoder.io.immValue,
     regFile.io.rs2Data
   )
