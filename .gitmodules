@@ -1,3 +1,6 @@
 [submodule "third_party/riscv-isa-sim"]
 	path = third_party/riscv-isa-sim
 	url = git@github.com:riscv/riscv-isa-sim.git
+[submodule "submodules/ibex"]
+	path = submodules/ibex
+	url = git@github.com:lowrisc/ibex.git

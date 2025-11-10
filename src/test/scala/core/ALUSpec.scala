@@ -7,8 +7,9 @@ import org.scalatest.matchers.must.Matchers
 import core.Opcodes._
 
 class ALUSpec extends AnyFreeSpec with Matchers with ChiselSim {
-  "ALU should perform ADD and SUB correctly" in {
+  "ALU should perform all operations correctly" in {
     simulate(new ALU) { dut =>
+      // Test ADD and SUB
       dut.io.op.poke(ALU_ADD)
       dut.io.srcA.poke(10.U)
       dut.io.srcB.poke(32.U)
@@ -20,11 +21,9 @@ class ALUSpec extends AnyFreeSpec with Matchers with ChiselSim {
       dut.io.srcB.poke(58.U)
       dut.clock.step()
       dut.io.result.expect(42.U)
-    }
-  }
+      dut.clock.step()
 
-  "ALU should perform AND, OR, XOR correctly" in {
-    simulate(new ALU) { dut =>
+      // Test AND, OR, XOR
       dut.io.op.poke(ALU_AND)
       dut.io.srcA.poke("hFF00FF00FF00FF00".U)
       dut.io.srcB.poke("h00FF00FF00FF00FF".U)
@@ -42,11 +41,9 @@ class ALUSpec extends AnyFreeSpec with Matchers with ChiselSim {
       dut.io.srcB.poke("h00FF00FF00FF00FF".U)
       dut.clock.step()
       dut.io.result.expect("hFFFFFFFFFFFFFFFF".U)
-    }
-  }
+      dut.clock.step()
 
-  "ALU should perform SLT and SLTU correctly" in {
-    simulate(new ALU) { dut =>
+      // Test SLT and SLTU
       dut.io.op.poke(ALU_SLT)
       dut.io.srcA.poke((-5).S(64.W).asUInt)
       dut.io.srcB.poke(3.U)
@@ -70,11 +67,9 @@ class ALUSpec extends AnyFreeSpec with Matchers with ChiselSim {
       dut.io.srcB.poke(0.U)
       dut.clock.step()
       dut.io.result.expect(0.U)
-    }
-  }
+      dut.clock.step()
 
-  "ALU should perform SLL, SRL, SRA correctly" in {
-    simulate(new ALU) { dut =>
+      // Test SLL, SRL, SRA
       dut.io.op.poke(ALU_SLL)
       dut.io.srcA.poke(1.U)
       dut.io.srcB.poke(4.U)
@@ -92,11 +87,9 @@ class ALUSpec extends AnyFreeSpec with Matchers with ChiselSim {
       dut.io.srcB.poke(2.U)
       dut.clock.step()
       dut.io.result.expect((-4).S(64.W).asUInt)
-    }
-  }
+      dut.clock.step()
 
-  "ALU should perform MUL, MULH, MULHU, MULHSU correctly" in {
-    simulate(new ALU) { dut =>
+      // Test MUL, MULH, MULHU, MULHSU
       dut.io.op.poke(ALU_MUL)
       dut.io.srcA.poke(7.U)
       dut.io.srcB.poke(6.U)
@@ -123,11 +116,9 @@ class ALUSpec extends AnyFreeSpec with Matchers with ChiselSim {
       dut.clock.step()
       // MULHSU: signed * unsigned, high bits for -1 * 2
       dut.io.result.expect("hFFFFFFFFFFFFFFFF".U)
-    }
-  }
+      dut.clock.step()
 
-  "ALU should perform DIV, DIVU, REM, REMU correctly" in {
-    simulate(new ALU) { dut =>
+      // Test DIV, DIVU, REM, REMU
       dut.io.op.poke(ALU_DIV)
       dut.io.srcA.poke(42.U)
       dut.io.srcB.poke(7.U)

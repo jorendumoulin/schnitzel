@@ -91,6 +91,12 @@ class Decoder extends Module {
       io.rdEn := false.B
     }
     is(OP_IMM) {
+      // Extract and sign-extend 12-bit immediate for I-type instructions
+      val imm12 = instr(31, 20)
+      val imm32 =
+        Cat(Fill(20, imm12(11)), imm12).asSInt.asUInt // Sign-extend to 32 bits
+      io.immValue := imm32
+
       switch(io.funct3) {
         is(F3_ADD_SUB) { io.aluOp := ALU_ADD; io.rdEn := true.B } // ADDI
         is(F3_SLT) { io.aluOp := ALU_SLT; io.rdEn := true.B } // SLTI

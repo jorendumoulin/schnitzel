@@ -6,8 +6,9 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 
 class RegisterFileSpec extends AnyFreeSpec with Matchers with ChiselSim {
-  "RegisterFile should read and write registers correctly" in {
+  "RegisterFile should handle all register operations correctly" in {
     simulate(new RegisterFile) { rf =>
+      // Test: RegisterFile should read and write registers correctly
       // Write to x1
       rf.io.rdAddr.poke(1.U)
       rf.io.rdData.poke(0x123456789abcdef0L.U)
@@ -28,11 +29,9 @@ class RegisterFileSpec extends AnyFreeSpec with Matchers with ChiselSim {
 
       rf.io.rs1Data.expect(0x123456789abcdef0L.U)
       rf.io.rs2Data.expect(0x0fedcba987654321L.U)
-    }
-  }
+      rf.clock.step()
 
-  "RegisterFile should always read zero from x0 and never write to x0" in {
-    simulate(new RegisterFile) { rf =>
+      // Test: RegisterFile should always read zero from x0 and never write to x0
       // Attempt to write to x0
       rf.io.rdAddr.poke(0.U)
       rf.io.rdData.poke(BigInt("FFFFFFFFFFFFFFFF", 16).U(64.W))
@@ -47,12 +46,10 @@ class RegisterFileSpec extends AnyFreeSpec with Matchers with ChiselSim {
 
       rf.io.rs1Data.expect(0.U)
       rf.io.rs2Data.expect(0.U)
-    }
-  }
+      rf.clock.step()
 
-  "RegisterFile should not overwrite registers when rdWrite is false" in {
-    simulate(new RegisterFile) { rf =>
-      // Write to x3
+      // Test: RegisterFile should not overwrite registers when rdWrite is false
+      // Write to x3 (different register to avoid interference)
       rf.io.rdAddr.poke(3.U)
       rf.io.rdData.poke(0xdeadbeefL.U)
       rf.io.rdWrite.poke(true.B)
@@ -64,9 +61,10 @@ class RegisterFileSpec extends AnyFreeSpec with Matchers with ChiselSim {
       rf.io.rdWrite.poke(false.B)
       rf.clock.step()
 
-      // Read from x3
+      // Read from x3 (should still have original value)
       rf.io.rs1Addr.poke(3.U)
       rf.io.rs2Addr.poke(3.U)
+      rf.io.rdWrite.poke(false.B)
       rf.clock.step()
 
       rf.io.rs1Data.expect(0xdeadbeefL.U)
