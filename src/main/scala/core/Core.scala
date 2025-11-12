@@ -1,80 +1,76 @@
 package core
 
 import chisel3._
-import chisel3.util._
-import chisel3.util.Decoupled
+import chisel3.util.HasBlackBoxResource
 
-/** Core: A basic RV64IM CPU implementation */
 class Core extends Module {
+
   val io = IO(new Bundle {
-    val imem = new BusIO(CoreConfig.addrWidth, CoreConfig.instrWidth)
-    val dmem = new BusIO(CoreConfig.addrWidth, CoreConfig.dataWidth)
+
+    val imem =
+      new DecoupledBusIO(
+        CoreConfig.addrWidth,
+        CoreConfig.instrWidth
+      ) // Instruction memory interface
+
+    val dmem =
+      new DecoupledBusIO(
+        CoreConfig.addrWidth,
+        CoreConfig.dataWidth
+      ) // Decoupled data memory interface
   })
 
-  // ============================
-  // === Module Instantiation ===
-  // ============================
+  val ibex = Module(new ibex_top_tracing())
+  ibex.io.clk_i := clock
+  ibex.io.rst_ni := reset
 
-  // === Instruction Fetch ===
-  val pc_start: Int = 0x1000
-  val pc = RegInit(pc_start.U(CoreConfig.addrWidth.W))
-  val fetch = Module(new InstructionFetch)
-  fetch.io.pc := pc
-  fetch.io.imem <> io.imem
+  ibex.io.test_en_i := 1.U
+  ibex.io.scan_rst_ni := 0.U
+  ibex.io.ram_cfg_i := 0.U
 
-  // === Decode ===
-  val decoder = Module(new Decoder)
-  decoder.io.instr := fetch.io.instr
+  ibex.io.hart_id_i := 0.U
+  ibex.io.boot_addr_i := 0.U
 
-  val regFile = Module(new RegisterFile)
-  regFile.io.rs1Addr := decoder.io.rs1
-  regFile.io.rs2Addr := decoder.io.rs2
-  regFile.io.rdAddr := decoder.io.rd
-  regFile.io.rdData := 0.U
-  regFile.io.rdWrite := decoder.io.rdEn
+  // Instruction memory interface
+  io.imem.req.valid := ibex.io.instr_req_o
+  io.imem.req.bits.addr := ibex.io.instr_addr_o
+  io.imem.req.bits.wen := false.B
+  io.imem.req.bits.wdata := 0.U
+  io.imem.rsp.ready := true.B
+  ibex.io.instr_gnt_i := io.imem.req.ready
+  ibex.io.instr_rvalid_i := io.imem.rsp.valid
+  ibex.io.instr_rdata_i := io.imem.rsp.bits.data
+  ibex.io.instr_rdata_intg_i := 0.U
+  ibex.io.instr_err_i := 0.U
 
-  // === Execute ===
-  val alu = Module(new ALU)
-  alu.io.op := decoder.io.aluOp
-  alu.io.srcA := Mux( // PC for AUIPC, else rs1
-    decoder.io.opcode === Opcodes.OP_AUIPC,
-    pc,
-    regFile.io.rs1Data
-  )
-  alu.io.srcB := Mux( // imm value on mem acess or csr, else rs2
-    decoder.io.memAccessEn || decoder.io.csrEn || decoder.io.opcode === Opcodes.OP_AUIPC,
-    decoder.io.immValue,
-    regFile.io.rs2Data
-  )
+  // Data memory interface
+  io.dmem.req.valid := ibex.io.data_req_o
+  io.dmem.req.bits.addr := ibex.io.data_addr_o
+  io.dmem.req.bits.wen := ibex.io.data_we_o
+  io.dmem.req.bits.wdata := ibex.io.data_wdata_o
+  ibex.io.data_gnt_i := io.dmem.req.ready
+  io.dmem.rsp.ready := true.B
+  ibex.io.data_rvalid_i := io.dmem.rsp.valid
+  ibex.io.data_rdata_i := io.dmem.rsp.bits.data
+  ibex.io.data_rdata_intg_i := 0.U
+  ibex.io.data_err_i := 0.U
 
-  // === Memory ===
-  val memory = Module(new MemoryAccess)
-  memory.io.dmem <> io.dmem
-  memory.io.memEn := decoder.io.memAccessEn
-  memory.io.memWe := decoder.io.memWriteEn
-  memory.io.addr := alu.io.result
-  memory.io.wdata := regFile.io.rs2Data
-  val memData = memory.io.rdata
+  // Scrambling
+  ibex.io.scramble_key_i := 0.U
+  ibex.io.scramble_key_valid_i := 0.U
+  ibex.io.scramble_nonce_i := 0.U
 
-  // === Writeback ===
-  val writeBack = Module(new WriteBack)
-  writeBack.io.aluResult := alu.io.result
-  writeBack.io.memResult := memData
-  writeBack.io.memToReg := decoder.io.memAccessEn
-  writeBack.io.csrToReg := decoder.io.csrEn
-  regFile.io.rdData := writeBack.io.rdData
+  // Interrupts
+  ibex.io.irq_software_i := 0.U
+  ibex.io.irq_timer_i := 0.U
+  ibex.io.irq_external_i := 0.U
+  ibex.io.irq_fast_i := 0.U
+  ibex.io.irq_nm_i := 0.U
 
-  // === Extras ===
-  val csr = Module(new CSR)
-  csr.io.addr := decoder.io.immValue
-  csr.io.wdata := regFile.io.rs2Data
-  csr.io.wen := decoder.io.csrEn && decoder.io.memWriteEn
-  csr.io.ren := decoder.io.csrEn && !decoder.io.memWriteEn
-  writeBack.io.csrResult := csr.io.rdata
+  // Debug
+  ibex.io.debug_req_i := 0.U
 
-  // === PC Update ===
-  when(!fetch.io.stall) {
-    pc := pc + 4.U
-  }
+  // Control
+  ibex.io.fetch_enable_i := 0.U
 
 }

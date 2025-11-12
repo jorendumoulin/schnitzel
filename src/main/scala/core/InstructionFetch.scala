@@ -19,7 +19,6 @@ class InstructionFetch extends Module {
 
   // Only read instructions:
   io.imem.req.bits.wen := false.B
-  io.imem.req.bits.ren := true.B
   io.imem.req.bits.wdata := 0.U
 
   // Read address is the program counter

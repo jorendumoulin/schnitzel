@@ -26,7 +26,6 @@ class MemoryAccess extends Module {
   io.dmem.req.bits.addr := io.addr
   io.dmem.req.bits.wdata := io.wdata
   io.dmem.req.bits.wen := io.memWe
-  io.dmem.req.bits.ren := io.memEn && !io.memWe
 
   // Read result from memory
   io.rdata := io.dmem.rsp.data
