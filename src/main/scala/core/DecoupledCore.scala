@@ -23,11 +23,11 @@ class DeocupledCore extends Module {
   val core = Module(new Core)
 
   // Standard imem interfance is simply connected through.
-  io.imem <> core.io.imem
+  // io.imem <> core.io.imem
 
   // Load-store unit to handle the decoupled data interface.
   val lsu = Module(new LSU(CoreConfig.addrWidth, CoreConfig.dataWidth))
-  lsu.io.in <> core.io.dmem
+  // lsu.io.in <> core.io.dmem
   io.dmem <> lsu.io.out
 
 }

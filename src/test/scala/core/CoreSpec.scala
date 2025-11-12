@@ -25,18 +25,20 @@ class CoreSpec extends AnyFreeSpec with Matchers with ChiselSim {
       // Issue LW instruction: lw x1, 12(x2)
       val lwInstr = "h00c12083".U(32.W)
       dut.io.imem.req.ready.poke(true.B)
-      dut.io.imem.rsp.data.poke(lwInstr)
+      dut.io.imem.rsp.bits.data.poke(lwInstr)
+      dut.io.imem.rsp.valid.poke(true.B)
 
       // Expect the core to issue a memory read request
       dut.io.dmem.req.valid.expect(true.B)
-      dut.io.dmem.req.bits.ren.expect(true.B)
+      dut.io.dmem.req.bits.wen.expect(false.B)
       dut.clock.step()
 
       // Test: Core should execute sw instruction
       // Issue a SW instruction: SW x1, 8(x2)
       val swInstr = "h00112423".U(32.W)
       dut.io.imem.req.ready.poke(true.B)
-      dut.io.imem.rsp.data.poke(swInstr)
+      dut.io.imem.rsp.bits.data.poke(swInstr)
+      dut.io.imem.rsp.valid.poke(true.B)
 
       // Expect the core to issue a memory write request
       dut.io.dmem.req.valid.expect(true.B)
@@ -48,7 +50,8 @@ class CoreSpec extends AnyFreeSpec with Matchers with ChiselSim {
       // Issue ADDI instruction: addi x11, x11, 28
       val addiInstr = "h01c58593".U(32.W)
       dut.io.imem.req.ready.poke(true.B)
-      dut.io.imem.rsp.data.poke(addiInstr)
+      dut.io.imem.rsp.bits.data.poke(addiInstr)
+      dut.io.imem.rsp.valid.poke(true.B)
 
       // For ADDI, no memory request should be made
       // The core should just proceed to the next instruction

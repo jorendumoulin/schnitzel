@@ -16,7 +16,7 @@ class LSU(addrWidth: Int, dataWidth: Int) extends Module {
   io.out.req <> io.in.req
 
   // On a read request, only assert the valid signal when the response has arrived.
-  when(io.in.req.bits.ren) {
+  when(!io.in.req.bits.wen) {
     io.in.req.valid := io.out.rsp.valid
   }
 

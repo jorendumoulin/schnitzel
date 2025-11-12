@@ -10,7 +10,6 @@ class BusReq(addrWidth: Int, dataWidth: Int) extends Bundle {
   val addr = UInt(addrWidth.W)
   val wdata = UInt(dataWidth.W)
   val wen = Bool()
-  val ren = Bool()
 }
 
 class BusRsp(dataWidth: Int) extends Bundle {
