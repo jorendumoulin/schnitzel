@@ -92,14 +92,19 @@ class ibex_top_tracing
 
   val resources = Paths.get(getClass.getClassLoader.getResource(".").toURI())
 
-  Files.list(resources.resolve("ibex-rtl")).forEach { p =>
-    println(s"Adding Ibex resource: ${resources.relativize(p).toString()}")
-    addResource(resources.relativize(p).toString())
-  }
+  addResource("/lc-ctrl/lc_ctrl_pkg.sv")
+  addResource("/lc-ctrl/lc_ctrl_state_pkg.sv")
 
   Files.list(resources.resolve("ibex-ip")).forEach { p =>
     println(s"Adding Ibex resource: ${resources.relativize(p).toString()}")
     addResource(resources.relativize(p).toString())
   }
+
+  Files.list(resources.resolve("ibex-rtl")).forEach { p =>
+    println(s"Adding Ibex resource: ${resources.relativize(p).toString()}")
+    addResource(resources.relativize(p).toString())
+  }
+
+  addResource("/ibex-dv/dv_fcov_macros.vh")
 
 }
