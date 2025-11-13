@@ -1,6 +1,3 @@
 [submodule "submodules/ibex"]
 	path = submodules/ibex
 	url = git@github.com:jorendumoulin/ibex.git
-[submodule "submodules/opentitan"]
-	path = submodules/opentitan
-	url = git@github.com:lowrisc/opentitan.git
