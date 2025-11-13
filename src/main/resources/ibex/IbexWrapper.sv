@@ -1,6 +1,6 @@
 // Simple wrapper exposing useful ports and configuring Ibex parameters to the 'small' configuration.
 
-module IbexWrapper (
+module ibex_wrapper (
     // Clock and Reset
     input clk_i,
     input rst_ni,
@@ -15,7 +15,6 @@ module IbexWrapper (
     input  logic        instr_rvalid_i,
     output logic [31:0] instr_addr_o,
     input  logic [31:0] instr_rdata_i,
-    input  logic [ 6:0] instr_rdata_intg_i,
     input  logic        instr_err_i,
 
     // Data memory interface
@@ -63,7 +62,7 @@ module IbexWrapper (
       .instr_rvalid_i,
       .instr_addr_o,
       .instr_rdata_i,
-      .instr_rdata_intg_i,
+      .instr_rdata_intg_i(),
       .instr_err_i,
 
       .data_req_o,
