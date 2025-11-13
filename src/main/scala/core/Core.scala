@@ -20,13 +20,9 @@ class Core extends Module {
       ) // Decoupled data memory interface
   })
 
-  val ibex = Module(new ibex_top_tracing())
+  val ibex = Module(new ibex_wrapper())
   ibex.io.clk_i := clock
   ibex.io.rst_ni := reset
-
-  ibex.io.test_en_i := 1.U
-  ibex.io.scan_rst_ni := 0.U
-  ibex.io.ram_cfg_i := 0.U
 
   ibex.io.hart_id_i := 0.U
   ibex.io.boot_addr_i := 0.U
@@ -40,7 +36,6 @@ class Core extends Module {
   ibex.io.instr_gnt_i := io.imem.req.ready
   ibex.io.instr_rvalid_i := io.imem.rsp.valid
   ibex.io.instr_rdata_i := io.imem.rsp.bits.data
-  ibex.io.instr_rdata_intg_i := 0.U
   ibex.io.instr_err_i := 0.U
 
   // Data memory interface
@@ -52,25 +47,6 @@ class Core extends Module {
   io.dmem.rsp.ready := true.B
   ibex.io.data_rvalid_i := io.dmem.rsp.valid
   ibex.io.data_rdata_i := io.dmem.rsp.bits.data
-  ibex.io.data_rdata_intg_i := 0.U
   ibex.io.data_err_i := 0.U
-
-  // Scrambling
-  ibex.io.scramble_key_i := 0.U
-  ibex.io.scramble_key_valid_i := 0.U
-  ibex.io.scramble_nonce_i := 0.U
-
-  // Interrupts
-  ibex.io.irq_software_i := 0.U
-  ibex.io.irq_timer_i := 0.U
-  ibex.io.irq_external_i := 0.U
-  ibex.io.irq_fast_i := 0.U
-  ibex.io.irq_nm_i := 0.U
-
-  // Debug
-  ibex.io.debug_req_i := 0.U
-
-  // Control
-  ibex.io.fetch_enable_i := 0.U
 
 }
