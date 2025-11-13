@@ -1,7 +1,7 @@
 # Flatten Ibex to a single file, loosely based on https://github.com/ucb-bar/ibex-wrapper
 
 dir := $(abspath .)
-ibex := $(dir)/ibex
+ibex := $(dir)/../../../../submodules/ibex
 
 FLATTENED_VERILOG := IbexWrapperFlattened.sv
 
