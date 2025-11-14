@@ -2,11 +2,19 @@ package core
 
 import chisel3._
 import chisel3.simulator.scalatest.ChiselSim
+import svsim.BackendSettingsModifications
+import svsim.verilator.Backend.CompilationSettings
 import org.scalatest.freespec.AnyFreeSpec
 import core.Opcodes._
 import org.scalatest.matchers.must.Matchers
 
 class CoreSpec extends AnyFreeSpec with Matchers with ChiselSim {
+
+  // Disable UNOPTFLAT warnings
+  implicit val se: BackendSettingsModifications = {
+    case v: CompilationSettings => v.copy(disabledWarnings = Seq("UNOPTFLAT"))
+    case other                  => other
+  }
 
   "Core should handle all operations correctly" in {
     simulate(new Core) { dut =>
