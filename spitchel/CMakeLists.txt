@@ -58,6 +58,7 @@ target_include_directories(spitchel PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${FESVR_INCLUDE_DIRS}
   ${VERILATOR_ROOT}/include
+  ${VERILATOR_ROOT}/include/vltstd
   ${VERILATED_DIR}
 )
 

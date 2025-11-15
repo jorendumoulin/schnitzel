@@ -165,9 +165,13 @@ private:
 
   /** Handle instruction memory bus requests */
   void handle_imem();
+  bool imem_response_next;
+  uint32_t imem_response_data;
 
   /** Handle data memory bus requests */
   void handle_dmem();
+  bool dmem_response_next;
+  uint32_t dmem_response_data;
 
   /** Check for HTIF communication (tohost/fromhost) */
   void check_htif();

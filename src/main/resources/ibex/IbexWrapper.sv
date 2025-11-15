@@ -31,7 +31,7 @@ module ibex_wrapper (
 
   // Based on ibex_simple_system.sv
 
-  ibex_top #(
+  ibex_top_tracing #(
       .RV32E(0),
       .RV32M(ibex_pkg::RV32MFast),
       .RV32B(ibex_pkg::RV32BNone),
@@ -52,7 +52,7 @@ module ibex_wrapper (
   ) i_ibex (
       .clk_i,
       .rst_ni,
-      .test_en_i  (1'b0),
+      .test_en_i  (1'b1),
       .ram_cfg_i  (prim_ram_1p_pkg::RAM_1P_CFG_DEFAULT),
       .hart_id_i  (32'b0),
       .boot_addr_i(32'h1000),
