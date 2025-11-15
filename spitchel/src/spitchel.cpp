@@ -11,7 +11,8 @@ spitchel_t::spitchel_t(const std::vector<std::string> &args)
     : htif_t(args), core(nullptr), context(nullptr), trace(nullptr),
       mem_base(0x1000), mem_size(128 * 1024 * 1024), cycle_count(0),
       max_cycles(0), instr_count(0), verbose(false), sim_finished(false),
-      imem_req_pending(false), dmem_req_pending(false) {
+      imem_req_pending(false), dmem_req_pending(false),
+      imem_response_next(false), dmem_response_next(false) {
 
   mem.resize(mem_size, 0);
   init_core();
@@ -21,15 +22,17 @@ spitchel_t::~spitchel_t() { cleanup_core(); }
 
 void spitchel_t::init_core() {
   context = new VerilatedContext;
+  context->commandArgs(0, (char **)nullptr);
+
   core = new VCore(context);
 
   // Initialize signals
   core->clock = 0;
   core->reset = 0;
   core->io_imem_req_ready = 0;
-  core->io_imem_rsp_data = 0;
+  core->io_imem_rsp_bits_data = 0;
   core->io_dmem_req_ready = 0;
-  core->io_dmem_rsp_data = 0;
+  core->io_dmem_rsp_bits_data = 0;
 
   core->eval();
 }
@@ -46,10 +49,17 @@ void spitchel_t::cleanup_core() {
 
 void spitchel_t::reset() {
   // Reset the core
-  core->reset = 1;
-  tick();
-  tick();
   core->reset = 0;
+  tick();
+  tick();
+  tick();
+  tick();
+  tick();
+  tick();
+  tick();
+  tick();
+  tick();
+  core->reset = 1;
   tick();
 
   cycle_count = 0;
@@ -128,19 +138,28 @@ void spitchel_t::handle_imem() {
   // Always ready to serve instruction requests
   core->io_imem_req_ready = 1;
 
+  // Serve response
+  if (imem_response_next) {
+    core->io_imem_rsp_bits_data = imem_response_data;
+    core->io_imem_rsp_valid = 1;
+    imem_response_next = false;
+  } else {
+    core->io_imem_rsp_valid = 0;
+  }
+
+  // Get request
   if (core->io_imem_req_valid) {
     uint64_t addr = core->io_imem_req_bits_addr;
 
     if (is_valid_addr(addr, 4)) {
       size_t offset = addr_to_offset(addr);
-      uint32_t instr = *(uint32_t *)&mem[offset];
-      core->io_imem_rsp_data = instr;
+      imem_response_next = true;
+      imem_response_data = *(uint32_t *)&mem[offset];
 
       if (verbose) {
-        log("IMEM: addr=0x%lx instr=0x%08x\n", addr, instr);
+        log("IMEM: addr=0x%lx instr=0x%08x\n", addr, imem_response_data);
       }
     } else {
-      core->io_imem_rsp_data = 0;
       if (verbose) {
         log("IMEM: invalid address 0x%lx\n", addr);
       }
@@ -166,20 +185,24 @@ void spitchel_t::handle_dmem() {
           log("DMEM WRITE: addr=0x%lx data=0x%016lx\n", addr, data);
         }
       }
-    } else if (core->io_dmem_req_bits_ren) {
+    } else {
       // Read request
       if (is_valid_addr(addr, 8)) {
         size_t offset = addr_to_offset(addr);
         uint64_t data = *(uint64_t *)&mem[offset];
-        core->io_dmem_rsp_data = data;
+        core->io_dmem_rsp_bits_data = data;
+        core->io_dmem_rsp_valid = 1;
 
         if (verbose) {
           log("DMEM READ: addr=0x%lx data=0x%016lx\n", addr, data);
         }
       } else {
-        core->io_dmem_rsp_data = 0;
+        core->io_dmem_rsp_bits_data = 0;
+        core->io_dmem_rsp_valid = 1;
       }
     }
+  } else {
+    core->io_dmem_rsp_valid = 0;
   }
 }
 
@@ -198,12 +221,12 @@ extern unsigned char bootrom_data[];
 extern unsigned int bootrom_data_len;
 
 void spitchel_t::load_bootrom() {
-  // Load bootrom at starting address 0x1000
-  write_chunk(0x1000, bootrom_data_len, bootrom_data);
+  // Load bootrom at starting address 0x1080
+  write_chunk(0x1080, bootrom_data_len, bootrom_data);
 
   // Overwrite starting address with entry point of binary
   uint32_t e = get_entry_point();
-  write_chunk(0x1000 + bootrom_data_len - 4, 4, &e);
+  write_chunk(0x1080 + bootrom_data_len - 4, 4, &e);
 
   if (verbose) {
     log("Finished loading program\n", e);

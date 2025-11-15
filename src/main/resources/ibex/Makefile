@@ -10,6 +10,7 @@ default: $(FLATTENED_VERILOG)
 
 IBEX_PKGS := \
 	$(ibex)/rtl/ibex_pkg.sv \
+	$(ibex)/rtl/ibex_tracer_pkg.sv \
 	$(ibex)/vendor/lowrisc_ip/ip/prim/rtl/prim_assert.sv \
 	$(ibex)/vendor/lowrisc_ip/ip/prim/rtl/prim_ram_1p_pkg.sv \
 	$(ibex)/vendor/lowrisc_ip/ip/prim/rtl/prim_cipher_pkg.sv \
@@ -42,6 +43,8 @@ IBEX_VSRCS := \
 	$(ibex)/rtl/ibex_register_file_fpga.sv \
 	$(ibex)/rtl/ibex_register_file_latch.sv \
 	$(ibex)/rtl/ibex_top.sv \
+	$(ibex)/rtl/ibex_tracer.sv \
+	$(ibex)/rtl/ibex_top_tracing.sv \
 	$(ibex)/rtl/ibex_wb_stage.sv \
 	$(ibex)/dv/uvm/core_ibex/common/prim/prim_clock_gating.sv \
 	$(ibex)/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_generic_clock_gating.sv \
@@ -66,7 +69,7 @@ IBEX_INCLUDES := \
 
 # Flatten Ibex to a single file using verilog, comment out all resulting ` line references.
 $(FLATTENED_VERILOG): $(IBEX_SRCS)
-	verilator -sv -E $(IBEX_INCLUDES) $(IBEX_SRCS) > $@
+	verilator -sv -E +define+RVFI $(IBEX_INCLUDES) $(IBEX_SRCS) > $@
 	sed -i '/^`/s/^/\/\//' $@
 
 clean:
