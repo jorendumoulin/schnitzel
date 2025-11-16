@@ -171,6 +171,15 @@ void spitchel_t::handle_dmem() {
   // Always ready to serve data requests
   core->io_dmem_req_ready = 1;
 
+  // Serve response
+  if (dmem_response_next) {
+    core->io_dmem_rsp_bits_data = dmem_response_data;
+    core->io_dmem_rsp_valid = 1;
+    dmem_response_next = false;
+  } else {
+    core->io_dmem_rsp_valid = 0;
+  }
+
   if (core->io_dmem_req_valid) {
     uint64_t addr = core->io_dmem_req_bits_addr;
 
@@ -189,20 +198,15 @@ void spitchel_t::handle_dmem() {
       // Read request
       if (is_valid_addr(addr, 8)) {
         size_t offset = addr_to_offset(addr);
-        uint64_t data = *(uint64_t *)&mem[offset];
-        core->io_dmem_rsp_bits_data = data;
-        core->io_dmem_rsp_valid = 1;
+        dmem_response_next = true;
+        dmem_response_data = *(uint32_t *)&mem[offset];
 
         if (verbose) {
-          log("DMEM READ: addr=0x%lx data=0x%016lx\n", addr, data);
+          log("DMEM READ: addr=0x%lx data=0x%016lx\n", addr,
+              dmem_response_data);
         }
-      } else {
-        core->io_dmem_rsp_bits_data = 0;
-        core->io_dmem_rsp_valid = 1;
       }
     }
-  } else {
-    core->io_dmem_rsp_valid = 0;
   }
 }
 
