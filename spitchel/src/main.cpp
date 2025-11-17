@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     sim.enable_trace("./sim.vcd");
 
     // Run simulation
-    return sim.run();
+    return sim.run_htif();
 
   } catch (const std::exception &e) {
     fprintf(stderr, "Error: %s\n", e.what());

@@ -4,8 +4,9 @@ add_executable(bootrom bootrom.S )
 target_link_options(bootrom PRIVATE
     -nostdlib
     -nostartfiles
-    -Wl,--section-start=.text=0x1000
+    -Wl,--image-base=0x1000,--section-start=.text=0x1000
     -Wl,-e,_start
+    -fuse-ld=lld
 )
 
 # Dump bootrom as binary after building
