@@ -3,17 +3,20 @@
 #ifndef __SPITCHEL_H
 #define __SPITCHEL_H
 
+#include <VCore.h>
 #include <cstdint>
-#include <fesvr/context.h>
-#include <fesvr/htif.h>
-#include <fesvr/memif.h>
+#include <elfio/elfio.hpp>
+#include <loader.h>
+#include <memory.h>
 #include <string>
 #include <vector>
+#include <verilated.h>
+#include <verilated_vcd_c.h>
 
 // Forward declarations for Verilator
-class VCore;
-class VerilatedContext;
-class VerilatedVcdC;
+// class VCore;
+// class VerilatedContext;
+// class VerilatedVcdC;
 
 /** spitchel_t: RISC-V simulator using verilated Schnitzel core
  *
@@ -25,24 +28,20 @@ class VerilatedVcdC;
  * - fesvr's memory interface (for loading ELF, syscalls)
  * - Schnitzel's BusIO interface (for instruction/data memory)
  */
-class spitchel_t : public htif_t {
+class Sim {
 public:
   /** Constructor with vector of arguments
    * @param args Command line arguments
    */
-  spitchel_t(const std::vector<std::string> &args);
+  Sim(const std::vector<std::string> &args);
 
   /** Destructor */
-  virtual ~spitchel_t();
+  virtual ~Sim();
 
   /** Main simulation loop
    * @return Exit code from the simulated program
    */
   int run();
-
-  int main();
-
-  int run_htif();
 
   /** Enable/disable VCD tracing
    * @param filename VCD file to write to (nullptr to disable)
@@ -56,49 +55,13 @@ public:
   void set_max_cycles(uint64_t cycles) { max_cycles = cycles; }
 
 protected:
-  // ========================================
-  // Required htif_t virtual method overrides
-  // ========================================
-
   /** Reset the core to initial state */
-  virtual void reset() override;
-
-  /** Read a chunk of memory
-   * @param taddr Target address
-   * @param len Length to read
-   * @param dst Destination buffer
-   */
-  virtual void read_chunk(addr_t taddr, size_t len, void *dst) override;
-
-  /** Write a chunk of memory
-   * @param taddr Target address
-   * @param len Length to write
-   * @param src Source buffer
-   */
-  virtual void write_chunk(addr_t taddr, size_t len, const void *src) override;
-
-  /** Clear a chunk of memory (fill with zeros)
-   * @param taddr Target address
-   * @param len Length to clear
-   */
-  virtual void clear_chunk(addr_t taddr, size_t len) override;
-
-  /** Get chunk alignment requirement */
-  virtual size_t chunk_align() override { return 8; }
-
-  /** Get maximum chunk size */
-  virtual size_t chunk_max_size() override { return 64; }
-
-  /** Idle function called during simulation */
-  virtual void idle() override;
+  void reset();
 
 private:
   // ========================================
   // Verilator components
   // ========================================
-
-  context_t *context_test;
-  context_t context_target;
 
   /** Verilated core instance */
   VCore *core;
@@ -109,24 +72,8 @@ private:
   /** VCD trace file */
   VerilatedVcdC *trace;
 
-  // ========================================
-  // Memory subsystem
-  // ========================================
-
-  /** Main memory storage */
-  std::vector<uint8_t> mem;
-
-  /** Base address of memory */
-  addr_t mem_base;
-
-  /** Size of memory in bytes */
-  size_t mem_size;
-
-  /** Check if address is in valid memory range */
-  bool is_valid_addr(addr_t addr, size_t len) const;
-
-  /** Convert target address to memory array offset */
-  size_t addr_to_offset(addr_t addr) const;
+  Memory memory;
+  Loader loader;
 
   // ========================================
   // Simulation state
@@ -153,11 +100,11 @@ private:
 
   /** Pending instruction memory request */
   bool imem_req_pending;
-  addr_t imem_req_addr;
+  size_t imem_req_addr;
 
   /** Pending data memory request */
   bool dmem_req_pending;
-  addr_t dmem_req_addr;
+  size_t dmem_req_addr;
   bool dmem_req_wen;
   uint64_t dmem_req_wdata;
 
@@ -180,9 +127,6 @@ private:
   void handle_dmem();
   bool dmem_response_next;
   uint32_t dmem_response_data;
-
-  /** Check for HTIF communication (tohost/fromhost) */
-  void check_htif();
 
   /** Initialize the verilated core */
   void init_core();

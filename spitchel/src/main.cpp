@@ -1,4 +1,4 @@
-#include "spitchel.h"
+#include "sim.h"
 #include <argparse/argparse.hpp>
 #include <vector>
 
@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     // Create simulator
     std::vector<std::string> program_args;
     program_args.push_back(program.get("program"));
-    spitchel_t sim(program_args);
+    Sim sim(program_args);
 
     // Configure
     sim.set_verbose(program.get<bool>("verbose"));
@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     sim.enable_trace("./sim.vcd");
 
     // Run simulation
-    return sim.run_htif();
+    return sim.run();
 
   } catch (const std::exception &e) {
     fprintf(stderr, "Error: %s\n", e.what());

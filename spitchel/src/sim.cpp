@@ -1,0 +1,253 @@
+#include "sim.h"
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+Sim::Sim(const std::vector<std::string> &args)
+    : core(nullptr), context(nullptr), trace(nullptr), cycle_count(0),
+      memory(1024 * 1024), max_cycles(0), instr_count(0), verbose(false),
+      sim_finished(false), imem_req_pending(false), dmem_req_pending(false),
+      imem_response_next(false), dmem_response_next(false) {
+
+  init_core();
+  loader.load_program(args[0], memory);
+}
+
+Sim::~Sim() { cleanup_core(); }
+
+void Sim::init_core() {
+  context = new VerilatedContext;
+  context->commandArgs(0, (char **)nullptr);
+
+  core = new VCore(context);
+
+  // Initialize signals
+  core->clock = 0;
+  core->reset = 0;
+  core->io_imem_req_ready = 0;
+  core->io_imem_rsp_bits_data = 0;
+  core->io_dmem_req_ready = 0;
+  core->io_dmem_rsp_bits_data = 0;
+
+  core->eval();
+}
+
+void Sim::cleanup_core() {
+  if (core) {
+    core->final();
+    delete core;
+  }
+  if (context) {
+    delete context;
+  }
+}
+
+void Sim::reset() {
+  // Reset the core
+  core->reset = 0;
+  tick();
+  tick();
+  core->reset = 1;
+  tick();
+
+  cycle_count = 0;
+  instr_count = 0;
+  sim_finished = false;
+}
+
+void Sim::tick() {
+  // Drive low phase
+  core->clock = 0;
+  core->eval();
+  if (trace) {
+    trace->dump(context->time());
+  }
+  context->timeInc(1);
+
+  // Drive high phase
+  core->clock = 1;
+  core->eval();
+  if (trace) {
+    trace->dump(context->time());
+  }
+  context->timeInc(1);
+
+  cycle_count++;
+}
+
+void Sim::handle_imem() {
+  // Always ready to serve instruction requests
+  core->io_imem_req_ready = 1;
+
+  // Serve response
+  if (imem_response_next) {
+    core->io_imem_rsp_bits_data = imem_response_data;
+    core->io_imem_rsp_valid = 1;
+    imem_response_next = false;
+  } else {
+    core->io_imem_rsp_valid = 0;
+  }
+
+  // Get request
+  if (core->io_imem_req_valid) {
+    uint64_t addr = core->io_imem_req_bits_addr;
+
+    size_t offset = addr;
+    imem_response_next = true;
+    imem_response_data = memory.read_word(offset);
+
+    if (verbose) {
+      log("IMEM: addr=0x%lx instr=0x%08x\n", addr, imem_response_data);
+    }
+  }
+}
+
+void Sim::handle_dmem() {
+  // Always ready to serve data requests
+  core->io_dmem_req_ready = 1;
+
+  // Serve response
+  if (dmem_response_next) {
+    core->io_dmem_rsp_bits_data = dmem_response_data;
+    core->io_dmem_rsp_valid = 1;
+    dmem_response_next = false;
+  } else {
+    core->io_dmem_rsp_valid = 0;
+  }
+
+  if (core->io_dmem_req_valid) {
+    uint64_t addr = core->io_dmem_req_bits_addr;
+
+    if (core->io_dmem_req_bits_wen) {
+      // Write request
+      uint64_t data = core->io_dmem_req_bits_wdata;
+      memory.write_word(addr, data);
+
+      dmem_response_next = true;
+      dmem_response_data = memory.read_word(addr);
+
+      if (verbose) {
+        log("DMEM WRITE: addr=0x%lx data=0x%016lx\n", addr, data);
+      }
+    } else {
+      // Read request
+      dmem_response_next = true;
+      dmem_response_data = memory.read_word(addr);
+
+      if (verbose) {
+        log("DMEM READ: addr=0x%lx data=0x%016lx\n", addr, dmem_response_data);
+      }
+    }
+  }
+}
+
+// Bootloader binary provided by cmake build process
+extern unsigned char bootrom_data[];
+extern unsigned int bootrom_data_len;
+
+void Sim::load_bootrom() {
+  // Load bootrom at starting address 0x1080
+  memory.write_chunk(0x1080, bootrom_data_len, bootrom_data);
+
+  // Overwrite starting address with entry point of binary
+  uint32_t e = loader.get_entry_point();
+  memory.write_chunk(0x1080 + bootrom_data_len - 4, 4, &e);
+
+  if (verbose) {
+    log("Finished loading program\n", e);
+  }
+}
+
+int Sim::run() {
+
+  if (verbose) {
+    fprintf(stderr, "Loading program...\n");
+  }
+
+  // Load the bootloader into memory
+  load_bootrom();
+
+  if (verbose) {
+    uint32_t e = loader.get_entry_point();
+    log("Entry point at 0x%x\n", e);
+  }
+
+  if (verbose) {
+    fprintf(stderr, "Resetting core...\n");
+  }
+
+  // Reset the core
+  reset();
+
+  if (verbose) {
+    fprintf(stderr, "Starting simulation...\n");
+  }
+
+  // Main simulation loop
+  while (true) {
+    // Handle bus interfaces before clock tick
+    handle_imem();
+    handle_dmem();
+
+    // Clock tick
+    tick();
+
+    // Check max cycles limit
+    if (max_cycles > 0 && cycle_count >= max_cycles) {
+      if (verbose) {
+        fprintf(stderr, "Reached maximum cycles: %lu\n", cycle_count);
+      }
+      break;
+    }
+
+    // Periodic progress update
+    if (verbose && (cycle_count % 10000) == 0) {
+      fprintf(stderr, "Cycle: %lu\n", cycle_count);
+    }
+  }
+
+  if (trace) {
+    if (verbose) {
+      fprintf(stderr, "Closing VCD trace\n");
+    }
+    trace->close();
+    delete trace;
+    trace = nullptr;
+  }
+
+  if (verbose) {
+    fprintf(stderr, "Simulation finished after %lu cycles\n", cycle_count);
+  }
+
+  return 0;
+}
+
+void Sim::enable_trace(const char *filename) {
+  if (verbose) {
+    fprintf(stderr, "Enabling VCD tracing to %s\n", filename);
+  }
+  context->traceEverOn(true);
+  trace = new VerilatedVcdC;
+  core->trace(trace, 99);
+  trace->open(filename);
+  trace->dump(context->time());
+}
+
+void Sim::log(const char *format, ...) {
+  if (!verbose)
+    return;
+
+  va_list args;
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
+}
+
+void Sim::print_core_state() {
+  if (!verbose)
+    return;
+
+  fprintf(stderr, "Cycle: %lu, PC: 0x%lx\n", cycle_count,
+          (uint64_t)core->io_imem_req_bits_addr);
+}
