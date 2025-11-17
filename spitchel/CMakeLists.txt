@@ -49,13 +49,15 @@ add_dependencies(bootrom_data bootrom)
 # Spitchel executable
 add_executable(spitchel
   src/main.cpp
-  src/spitchel.cpp
+  src/sim.cpp
+  src/memory.cpp
+  src/loader.cpp
 )
 
 add_dependencies(spitchel verilate)
 
 target_include_directories(spitchel PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${FESVR_INCLUDE_DIRS}
   ${VERILATOR_ROOT}/include
   ${VERILATOR_ROOT}/include/vltstd
