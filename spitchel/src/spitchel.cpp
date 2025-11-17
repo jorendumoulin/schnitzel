@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fesvr/htif.h>
 #include <verilated.h>
 #include <verilated_vcd_c.h>
 
@@ -47,16 +48,26 @@ void spitchel_t::cleanup_core() {
   }
 }
 
+void sim_thread_main(void *arg) { ((spitchel_t *)arg)->main(); }
+
+int spitchel_t::main() {
+  htif_t::run();
+  // hello
+  while (true)
+    idle();
+  return 0;
+}
+
+int spitchel_t::run_htif() {
+  context_test = context_t::current();
+  context_target.init(sim_thread_main, this);
+  context_target.switch_to();
+  return (exit_code() << 1 | done());
+}
+
 void spitchel_t::reset() {
   // Reset the core
   core->reset = 0;
-  tick();
-  tick();
-  tick();
-  tick();
-  tick();
-  tick();
-  tick();
   tick();
   tick();
   core->reset = 1;
@@ -130,6 +141,8 @@ void spitchel_t::tick() {
     trace->dump(context->time());
   }
   context->timeInc(1);
+
+  context_test->switch_to();
 
   cycle_count++;
 }
@@ -216,6 +229,7 @@ void spitchel_t::check_htif() {
 }
 
 void spitchel_t::idle() {
+  context_target.switch_to();
   // Called periodically by htif_t
   // Could add progress updates here
 }

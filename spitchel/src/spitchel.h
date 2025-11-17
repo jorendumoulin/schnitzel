@@ -4,6 +4,7 @@
 #define __SPITCHEL_H
 
 #include <cstdint>
+#include <fesvr/context.h>
 #include <fesvr/htif.h>
 #include <fesvr/memif.h>
 #include <string>
@@ -38,6 +39,10 @@ public:
    * @return Exit code from the simulated program
    */
   int run();
+
+  int main();
+
+  int run_htif();
 
   /** Enable/disable VCD tracing
    * @param filename VCD file to write to (nullptr to disable)
@@ -91,6 +96,9 @@ private:
   // ========================================
   // Verilator components
   // ========================================
+
+  context_t *context_test;
+  context_t context_target;
 
   /** Verilated core instance */
   VCore *core;

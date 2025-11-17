@@ -2,3 +2,4 @@
 include("${TOOLCHAIN_ROOT}/riscv-toolchain.cmake")
 
 add_subdirectory(bootrom)
+add_subdirectory(runtime)
