@@ -128,6 +128,8 @@ private:
   bool dmem_response_next;
   uint32_t dmem_response_data;
 
+  int handle_host();
+
   /** Initialize the verilated core */
   void init_core();
 

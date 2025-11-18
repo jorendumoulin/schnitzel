@@ -2,6 +2,7 @@ package core
 
 import chisel3._
 import chisel3.util.HasBlackBoxResource
+import chisel3.util.Fill
 
 class Core extends Module {
 
@@ -31,6 +32,7 @@ class Core extends Module {
   io.imem.req.valid := ibex.io.instr_req_o
   io.imem.req.bits.addr := ibex.io.instr_addr_o
   io.imem.req.bits.wen := false.B
+  io.imem.req.bits.ben := Fill(4, 1.U);
   io.imem.req.bits.wdata := 0.U
   io.imem.rsp.ready := true.B
   ibex.io.instr_gnt_i := io.imem.req.ready
@@ -42,6 +44,7 @@ class Core extends Module {
   io.dmem.req.valid := ibex.io.data_req_o
   io.dmem.req.bits.addr := ibex.io.data_addr_o
   io.dmem.req.bits.wen := ibex.io.data_we_o
+  io.dmem.req.bits.ben := ibex.io.data_be_o
   io.dmem.req.bits.wdata := ibex.io.data_wdata_o
   ibex.io.data_gnt_i := io.dmem.req.ready
   io.dmem.rsp.ready := true.B

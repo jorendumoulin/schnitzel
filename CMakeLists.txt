@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 project(schnitzel)
 
 # Global paths:
@@ -8,4 +10,5 @@ set(GENERATED_DIR ${PROJECT_ROOT}/generated)
 set(VERILATED_DIR ${PROJECT_ROOT}/verilated)
 
 add_subdirectory(sw)
+add_subdirectory(tests/apps)
 add_subdirectory(spitchel)
