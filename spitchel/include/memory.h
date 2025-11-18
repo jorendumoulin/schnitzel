@@ -25,6 +25,7 @@ public:
 
   uint32_t read_word(size_t addr);
   void write_word(size_t addr, uint32_t val);
+  void write_word(size_t addr, uint32_t val, uint32_t strobe);
 
   /** Main memory storage */
   std::vector<uint8_t> mem;

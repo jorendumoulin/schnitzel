@@ -9,17 +9,12 @@
 // Putchar buffer size per hart.
 #define PUTC_BUFFER_LEN 256
 
-// HTIF communication registers
-struct htif_regs {
-    volatile uintptr_t tohost;
-    volatile uintptr_t fromhost;
-};
-
-struct htif_regs htif __attribute__((section(".tohost")));
+volatile uintptr_t tohost __attribute__((section(".tohost"), used));
+volatile uintptr_t fromhost __attribute__((section(".fromhost"), used));
 
 struct putc_buffer_hdr {
     size_t size;            /* current number of bytes in data[] */
-    uint64_t syscall_mem[8];/* syscall descriptor used by host when flushing */
+    uint32_t syscall_mem[8];/* syscall descriptor used by host when flushing */
 };
 
 /* Putchar buffers */
@@ -47,17 +42,17 @@ static void flush_buffer(struct putc_buffer *buf)
     h->syscall_mem[3] = h->size;                /* length */
 
     /* Trigger the host by writing the pointer to syscall_mem into tohost */
-    htif.tohost = (uintptr_t)h->syscall_mem;
+    tohost = (uintptr_t)h->syscall_mem;
 
     /* Busy-wait for host response */
-    while (htif.fromhost == 0);
+    while (fromhost == 0);
 
     /* Reset the host signal and our buffer */
-    htif.fromhost = 0;
+    fromhost = 0;
     h->size = 0;
 }
 
-void _putchar(char ch)
+void putchar_(char ch)
 {
     unsigned int hart = 0; // TODO: replace with snrt_hartid() or equivalent
 
@@ -79,19 +74,7 @@ void htif_exit(int code)
     volatile uint64_t exit_syscall[4];
     exit_syscall[0] = 93;    /* exit */
     exit_syscall[1] = (uint64_t)code;
-    htif.tohost = (uintptr_t)exit_syscall;
-    while (htif.fromhost == 0) { }
-    htif.fromhost = 0;
-}
-
-int main() {
-    // Example usage of _putchar
-    const char *message = "Hello, HTIF!\n";
-    for (const char *p = message; *p != '\0'; p++) {
-        _putchar(*p);
-    }
-
-    // Exit with code 0
-    htif_exit(0);
-    return 0;
+    tohost = (uintptr_t)exit_syscall;
+    while (fromhost == 0) { }
+    fromhost = 0;
 }

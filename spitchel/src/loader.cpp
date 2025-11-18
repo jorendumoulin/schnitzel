@@ -4,7 +4,6 @@
 
 void Loader::load_program(std::string program, Memory &memory) {
   ELFIO::elfio reader;
-  printf("Loading program %s\n", program.c_str());
   if (!reader.load(program)) {
     fprintf(stderr, "Failed to load ELF program: %s\n", program.c_str());
     exit(1);
@@ -35,17 +34,11 @@ void Loader::load_program(std::string program, Memory &memory) {
       std::vector<char> zeros(bss_size, 0);
       memory.write_chunk(vaddr + fsize, bss_size, zeros.data());
     }
-
-    std::cout << "Loaded segment: vaddr=0x" << std::hex << vaddr
-              << " file=" << std::dec << fsize << " mem=" << msize << "\n";
   }
 
   ELFIO::Elf_Half sec_num = reader.sections.size();
-  std::cout << "Number of sections: " << sec_num << std::endl;
   for (int i = 0; i < sec_num; ++i) {
     ELFIO::section *psec = reader.sections[i];
-    std::cout << "  [" << i << "] " << psec->get_name() << "\t"
-              << psec->get_size() << std::endl;
     // Access to section's data
     // const char* p = reader.sections[i]->get_data()
   }
@@ -66,20 +59,13 @@ void Loader::load_program(std::string program, Memory &memory) {
         // Read symbol properties
         symbols.get_symbol(j, name, value, size, bind, type, section_index,
                            other);
-        std::cout << j << " " << name << " " << value << std::endl;
 
         if (name == "_start") {
           entry_point = value;
-          std::cout << "Entry point found at 0x" << std::hex << value
-                    << std::dec << "\n";
         } else if (name == "tohost") {
           tohost_addr = value;
-          std::cout << "Entry point found at 0x" << std::hex << value
-                    << std::dec << "\n";
         } else if (name == "fromhost") {
           fromhost_addr = value;
-          std::cout << "Entry point found at 0x" << std::hex << value
-                    << std::dec << "\n";
         }
       }
     }

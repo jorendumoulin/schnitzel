@@ -1,3 +1,9 @@
 [submodule "submodules/ibex"]
 	path = submodules/ibex
 	url = git@github.com:jorendumoulin/ibex.git
+[submodule "submodules/printf"]
+	path = submodules/printf
+	url = git@github.com:eyalroz/printf
+[submodule "submodules/picolibc"]
+	path = submodules/picolibc
+	url = https://github.com/picolibc/picolibc.git

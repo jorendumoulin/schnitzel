@@ -20,3 +20,15 @@ uint32_t Memory::read_word(size_t addr) {
 void Memory::write_word(size_t addr, uint32_t data) {
   write_chunk(addr, sizeof(uint32_t), &data);
 }
+
+void Memory::write_word(size_t addr, uint32_t data, uint32_t strobe) {
+  uint32_t val = read_word(addr);
+  uint32_t mask = 0xFF;
+  for (int i = 0; i < 4; i++) {
+    if (strobe & (1 << i)) {
+      uint32_t byte = (data >> (i * 8)) & 0xFF;
+      val = (val & ~(mask << (i * 8))) | (byte << (i * 8));
+    }
+  }
+  write_chunk(addr, sizeof(uint32_t), &val);
+}
