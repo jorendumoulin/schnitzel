@@ -13,8 +13,3 @@ target_link_options(hello_world.elf PRIVATE
     -T link.ld
     -L${RUNTIME_PATH}
 )
-
-target_include_directories(hello_world.elf PRIVATE
-    ${CMAKE_SOURCE_DIR}/submodules/picolibc/newlib/libc/include
-    ${CMAKE_BINARY_DIR}/picolibc-build/picolibc/include
-)

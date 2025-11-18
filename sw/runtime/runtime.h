@@ -6,8 +6,7 @@
 void putchar_(char ch);
 void htif_exit(int exit_code);
 
-int printf_(const char *format, ...);
-#define printf printf_
+int printf(const char *format, ...);
 
 void *memset(void *s, int c, size_t n) {
   unsigned char *p = s;
