@@ -44,44 +44,35 @@ class ICache(numInp: Int = 1) extends Module {
   val valids = RegInit(VecInit(Seq.fill(cfg.cacheLines)(false.B)))
   val tags_sram = SRAM(cfg.cacheLines, UInt(cfg.tagWidth.W), 0, 0, 1);
   val tags = tags_sram.readwritePorts(0)
-  tags.enable := false.B;
-  tags.address := 0.U;
-  tags.isWrite := false.B;
-  tags.writeData := 0.U;
-  val data_sram = Seq.fill(cfg.instrsPerLine)(SRAM(cfg.cacheLines, UInt(cfg.instrWidth.W), 0, 0, 1));
+  tags.enable := false.B; tags.address := DontCare; tags.isWrite := DontCare; tags.writeData := DontCare;
+  val data_sram = VecInit(Seq.fill(cfg.instrsPerLine)(SRAM(cfg.cacheLines, UInt(cfg.instrWidth.W), 0, 0, 1)));
   val data_ports = VecInit(data_sram.map(sram => sram.readwritePorts(0)));
-  data_ports.foreach(port => { port := 0.U.asTypeOf(chiselTypeOf(port)); port.enable := false.B; })
+  data_ports.foreach { port =>
+    port.enable := false.B; port.address := DontCare;
+    port.writeData := DontCare; port.isWrite := DontCare;
+  }
 
   // Fetch element from the cache
   val cacheRead = req.bits.addr.asTypeOf(new ICacheRead)
-  val data = data_ports(cacheRead.instr)
   when(req.fire) {
     tags.enable := true.B; tags.address := cacheRead.line; tags.isWrite := false.B;
-    data.enable := true.B; data.address := cacheRead.line; data.isWrite := false.B;
+    val port = data_ports(cacheRead.instr);
+    port.enable := true.B; port.address := cacheRead.line; port.isWrite := false.B;
   }
 
+  // Cache response is valid in the next cycle:
   val cacheRsp = new ICacheRsp
   cacheRsp.req := RegNext(req.fire)
   cacheRsp.valid := RegNext(valids(cacheRead.line));
   cacheRsp.tag := tags.readData;
   cacheRsp.tag_target := RegNext(cacheRead.tag);
-  cacheRsp.instr := data_ports(RegNext(cacheRead.instr)).readData;
+  cacheRsp.instr_target := RegNext(cacheRead.instr);
+  cacheRsp.instr_data := data_ports(cacheRsp.instr_target).readData;
 
   // Cache responses
-  io.imems.zipWithIndex.foreach {
-    case (imem, i) => {
-      when(true.B) {
-        imem.rsp.valid := cacheRsp.hit;
-        imem.rsp.bits.data := cacheRsp.instr;
-      }.otherwise {
-        imem.rsp.valid := false.B;
-        imem.rsp.bits.data := 0.U.asTypeOf(chiselTypeOf(imem.rsp.bits.data));
-      }
-    }
-  };
-  // io.imems.foreach(imem => { imem.rsp.valid := false.B; imem.rsp.bits := 0.U.asTypeOf(chiselTypeOf(imem.rsp.bits)); });
-  // io.imems(prevChoice).rsp.bits.data := cacheRsp.instr;
-  // io.imems(prevChoice).rsp.valid := cacheRsp.hit;
+  io.imems.foreach(imem => { imem.rsp.valid := false.B; imem.rsp.bits.data := DontCare; });
+  io.imems(prevChoice).rsp.bits.data := cacheRsp.instr_data;
+  io.imems(prevChoice).rsp.valid := cacheRsp.hit;
 
   // Cache misses
   // Keep track of the cache miss to send out outside request:
@@ -114,12 +105,14 @@ class ICache(numInp: Int = 1) extends Module {
     tags.writeData := io.axi.rsp.bits.data;
     val instrs = io.axi.rsp.bits.data.asTypeOf(Vec(cfg.instrsPerLine, UInt(cfg.instrWidth.W)));
     data_ports.zip(instrs).foreach { case (port, instr) =>
+      // val port = sram.readwritePorts(0);
       port.enable := true.B; port.address := cacheMiss.line; port.isWrite := true.B;
       port.writeData := io.axi.rsp.bits.data;
     }
+
     // Serve result of miss as valid response:
-    io.imems(prevChoice).rsp.bits.data := cacheRsp.instr;
-    io.imems(prevChoice).rsp.valid := cacheRsp.hit;
+    io.imems(prevChoice).rsp.bits.data := instrs(cacheMiss.instr);
+    io.imems(prevChoice).rsp.valid := true.B;
   }
 
 }

@@ -59,8 +59,10 @@ class ICacheRsp extends Bundle {
   val tag = Wire(UInt(ICacheConfig.tagWidth.W))
   // tag of the request
   val tag_target = Wire(UInt(ICacheConfig.tagWidth.W))
-  // instr stored in cache
-  val instr = Wire(UInt(ICacheConfig.instrWidth.W))
+  // which instruction in the cache line?
+  val instr_target = Wire(UInt(ICacheConfig.instrBits.W))
+  // instruction data
+  val instr_data = Wire(UInt(ICacheConfig.instrWidth.W))
   def hit: Bool = req && valid && tag === tag_target;
   def miss: Bool = req && (~valid || tag =/= tag_target);
 }
