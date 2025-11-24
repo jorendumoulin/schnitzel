@@ -6,10 +6,10 @@ generate-verilog: flatten-ibex
 
 verilate: generate-verilog
     verilator --cc --build -O3 -j $(nproc) \
-        --top-module Core \
+        --top-module Top \
         -Mdir ./verilated \
         --trace \
-        --prefix VCore \
+        --prefix VTop \
         -Wno-UNOPTFLAT \
         -Wno-MULTIDRIVEN \
         ./generated/*.sv

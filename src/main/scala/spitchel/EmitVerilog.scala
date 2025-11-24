@@ -2,12 +2,11 @@ package spitchel
 
 import chisel3._
 import circt.stage.ChiselStage
-import core.Core
+import top.Top
 
 /** Elaboration object to generate Verilog for spitchel integration
   *
-  * This generates the Verilog RTL that will be verilated and integrated with
-  * the spike/fesvr infrastructure.
+  * This generates the Verilog RTL that will be verilated and integrated with the spike/fesvr infrastructure.
   */
 object EmitVerilog extends App {
 
@@ -17,7 +16,7 @@ object EmitVerilog extends App {
   val outputDir = "generated"
 
   ChiselStage.emitSystemVerilogFile(
-    new Core,
+    new Top,
     args = Array("--target-dir", outputDir),
     firtoolOpts = Array(
       "-disable-all-randomization",
@@ -25,5 +24,5 @@ object EmitVerilog extends App {
     )
   )
 
-  println(s"Verilog generated in $outputDir/Core.sv")
+  println(s"Verilog generated in $outputDir/Top.sv")
 }
