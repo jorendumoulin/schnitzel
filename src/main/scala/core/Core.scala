@@ -23,7 +23,7 @@ class Core extends Module {
 
   val ibex = Module(new ibex_wrapper())
   ibex.io.clk_i := clock
-  ibex.io.rst_ni := reset
+  ibex.io.rst_ni := ~reset.asBool
 
   ibex.io.hart_id_i := 0.U
   ibex.io.boot_addr_i := 0.U

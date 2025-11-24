@@ -5,7 +5,7 @@ generate-verilog: flatten-ibex
     ./mill schnitzel.runMain spitchel.EmitVerilog
 
 verilate: generate-verilog
-    verilator --cc --build -O3 -j $(nproc) \
+    verilator --cc --build -j $(nproc) \
         --top-module Top \
         -Mdir ./verilated \
         --trace \

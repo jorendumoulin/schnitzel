@@ -29,13 +29,14 @@ class ICache(numInp: Int = 1) extends Module {
 
   // FSM state of icache
   val state = RegInit(ICacheState.serve);
+  dontTouch(state);
 
   // Arbitrate requests
   val arbiter = Module(new LockingRRArbiter(new BusReq(CoreConfig.addrWidth, CoreConfig.instrWidth), numInp, 32))
   arbiter.io.in <> VecInit(io.imems.map { imem => imem.req })
   val req = arbiter.io.out;
-  // Ready for requests when in serving state or fill state
-  req.ready := state === ICacheState.serve;
+  // Ready for requests when in serving state
+  req.ready := (state === ICacheState.serve);
   // Keep track of arbiter choice for returning responses
   val prevChoice = RegNext(arbiter.io.chosen);
 
@@ -60,6 +61,8 @@ class ICache(numInp: Int = 1) extends Module {
     port.enable := true.B; port.address := cacheRead.line; port.isWrite := false.B;
   }
 
+  dontTouch(cacheRead)
+
   // Cache response is valid in the next cycle:
   val cacheRsp = new ICacheRsp
   cacheRsp.req := RegNext(req.fire)
@@ -79,8 +82,13 @@ class ICache(numInp: Int = 1) extends Module {
   val cacheMiss = Reg(new ICacheRead);
   cacheMiss := Mux(req.fire, cacheRead, cacheMiss);
 
-  // Go to req state
-  when(cacheRsp.miss) { state := ICacheState.req };
+  val abcd = state === ICacheState.serve && cacheRsp.miss;
+  dontTouch(abcd);
+  // Go to req state, do not accept any requests anymore
+  when(abcd) {
+    state := ICacheState.req;
+    req.ready := false.B
+  }
 
   // Send out AXI req for new cache line
   when(cacheRsp.miss || state === ICacheState.req) {
@@ -102,17 +110,18 @@ class ICache(numInp: Int = 1) extends Module {
   when(io.axi.rsp.fire) {
     valids(cacheMiss.line) := true.B;
     tags.enable := true.B; tags.address := cacheMiss.line; tags.isWrite := true.B;
-    tags.writeData := io.axi.rsp.bits.data;
+    tags.writeData := cacheMiss.tag;
     val instrs = io.axi.rsp.bits.data.asTypeOf(Vec(cfg.instrsPerLine, UInt(cfg.instrWidth.W)));
     data_ports.zip(instrs).foreach { case (port, instr) =>
       // val port = sram.readwritePorts(0);
       port.enable := true.B; port.address := cacheMiss.line; port.isWrite := true.B;
-      port.writeData := io.axi.rsp.bits.data;
+      port.writeData := instr;
     }
 
     // Serve result of miss as valid response:
     io.imems(prevChoice).rsp.bits.data := instrs(cacheMiss.instr);
     io.imems(prevChoice).rsp.valid := true.B;
+    state := ICacheState.serve;
   }
 
 }

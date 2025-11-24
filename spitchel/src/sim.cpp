@@ -5,7 +5,7 @@
 #include <cstring>
 
 Sim::Sim(const std::vector<std::string> &args)
-    : core(nullptr), context(nullptr), trace(nullptr), cycle_count(0),
+    : dut(nullptr), context(nullptr), trace(nullptr), cycle_count(0),
       memory(1024 * 1024 * 1024), max_cycles(0), instr_count(0), verbose(false),
       sim_finished(false), imem_req_pending(false), dmem_req_pending(false),
       imem_response_next(false), dmem_response_next(false) {
@@ -20,23 +20,23 @@ void Sim::init_core() {
   context = new VerilatedContext;
   context->commandArgs(0, (char **)nullptr);
 
-  core = new VCore(context);
+  dut = new VTop(context);
 
   // Initialize signals
-  core->clock = 0;
-  core->reset = 0;
-  core->io_imem_req_ready = 0;
-  core->io_imem_rsp_bits_data = 0;
-  core->io_dmem_req_ready = 0;
-  core->io_dmem_rsp_bits_data = 0;
+  dut->clock = 0;
+  dut->reset = 0;
+  dut->io_imem_req_ready = 0;
+  // dut->io_imem_rsp_bits_data = 0;
+  dut->io_dmem_req_ready = 0;
+  dut->io_dmem_rsp_bits_data = 0;
 
-  core->eval();
+  dut->eval();
 }
 
 void Sim::cleanup_core() {
-  if (core) {
-    core->final();
-    delete core;
+  if (dut) {
+    dut->final();
+    delete dut;
   }
   if (context) {
     delete context;
@@ -45,10 +45,10 @@ void Sim::cleanup_core() {
 
 void Sim::reset() {
   // Reset the core
-  core->reset = 0;
+  dut->reset = 1;
   tick();
   tick();
-  core->reset = 1;
+  dut->reset = 0;
   tick();
 
   cycle_count = 0;
@@ -58,16 +58,16 @@ void Sim::reset() {
 
 void Sim::tick() {
   // Drive low phase
-  core->clock = 0;
-  core->eval();
+  dut->clock = 0;
+  dut->eval();
   if (trace) {
     trace->dump(context->time());
   }
   context->timeInc(1);
 
   // Drive high phase
-  core->clock = 1;
-  core->eval();
+  dut->clock = 1;
+  dut->eval();
   if (trace) {
     trace->dump(context->time());
   }
@@ -78,24 +78,25 @@ void Sim::tick() {
 
 void Sim::handle_imem() {
   // Always ready to serve instruction requests
-  core->io_imem_req_ready = 1;
+  dut->io_imem_req_ready = 1;
 
   // Serve response
   if (imem_response_next) {
-    core->io_imem_rsp_bits_data = imem_response_data;
-    core->io_imem_rsp_valid = 1;
+    dut->io_imem_rsp_bits_data = imem_response_data;
+    dut->io_imem_rsp_valid = 1;
     imem_response_next = false;
   } else {
-    core->io_imem_rsp_valid = 0;
+    dut->io_imem_rsp_valid = 0;
   }
 
   // Get request
-  if (core->io_imem_req_valid) {
-    uint64_t addr = core->io_imem_req_bits_addr;
+  if (dut->io_imem_req_valid) {
+    uint64_t addr = dut->io_imem_req_bits_addr;
 
     size_t offset = addr;
     imem_response_next = true;
-    imem_response_data = memory.read_word(offset);
+    memory.read_chunk(offset, 64, imem_response_data);
+    // imem_response_data = memory.read_word(offset);
 
     if (verbose) {
       log("IMEM: addr=0x%lx instr=0x%08x\n", addr, imem_response_data);
@@ -105,24 +106,24 @@ void Sim::handle_imem() {
 
 void Sim::handle_dmem() {
   // Always ready to serve data requests
-  core->io_dmem_req_ready = 1;
+  dut->io_dmem_req_ready = 1;
 
   // Serve response
   if (dmem_response_next) {
-    core->io_dmem_rsp_bits_data = dmem_response_data;
-    core->io_dmem_rsp_valid = 1;
+    dut->io_dmem_rsp_bits_data = dmem_response_data;
+    dut->io_dmem_rsp_valid = 1;
     dmem_response_next = false;
   } else {
-    core->io_dmem_rsp_valid = 0;
+    dut->io_dmem_rsp_valid = 0;
   }
 
-  if (core->io_dmem_req_valid) {
-    uint64_t addr = core->io_dmem_req_bits_addr;
+  if (dut->io_dmem_req_valid) {
+    uint64_t addr = dut->io_dmem_req_bits_addr;
 
-    if (core->io_dmem_req_bits_wen) {
+    if (dut->io_dmem_req_bits_wen) {
       // Write request
-      uint64_t data = core->io_dmem_req_bits_wdata;
-      uint32_t strobe = core->io_dmem_req_bits_ben;
+      uint64_t data = dut->io_dmem_req_bits_wdata;
+      uint32_t strobe = dut->io_dmem_req_bits_ben;
       if (verbose) {
         log("DMEM WRITE: addr=0x%lx strobe=%04b data=0x%016lx\n", addr, strobe,
             data);
@@ -216,7 +217,7 @@ int Sim::handle_host() {
       log("Host response written to fromhost=0x%lx\n", fromhost_addr);
     }
   } else {
-    log("No host interaction %x %x\n", tohost_addr, fromhost_addr);
+    // log("No host interaction %x %x\n", tohost_addr, fromhost_addr);
   }
   return 0;
 }
@@ -297,7 +298,7 @@ void Sim::enable_trace(const char *filename) {
   }
   context->traceEverOn(true);
   trace = new VerilatedVcdC;
-  core->trace(trace, 99);
+  dut->trace(trace, 99);
   trace->open(filename);
   // trace->dump(context->time());
 }
@@ -317,5 +318,5 @@ void Sim::print_core_state() {
     return;
 
   fprintf(stderr, "Cycle: %lu, PC: 0x%lx\n", cycle_count,
-          (uint64_t)core->io_imem_req_bits_addr);
+          (uint64_t)dut->io_imem_req_bits_addr);
 }
