@@ -3,7 +3,7 @@
 #ifndef __SPITCHEL_H
 #define __SPITCHEL_H
 
-#include <VCore.h>
+#include <VTop.h>
 #include <cstdint>
 #include <elfio/elfio.hpp>
 #include <loader.h>
@@ -64,7 +64,7 @@ private:
   // ========================================
 
   /** Verilated core instance */
-  VCore *core;
+  VTop *dut;
 
   /** Verilator context */
   VerilatedContext *context;
@@ -121,7 +121,7 @@ private:
   /** Handle instruction memory bus requests */
   void handle_imem();
   bool imem_response_next;
-  uint32_t imem_response_data;
+  VlWide<16> imem_response_data;
 
   /** Handle data memory bus requests */
   void handle_dmem();
