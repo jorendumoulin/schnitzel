@@ -7,8 +7,8 @@
 Sim::Sim(const std::vector<std::string> &args)
     : dut(nullptr), context(nullptr), trace(nullptr), cycle_count(0),
       memory(1024 * 1024 * 1024), max_cycles(0), instr_count(0), verbose(false),
-      sim_finished(false), imem_req_pending(false), dmem_req_pending(false),
-      imem_response_next(false), dmem_response_next(false) {
+      sim_finished(false), axi_wide_req_pending(false), dmem_req_pending(false),
+      axi_wide_response_next(false), dmem_response_next(false) {
 
   init_core();
   loader.load_program(args[0], memory);
@@ -25,8 +25,7 @@ void Sim::init_core() {
   // Initialize signals
   dut->clock = 0;
   dut->reset = 0;
-  dut->io_imem_req_ready = 0;
-  // dut->io_imem_rsp_bits_data = 0;
+  dut->io_axi_wide_ar_ready = 0;
   dut->io_dmem_req_ready = 0;
   dut->io_dmem_rsp_bits_data = 0;
 
@@ -76,30 +75,31 @@ void Sim::tick() {
   cycle_count++;
 }
 
-void Sim::handle_imem() {
-  // Always ready to serve instruction requests
-  dut->io_imem_req_ready = 1;
+void Sim::handle_axi_wide() {
+  // Always ready to serve requests
+  dut->io_axi_wide_ar_ready = 1;
 
   // Serve response
-  if (imem_response_next) {
-    dut->io_imem_rsp_bits_data = imem_response_data;
-    dut->io_imem_rsp_valid = 1;
-    imem_response_next = false;
+  if (axi_wide_response_next) {
+    dut->io_axi_wide_r_bits_data = axi_wide_response_data;
+    dut->io_axi_wide_r_valid = 1;
+    axi_wide_response_next = false;
   } else {
-    dut->io_imem_rsp_valid = 0;
+    // dut->io_imem_rsp_valid = 0;
+    dut->io_axi_wide_r_valid = 0;
   }
 
   // Get request
-  if (dut->io_imem_req_valid) {
-    uint64_t addr = dut->io_imem_req_bits_addr;
+  if (dut->io_axi_wide_ar_valid) {
+    uint64_t addr = dut->io_axi_wide_ar_bits_addr;
 
     size_t offset = addr;
-    imem_response_next = true;
-    memory.read_chunk(offset, 64, imem_response_data);
+    axi_wide_response_next = true;
+    memory.read_chunk(offset, 64, axi_wide_response_data);
     // imem_response_data = memory.read_word(offset);
 
     if (verbose) {
-      log("IMEM: addr=0x%lx instr=0x%08x\n", addr, imem_response_data);
+      log("IMEM: addr=0x%lx instr=0x%08x\n", addr, axi_wide_response_data);
     }
   }
 }
@@ -250,7 +250,7 @@ int Sim::run() {
   // Main simulation loop
   while (true) {
     // Handle bus interfaces before clock tick
-    handle_imem();
+    handle_axi_wide();
     handle_dmem();
 
     // Handle host interactions
@@ -316,7 +316,4 @@ void Sim::log(const char *format, ...) {
 void Sim::print_core_state() {
   if (!verbose)
     return;
-
-  fprintf(stderr, "Cycle: %lu, PC: 0x%lx\n", cycle_count,
-          (uint64_t)dut->io_imem_req_bits_addr);
 }

@@ -5,16 +5,13 @@ import chisel3._
 import core.Core
 import icache.ICache
 import core.{DecoupledBusIO, CoreConfig}
+import axi.{AXIBundle, AXIConfig}
 
 class Top extends Module {
 
   val io = IO(new Bundle {
 
-    val imem =
-      new DecoupledBusIO(
-        32,
-        512
-      ) // Instruction memory interface
+    val axi_wide = new AXIBundle(AXIConfig(dataWidth = 512))
 
     val dmem =
       new DecoupledBusIO(
@@ -29,6 +26,6 @@ class Top extends Module {
   val icache = Module(new ICache())
   icache.io.imems <> VecInit(Seq(core.io.imem));
 
-  io.imem <> icache.io.axi
+  io.axi_wide <> icache.io.axi
 
 }

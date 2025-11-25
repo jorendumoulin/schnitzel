@@ -98,9 +98,9 @@ private:
   // Bus interface state
   // ========================================
 
-  /** Pending instruction memory request */
-  bool imem_req_pending;
-  size_t imem_req_addr;
+  /** Pending wide axi request */
+  bool axi_wide_req_pending;
+  size_t axi_wide_req_addr;
 
   /** Pending data memory request */
   bool dmem_req_pending;
@@ -118,10 +118,10 @@ private:
   /** Advance simulation by one clock cycle */
   void tick();
 
-  /** Handle instruction memory bus requests */
-  void handle_imem();
-  bool imem_response_next;
-  VlWide<16> imem_response_data;
+  /** Handle axi wide requests */
+  void handle_axi_wide();
+  bool axi_wide_response_next;
+  VlWide<16> axi_wide_response_data;
 
   /** Handle data memory bus requests */
   void handle_dmem();

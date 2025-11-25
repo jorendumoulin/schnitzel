@@ -9,6 +9,7 @@ import icache.BankPort
 import chisel3.util.SRAM
 import icache.ICacheRead
 import core.BusReq
+import axi.{AXIBundle, AXIConfig}
 
 // serve = Serving Cache Requests
 // req = Made outside request for long cache line
@@ -23,7 +24,8 @@ class ICache(numInp: Int = 1) extends Module {
     // incoming instruction requests
     val imems = Vec(numInp, Flipped(new DecoupledBusIO(CoreConfig.addrWidth, CoreConfig.instrWidth)))
     // outgoing axi requests
-    val axi = new DecoupledBusIO(32, 512);
+    // val axi = new DecoupledBusIO(32, 512);
+    val axi = new AXIBundle(AXIConfig(dataWidth = 512))
   })
 
   // FSM state of icache
@@ -85,27 +87,29 @@ class ICache(numInp: Int = 1) extends Module {
   }
 
   // Send out AXI req for new cache line
-  when(cacheRsp.miss || state === ICacheState.req) {
-    io.axi.req.valid := true.B
-    io.axi.req.bits.addr := Cat(cacheMiss.tag, cacheMiss.line, 0.U(ICacheConfig.instrBits.W + ICacheConfig.byteBits.W))
-    io.axi.req.bits.wen := false.B
-    io.axi.req.bits.ben := 1.U.asTypeOf(chiselTypeOf(io.axi.req.bits.ben));
-    io.axi.req.bits.wdata := DontCare
-  }.otherwise {
-    io.axi.req.valid := false.B;
-    io.axi.req.bits := DontCare
-  }
+  io.axi.ar.valid := (cacheRsp.miss || state === ICacheState.req)
+  io.axi.ar.bits.id := 0.U; // TODO: fix AXI ids
+  io.axi.ar.bits.addr := Cat(cacheMiss.tag, cacheMiss.line, 0.U(ICacheConfig.instrBits.W + ICacheConfig.byteBits.W))
+  io.axi.ar.bits.len := 0.U;
+  io.axi.ar.bits.size := (512 / 8).U;
+  io.axi.ar.bits.burst := 0.U;
+  io.axi.ar.bits.lock := 0.U;
+  io.axi.ar.bits.cache := 0.U;
+  io.axi.ar.bits.prot := 0.U;
+  io.axi.ar.bits.qos := 0.U;
+  io.axi.ar.bits.region := 0.U;
+  io.axi.ar.bits.user := 0.U;
 
   // wait for AXI rsp on accepted request
-  when(io.axi.req.fire) { state := ICacheState.axi };
+  when(io.axi.ar.fire) { state := ICacheState.axi };
 
   // Write back AXI rsp:
-  io.axi.rsp.ready := state === ICacheState.axi;
-  when(io.axi.rsp.fire) {
+  io.axi.r.ready := state === ICacheState.axi;
+  when(io.axi.r.fire) {
     valids(cacheMiss.line) := true.B;
     tags.enable := true.B; tags.address := cacheMiss.line; tags.isWrite := true.B;
     tags.writeData := cacheMiss.tag;
-    val instrs = io.axi.rsp.bits.data.asTypeOf(Vec(cfg.instrsPerLine, UInt(cfg.instrWidth.W)));
+    val instrs = io.axi.r.bits.data.asTypeOf(Vec(cfg.instrsPerLine, UInt(cfg.instrWidth.W)));
     data_ports.zip(instrs).foreach { case (port, instr) =>
       // val port = sram.readwritePorts(0);
       port.enable := true.B; port.address := cacheMiss.line; port.isWrite := true.B;
@@ -117,5 +121,12 @@ class ICache(numInp: Int = 1) extends Module {
     io.imems(prevChoice).rsp.valid := true.B;
     state := ICacheState.serve;
   }
+
+  // Disable axi write port
+  io.axi.aw.valid := 0.U
+  io.axi.aw.bits := DontCare
+  io.axi.w.valid := 0.U
+  io.axi.w.bits := DontCare
+  io.axi.b := DontCare
 
 }
