@@ -12,8 +12,7 @@ import core.BusReq
 
 // serve = Serving Cache Requests
 // req = Made outside request for long cache line
-// wait = Waiting for outside cache request to arrive
-// fill = Filling up the cache with received outside data
+// axi = Filling up the cache with received outside data
 object ICacheState extends ChiselEnum { val serve, req, axi = Value }
 
 class ICache(numInp: Int = 1) extends Module {
@@ -29,7 +28,6 @@ class ICache(numInp: Int = 1) extends Module {
 
   // FSM state of icache
   val state = RegInit(ICacheState.serve);
-  dontTouch(state);
 
   // Arbitrate requests
   val arbiter = Module(new LockingRRArbiter(new BusReq(CoreConfig.addrWidth, CoreConfig.instrWidth), numInp, 32))
@@ -41,7 +39,7 @@ class ICache(numInp: Int = 1) extends Module {
   val prevChoice = RegNext(arbiter.io.chosen);
 
   // Cache memory structure
-  // valids are registers such that they can be reset at once
+  // valids are registers such that they can be reset
   val valids = RegInit(VecInit(Seq.fill(cfg.cacheLines)(false.B)))
   val tags_sram = SRAM(cfg.cacheLines, UInt(cfg.tagWidth.W), 0, 0, 1);
   val tags = tags_sram.readwritePorts(0)
@@ -60,8 +58,6 @@ class ICache(numInp: Int = 1) extends Module {
     val port = data_ports(cacheRead.instr);
     port.enable := true.B; port.address := cacheRead.line; port.isWrite := false.B;
   }
-
-  dontTouch(cacheRead)
 
   // Cache response is valid in the next cycle:
   val cacheRsp = new ICacheRsp
@@ -82,10 +78,8 @@ class ICache(numInp: Int = 1) extends Module {
   val cacheMiss = Reg(new ICacheRead);
   cacheMiss := Mux(req.fire, cacheRead, cacheMiss);
 
-  val abcd = state === ICacheState.serve && cacheRsp.miss;
-  dontTouch(abcd);
   // Go to req state, do not accept any requests anymore
-  when(abcd) {
+  when(state === ICacheState.serve && cacheRsp.miss) {
     state := ICacheState.req;
     req.ready := false.B
   }
