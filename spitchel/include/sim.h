@@ -102,6 +102,13 @@ private:
   bool axi_wide_req_pending;
   size_t axi_wide_req_addr;
 
+  /** Pending axi_2 request */
+  bool axi_wide_2_req_pending;
+  bool axi_wide_2_write_rsp_pending = false;
+  size_t axi_wide_2_req_addr;
+  // bool dmem_req_wen;
+  // uint64_t dmem_req_wdata;
+
   /** Pending data memory request */
   bool dmem_req_pending;
   size_t dmem_req_addr;
@@ -122,6 +129,12 @@ private:
   void handle_axi_wide();
   bool axi_wide_response_next;
   VlWide<16> axi_wide_response_data;
+
+  void handle_axi_wide_2();
+  bool axi_wide_2_response_next;
+  uint64_t axi_wide_2_write_addr;
+  bool axi_wide_2_write_pending = false;
+  VlWide<16> axi_wide_2_response_data;
 
   /** Handle data memory bus requests */
   void handle_dmem();

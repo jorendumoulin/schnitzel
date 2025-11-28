@@ -10,6 +10,7 @@ import chisel3.util.SRAM
 import icache.ICacheRead
 import core.BusReq
 import axi.{AXIBundle, AXIConfig}
+import chisel3.util.log2Up
 
 // serve = Serving Cache Requests
 // req = Made outside request for long cache line
@@ -91,7 +92,7 @@ class ICache(numInp: Int = 1) extends Module {
   io.axi.ar.bits.id := 0.U; // TODO: fix AXI ids
   io.axi.ar.bits.addr := Cat(cacheMiss.tag, cacheMiss.line, 0.U(ICacheConfig.instrBits.W + ICacheConfig.byteBits.W))
   io.axi.ar.bits.len := 0.U;
-  io.axi.ar.bits.size := (512 / 8).U;
+  io.axi.ar.bits.size := log2Up(512 / 8).U;
   io.axi.ar.bits.burst := 0.U;
   io.axi.ar.bits.lock := 0.U;
   io.axi.ar.bits.cache := 0.U;
