@@ -1,5 +1,6 @@
 #include "sim.h"
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -110,7 +111,7 @@ void Sim::handle_axi_wide_2() {
 
   // Serve response
   if (axi_wide_2_response_next) {
-    dut->io_axi_wide_2_r_bits_data = axi_wide_response_data;
+    dut->io_axi_wide_2_r_bits_data = axi_wide_2_response_data;
     dut->io_axi_wide_2_r_valid = 1;
     axi_wide_2_response_next = false;
     if (verbose) {
@@ -149,9 +150,9 @@ void Sim::handle_axi_wide_2() {
   }
 
   // Write data
-  if (dut->io_axi_wide_2_aw_valid) {
+  if (dut->io_axi_wide_2_w_valid && axi_wide_2_write_pending) {
     auto wdata = dut->io_axi_wide_2_w_bits_data;
-    unsigned long strobe = dut->io_axi_wide_2_w_bits_strb;
+    uint64_t strobe = (uint64_t)dut->io_axi_wide_2_w_bits_strb;
     memory.write_words(axi_wide_2_write_addr, wdata, strobe, 512 / 32);
     axi_wide_2_write_rsp_pending = true;
     axi_wide_2_write_pending = false;

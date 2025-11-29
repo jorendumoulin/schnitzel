@@ -30,7 +30,7 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   // val wIndex = Reg(UInt(log2Ceil(axiConfig.dataWidth / dataWidth).W))
   val wIndex = Reg(UInt(4.W))
   when(io.axi.aw.fire) {
-    wIndex := io.axi.aw.bits.addr(5, 2)
+    wIndex := io.bus.req.bits.addr(5, 2)
   }
 
   // Data queue:& ~((axiConfig.dataWidth / 8 - 1).U);

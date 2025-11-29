@@ -44,8 +44,8 @@ void Memory::write_word(size_t addr, uint32_t data, uint32_t strobe) {
   write_chunk(addr, sizeof(uint32_t), &val);
 }
 
-void Memory::write_words(size_t addr, const uint32_t *data,
-                         unsigned long strobe, size_t num_words) {
+void Memory::write_words(size_t addr, const uint32_t *data, uint64_t strobe,
+                         size_t num_words) {
   uint32_t mask = 0xFF;
 
   for (size_t word_index = 0; word_index < num_words; word_index++) {
