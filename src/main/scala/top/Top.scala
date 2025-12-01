@@ -5,29 +5,31 @@ import chisel3._
 import core.Core
 import icache.ICache
 import core.{DecoupledBusIO, CoreConfig}
-import axi.{AXIBundle, AXIConfig}
+import axi.{AXIBundle, AXIConfig, AXIMux}
 import axi.DecoupledIOToAXI
 
 class Top extends Module {
 
   val io = IO(new Bundle {
-
-    val axi_wide = new AXIBundle(AXIConfig(dataWidth = 512))
-    val axi_wide_2 = new AXIBundle(AXIConfig(dataWidth = 512))
-
+    val axi = new AXIBundle(AXIConfig(dataWidth = 512))
   })
 
+  // RISC-V Core
   val core = Module(new Core())
 
+  // Convert data interface to AXI
   val mem_to_axi = Module(
     new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = 512), 1)
   )
   core.io.dmem <> mem_to_axi.io.bus
-  mem_to_axi.io.axi <> io.axi_wide_2
 
+  // Instruction Cache
   val icache = Module(new ICache())
   icache.io.imems <> VecInit(Seq(core.io.imem));
 
-  io.axi_wide <> icache.io.axi
+  // AXI Crossbar
+  val axiMux = Module(new AXIMux(AXIConfig(dataWidth = 512), 2))
+  axiMux.io.ins <> VecInit(icache.io.axi, mem_to_axi.io.axi)
+  axiMux.io.out <> io.axi
 
 }

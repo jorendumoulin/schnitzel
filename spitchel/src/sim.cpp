@@ -26,7 +26,7 @@ void Sim::init_core() {
   // Initialize signals (all default to 0 in verilator)
   dut->clock = 0;
   dut->reset = 0;
-  dut->io_axi_wide_ar_ready = 0;
+  dut->io_axi_ar_ready = 0;
 
   dut->eval();
 }
@@ -75,61 +75,63 @@ void Sim::tick() {
 }
 
 void Sim::handle_axi_wide() {
-  // Always ready to serve requests
-  dut->io_axi_wide_ar_ready = 1;
+  // // Always ready to serve requests
+  // dut->io_axi_wide_ar_ready = 1;
 
-  // Serve response
-  if (axi_wide_response_next) {
-    dut->io_axi_wide_r_bits_data = axi_wide_response_data;
-    dut->io_axi_wide_r_valid = 1;
-    axi_wide_response_next = false;
-  } else {
-    // dut->io_imem_rsp_valid = 0;
-    dut->io_axi_wide_r_valid = 0;
-  }
+  // // Serve response
+  // if (axi_wide_response_next) {
+  //   dut->io_axi_wide_r_bits_data = axi_wide_response_data;
+  //   dut->io_axi_wide_r_valid = 1;
+  //   axi_wide_response_next = false;
+  // } else {
+  //   // dut->io_imem_rsp_valid = 0;
+  //   dut->io_axi_wide_r_valid = 0;
+  // }
 
-  // Get request
-  if (dut->io_axi_wide_ar_valid) {
-    uint64_t addr = dut->io_axi_wide_ar_bits_addr;
+  // // Get request
+  // if (dut->io_axi_wide_ar_valid) {
+  //   uint64_t addr = dut->io_axi_wide_ar_bits_addr;
 
-    size_t offset = addr;
-    axi_wide_response_next = true;
-    memory.read_chunk(offset, 64, axi_wide_response_data);
-    // imem_response_data = memory.read_word(offset);
+  //   size_t offset = addr;
+  //   axi_wide_response_next = true;
+  //   memory.read_chunk(offset, 64, axi_wide_response_data);
+  //   // imem_response_data = memory.read_word(offset);
 
-    if (verbose) {
-      log("IMEM: addr=0x%lx instr=0x%08x\n", addr, axi_wide_response_data);
-    }
-  }
+  //   if (verbose) {
+  //     log("IMEM: addr=0x%lx instr=0x%08x\n", addr, axi_wide_response_data);
+  //   }
+  // }
 }
 
 void Sim::handle_axi_wide_2() {
   // Always ready to serve requests
-  dut->io_axi_wide_2_ar_ready = 1;
-  dut->io_axi_wide_2_aw_ready = 1;
-  dut->io_axi_wide_2_w_ready = 1;
+  dut->io_axi_ar_ready = 1;
+  dut->io_axi_aw_ready = 1;
+  dut->io_axi_w_ready = 1;
 
   // Serve response
   if (axi_wide_2_response_next) {
-    dut->io_axi_wide_2_r_bits_data = axi_wide_2_response_data;
-    dut->io_axi_wide_2_r_valid = 1;
+    dut->io_axi_r_bits_data = axi_wide_2_response_data;
+    dut->io_axi_r_valid = 1;
+    dut->io_axi_r_bits_id = axi_wide_2_response_id_next;
     axi_wide_2_response_next = false;
     if (verbose) {
       log("DMEM read resp\n");
     }
   } else {
     // dut->io_imem_rsp_valid = 0;
-    dut->io_axi_wide_2_r_valid = 0;
+    dut->io_axi_r_valid = 0;
   }
 
   // Get request
-  if (dut->io_axi_wide_2_ar_valid) {
-    uint64_t addr = dut->io_axi_wide_2_ar_bits_addr;
+  if (dut->io_axi_ar_valid) {
+    uint64_t addr = dut->io_axi_ar_bits_addr;
 
     // ignore transfer size for now, just send back whole 512 bits
 
     size_t offset = addr;
     axi_wide_2_response_next = true;
+    axi_wide_2_response_id_next = dut->io_axi_ar_bits_id;
     memory.read_chunk(offset, 64, axi_wide_2_response_data);
 
     if (verbose) {
@@ -140,28 +142,30 @@ void Sim::handle_axi_wide_2() {
 
   // Write success response
   if (axi_wide_2_write_rsp_pending) {
-    dut->io_axi_wide_2_b_valid = 1;
+    dut->io_axi_b_valid = 1;
+    dut->io_axi_b_bits_id = axi_wide_2_write_rsp_id;
     axi_wide_2_write_rsp_pending = false;
     if (verbose) {
       log("DMEM write resp\n");
     }
   } else {
-    dut->io_axi_wide_2_b_valid = 0;
+    dut->io_axi_b_valid = 0;
   }
 
   // Write data
-  if (dut->io_axi_wide_2_w_valid && axi_wide_2_write_pending) {
-    auto wdata = dut->io_axi_wide_2_w_bits_data;
-    uint64_t strobe = (uint64_t)dut->io_axi_wide_2_w_bits_strb;
+  if (dut->io_axi_w_valid && axi_wide_2_write_pending) {
+    auto wdata = dut->io_axi_w_bits_data;
+    uint64_t strobe = (uint64_t)dut->io_axi_w_bits_strb;
     memory.write_words(axi_wide_2_write_addr, wdata, strobe, 512 / 32);
     axi_wide_2_write_rsp_pending = true;
     axi_wide_2_write_pending = false;
   }
 
   // Write request
-  if (dut->io_axi_wide_2_aw_valid) {
-    axi_wide_2_write_addr = dut->io_axi_wide_2_aw_bits_addr;
+  if (dut->io_axi_aw_valid) {
+    axi_wide_2_write_addr = dut->io_axi_aw_bits_addr;
     axi_wide_2_write_pending = true;
+    axi_wide_2_write_rsp_id = dut->io_axi_aw_bits_id;
     if (verbose) {
       log("DMEM write: addr=0x%lx\n", axi_wide_2_write_addr);
     }
@@ -273,7 +277,7 @@ int Sim::run() {
   // Main simulation loop
   while (true) {
     // Handle bus interfaces before clock tick
-    handle_axi_wide();
+    // handle_axi_wide();
     handle_axi_wide_2();
 
     // Handle host interactions
