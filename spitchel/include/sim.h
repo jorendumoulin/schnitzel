@@ -129,9 +129,11 @@ private:
 
   bool axi_wide_2_req_pending;
   bool axi_wide_2_write_rsp_pending = false;
+  int axi_wide_2_write_rsp_id;
   size_t axi_wide_2_req_addr;
   void handle_axi_wide_2();
   bool axi_wide_2_response_next = false;
+  int axi_wide_2_response_id_next;
   uint64_t axi_wide_2_write_addr;
   bool axi_wide_2_write_pending = false;
   VlWide<16> axi_wide_2_response_data;
