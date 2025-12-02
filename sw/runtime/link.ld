@@ -1,6 +1,7 @@
 MEMORY
 {
   DRAM   (rwx): ORIGIN = 0x10000, LENGTH = 1024K
+  TCDM   (rwx): ORIGIN = 0x10000000, LENGTH = 32K
 }
 
 SECTIONS
@@ -25,5 +26,5 @@ SECTIONS
   } > DRAM
 
   /* Stack top symbol */
-  _stack_top = ORIGIN(DRAM) + LENGTH(DRAM);
+  _stack_top = ORIGIN(TCDM) + LENGTH(TCDM);
 }
