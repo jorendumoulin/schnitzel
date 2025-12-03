@@ -23,6 +23,7 @@ struct putc_buffer {
     char data[PUTC_BUFFER_LEN];
 };
 
+// Important that this static buffer is statically allocated in DRAM: otherwise host has no direct access.
 static struct putc_buffer putc_buffers[NUM_HARTS];
 
 /* ---------- Helper: flush one buffer via HTIF ---------- */
@@ -68,10 +69,12 @@ void putchar_(char ch)
     }
 }
 
+// Important that this static buffer is statically allocated in DRAM: otherwise host has no direct access.
+static uint64_t exit_syscall[4];
+
 // HTIF exit routine
 void htif_exit(int code)
 {
-    volatile uint64_t exit_syscall[4];
     exit_syscall[0] = 93;    /* exit */
     exit_syscall[1] = (uint64_t)code;
     tohost = (uintptr_t)exit_syscall;
