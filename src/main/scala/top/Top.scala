@@ -41,7 +41,7 @@ class Top extends Module {
 
   // TCDM
   val numBanks = 32
-  val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM(1024, Vec(4, UInt(8.W)), 0, 0, 1)));
+  val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM.masked(1024, Vec(4, UInt(8.W)), 0, 0, 1)));
   val tcdm_ports = VecInit(tcdm_sram.map(sram => sram.readwritePorts(0)));
   val interconnect = Module(new Interconnect(1, numBanks, CoreConfig.addrWidth, CoreConfig.dataWidth));
   interconnect.io.ins <> VecInit(Seq(memMux.io.outs(1)))
@@ -49,7 +49,7 @@ class Top extends Module {
     port.enable := out.req.valid
     port.address := out.req.bits.addr(CoreConfig.addrWidth - 1, log2Up(numBanks) + log2Up(CoreConfig.dataWidth / 8))
     port.isWrite := out.req.bits.wen
-    port.mask.foreach(_ := out.req.bits.ben.asBools);
+    port.mask.foreach { _ := out.req.bits.ben.asBools }
     port.writeData := out.req.bits.wdata.asTypeOf(Vec(4, UInt(8.W)))
     out.rsp.bits.data := port.readData.asUInt
     out.req.ready := true.B
