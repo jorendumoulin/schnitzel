@@ -197,6 +197,7 @@ int Sim::handle_host() {
   uint32_t tohost = memory.read_word(tohost_addr);
   if (tohost != 0) {
     // Handle host request
+    log("Host interaction at addr %p, data %d", tohost);
     if (verbose) {
       log("Host interaction: tohost=0x%lx\n", tohost);
     }
@@ -218,6 +219,9 @@ int Sim::handle_host() {
       memory.read_chunk(syscall_mem[2], syscall_mem[3], putc_buffer);
       for (int i = 0; i < syscall_mem[3]; i++)
         printf("%c", putc_buffer[i]);
+      for (int i = 0; i < syscall_mem[3]; i++)
+        printf("%x ", putc_buffer[i]);
+      printf("\n");
       memory.write_word(tohost_addr, 0);
       // dummy response
       memory.write_word(fromhost_addr, 1);
