@@ -26,7 +26,15 @@ module ibex_wrapper (
     output [31:0] data_addr_o,
     output [31:0] data_wdata_o,
     input [31:0] data_rdata_i,
-    input data_err_i
+    input data_err_i,
+
+    // CSR Extension Interface
+    input  logic                         csr_ext_ready_i,
+    output logic                         csr_ext_valid_o,
+    output logic [11:0]                  csr_ext_addr_o,
+    output logic [31:0]                  csr_ext_wdata_o,
+    output logic [1:0]                   csr_ext_op_o,
+    input  logic [31:0]                  csr_ext_rdata_i
 );
 
   // Based on ibex_simple_system.sv
@@ -97,8 +105,14 @@ module ibex_wrapper (
       .alert_major_internal_o(),
       .alert_major_bus_o     (),
       .core_sleep_o          (),
-      .scan_rst_ni           (1'b1)
+      .scan_rst_ni           (1'b1),
 
+      .csr_ext_ready_i,
+      .csr_ext_valid_o,
+      .csr_ext_addr_o,
+      .csr_ext_wdata_o,
+      .csr_ext_op_o,
+      .csr_ext_rdata_i
   );
 
 

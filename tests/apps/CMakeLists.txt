@@ -13,3 +13,15 @@ target_link_options(hello_world.elf PRIVATE
     -T link.ld
     -L${RUNTIME_PATH}
 )
+
+add_executable(csr_test.elf csr_test.c)
+target_include_directories(csr_test.elf PRIVATE ${RUNTIME_PATH})
+target_link_libraries(csr_test.elf PRIVATE runtime)
+
+target_link_options(csr_test.elf PRIVATE
+    -nostdlib
+    -nostartfiles
+    -fuse-ld=lld
+    -T link.ld
+    -L${RUNTIME_PATH}
+)
