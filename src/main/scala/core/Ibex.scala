@@ -34,6 +34,14 @@ class ibex_wrapper extends BlackBox with HasBlackBoxResource {
     val data_wdata_o = Output(UInt(32.W))
     val data_rdata_i = Input(UInt(32.W))
     val data_err_i = Input(Bool())
+
+    // CSR interface
+    val csr_ext_ready_i = Input(Bool())
+    val csr_ext_valid_o = Output(Bool())
+    val csr_ext_addr_o = Output(UInt(12.W))
+    val csr_ext_wdata_o = Output(UInt(32.W))
+    val csr_ext_op_o = Output(UInt(2.W))
+    val csr_ext_rdata_i = Input(UInt(32.W))
   })
 
   // Add ibex resources:

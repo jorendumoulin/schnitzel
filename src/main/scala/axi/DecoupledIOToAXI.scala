@@ -41,7 +41,7 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   val data_queue = Module(new Queue(new DataQueue, 2))
   data_queue.io.enq.bits.wdata := io.bus.req.bits.wdata
   data_queue.io.enq.bits.ben := io.bus.req.bits.ben
-  io.bus.req.ready := io.axi.aw.ready && data_queue.io.enq.ready;
+  val awReady = io.axi.aw.ready && data_queue.io.enq.ready;
   data_queue.io.enq.valid := io.axi.aw.fire
 
   // W channel
@@ -75,18 +75,18 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   io.axi.ar.bits.region := 0.U;
   io.axi.ar.bits.user := 0.U;
   io.axi.ar.valid := io.bus.req.valid && ~io.bus.req.bits.wen;
+  val arReady = io.axi.ar.ready
 
   val rIndex = Reg(UInt(4.W))
   when(io.axi.ar.fire) {
     rIndex := io.bus.req.bits.addr(5, 2)
   }
 
+  io.bus.req.ready := Mux(io.bus.req.bits.wen, awReady, arReady);
+
   // R channel
   io.bus.rsp.valid := io.axi.r.valid || io.axi.b.valid; io.axi.r.ready := io.bus.rsp.ready;
   val rdata = io.axi.r.bits.data.asTypeOf(Vec((axiConfig.dataWidth / dataWidth), UInt(dataWidth.W)))
   io.bus.rsp.bits.data := rdata(rIndex)
-
-  dontTouch(rdata)
-  dontTouch(rIndex)
 
 }

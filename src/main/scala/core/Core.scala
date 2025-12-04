@@ -52,4 +52,8 @@ class Core extends Module {
   ibex.io.data_rdata_i := io.dmem.rsp.bits.data
   ibex.io.data_err_i := 0.U
 
+  // CSR interface
+  ibex.io.csr_ext_ready_i := false.B
+  ibex.io.csr_ext_rdata_i := 177.U
+
 }
