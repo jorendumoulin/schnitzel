@@ -10,11 +10,11 @@ int main() {
 
     unsigned long csr = 0x300; // Example CSR address (mstatus)
     __asm__ volatile ("csrr %0, %1" : "=r" (value) : "i" (csr));
-    printf("msatus is at %lu\n", value);
+    printf("mtsatus is at %lu\n", value);
 
     csr = 0x900; // Example CSR address (mstatus)
     __asm__ volatile ("csrr %0, %1" : "=r" (value) : "i" (csr));
-    printf("msatus is at %lu\n", value);
+    printf("custom csr is at %lu\n", value);
 
     printf("Hello World! %d\n", 2);
 

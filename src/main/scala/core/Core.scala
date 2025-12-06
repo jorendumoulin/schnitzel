@@ -3,6 +3,7 @@ package core
 import chisel3._
 import chisel3.util.HasBlackBoxResource
 import chisel3.util.Fill
+import chisel3.util.Counter
 
 class Core extends Module {
 
@@ -52,8 +53,10 @@ class Core extends Module {
   ibex.io.data_rdata_i := io.dmem.rsp.bits.data
   ibex.io.data_err_i := 0.U
 
+  val (_, counterWrap) = Counter(ibex.io.csr_ext_valid_o, 4)
+
   // CSR interface
-  ibex.io.csr_ext_ready_i := false.B
+  ibex.io.csr_ext_ready_i := counterWrap
   ibex.io.csr_ext_rdata_i := 177.U
 
 }
