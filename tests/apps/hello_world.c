@@ -1,6 +1,9 @@
 #include <runtime.h>
 
 int main() {
+
+    int hart = hartid();
+
     for(int i = 0; i < 100; i++) {
         printf("Hello World! %d\n", i);
     }

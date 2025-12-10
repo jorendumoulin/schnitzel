@@ -130,6 +130,7 @@ private:
   bool axi_wide_2_req_pending;
   bool axi_wide_2_write_rsp_pending = false;
   int axi_wide_2_write_rsp_id;
+  int axi_wide_2_write_b_id;
   size_t axi_wide_2_req_addr;
   void handle_axi_wide_2();
   bool axi_wide_2_response_next = false;

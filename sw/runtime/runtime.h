@@ -5,6 +5,7 @@
 
 void putchar_(char ch);
 void htif_exit(int exit_code);
+int hartid();
 
 int printf(const char *format, ...);
 

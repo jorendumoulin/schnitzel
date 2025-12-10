@@ -143,7 +143,7 @@ void Sim::handle_axi_wide_2() {
   // Write success response
   if (axi_wide_2_write_rsp_pending) {
     dut->io_axi_b_valid = 1;
-    dut->io_axi_b_bits_id = axi_wide_2_write_rsp_id;
+    dut->io_axi_b_bits_id = axi_wide_2_write_b_id;
     axi_wide_2_write_rsp_pending = false;
     if (verbose) {
       log("DMEM write resp\n");
@@ -159,6 +159,7 @@ void Sim::handle_axi_wide_2() {
     memory.write_words(axi_wide_2_write_addr, wdata, strobe, 512 / 32);
     axi_wide_2_write_rsp_pending = true;
     axi_wide_2_write_pending = false;
+    axi_wide_2_write_b_id = axi_wide_2_write_rsp_id;
   }
 
   // Write request
@@ -216,6 +217,7 @@ int Sim::handle_host() {
     case 64: {
       // _putchar
       memory.read_chunk(syscall_mem[2], syscall_mem[3], putc_buffer);
+      printf("(hart %d) ", syscall_mem[4]);
       for (int i = 0; i < syscall_mem[3]; i++)
         printf("%c", putc_buffer[i]);
       memory.write_word(tohost_addr, 0);

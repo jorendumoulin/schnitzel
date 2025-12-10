@@ -5,7 +5,7 @@ import chisel3.util.HasBlackBoxResource
 import chisel3.util.Fill
 import chisel3.util.Counter
 
-class Core extends Module {
+class Core(hartId: Int) extends Module {
 
   val io = IO(new Bundle {
 
@@ -26,8 +26,8 @@ class Core extends Module {
   ibex.io.clk_i := clock
   ibex.io.rst_ni := ~reset.asBool
 
-  ibex.io.hart_id_i := 0.U
-  ibex.io.boot_addr_i := 0.U
+  ibex.io.hart_id_i := hartId.U
+  ibex.io.boot_addr_i := 0x1000.U
 
   // Instruction memory interface
   io.imem.req.valid := ibex.io.instr_req_o

@@ -1,7 +1,7 @@
 package icache
 
 import chisel3._
-import chisel3.util.{Cat, Decoupled, LockingRRArbiter, MuxLookup, MemoryReadWritePort}
+import chisel3.util.{Cat, Decoupled, RRArbiter, MuxLookup, MemoryReadWritePort}
 import core.{DecoupledBusIO, CoreConfig}
 import icache.{IReq, IRsp, ICacheConfig}
 import icache.ICacheRsp
@@ -33,13 +33,14 @@ class ICache(numInp: Int = 1) extends Module {
   val state = RegInit(ICacheState.serve);
 
   // Arbitrate requests
-  val arbiter = Module(new LockingRRArbiter(new BusReq(CoreConfig.addrWidth, CoreConfig.instrWidth), numInp, 32))
+  val arbiter = Module(new RRArbiter(new BusReq(CoreConfig.addrWidth, CoreConfig.instrWidth), numInp))
   arbiter.io.in <> VecInit(io.imems.map { imem => imem.req })
   val req = arbiter.io.out;
   // Ready for requests when in serving state
   req.ready := (state === ICacheState.serve);
   // Keep track of arbiter choice for returning responses
-  val prevChoice = RegNext(arbiter.io.chosen);
+  val prevChoice = Reg(chiselTypeOf(arbiter.io.chosen));
+  when(req.fire) { prevChoice := arbiter.io.chosen };
 
   // Cache memory structure
   // valids are registers such that they can be reset
