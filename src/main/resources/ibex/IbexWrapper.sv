@@ -62,8 +62,8 @@ module ibex_wrapper (
       .rst_ni,
       .test_en_i  (1'b1),
       .ram_cfg_i  (prim_ram_1p_pkg::RAM_1P_CFG_DEFAULT),
-      .hart_id_i  (32'b0),
-      .boot_addr_i(32'h1000),
+      .hart_id_i  (hart_id_i),
+      .boot_addr_i(boot_addr_i),
 
       .instr_req_o,
       .instr_gnt_i,

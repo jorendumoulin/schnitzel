@@ -3,11 +3,17 @@
 
 // Number of hardware threads (harts) the program will use.
 #ifndef NUM_HARTS
-#define NUM_HARTS 1 // TODO: replace with actual number of harts if available
+#define NUM_HARTS 2 // TODO: replace with actual number of harts if available
 #endif
 
 // Putchar buffer size per hart.
 #define PUTC_BUFFER_LEN 256
+
+int hartid() {
+    int result;
+    __asm__ volatile ("csrr %0, mhartid" : "=r" (result) );
+    return result;
+};
 
 volatile uintptr_t tohost __attribute__((section(".tohost"), used));
 volatile uintptr_t fromhost __attribute__((section(".fromhost"), used));
@@ -36,11 +42,14 @@ static void flush_buffer(struct putc_buffer *buf)
         return;
     }
 
+    int hart = hartid();
+
     /* Prepare an HTIF-style "write" syscall */
     h->syscall_mem[0] = 64;                     /* syscall: write */
     h->syscall_mem[1] = 1;                      /* fd = stdout */
     h->syscall_mem[2] = (uintptr_t)buf->data;   /* pointer to data */
     h->syscall_mem[3] = h->size;                /* length */
+    h->syscall_mem[4] = hart;      /* length */
 
     /* Trigger the host by writing the pointer to syscall_mem into tohost */
     tohost = (uintptr_t)h->syscall_mem;
@@ -55,7 +64,7 @@ static void flush_buffer(struct putc_buffer *buf)
 
 void putchar_(char ch)
 {
-    unsigned int hart = 0; // TODO: replace with snrt_hartid() or equivalent
+    unsigned int hart = hartid(); // TODO: replace with snrt_hartid() or equivalent
 
     struct putc_buffer *buf = &putc_buffers[hart];
     struct putc_buffer_hdr *h = &buf->hdr;
