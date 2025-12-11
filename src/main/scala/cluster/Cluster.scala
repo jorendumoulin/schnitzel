@@ -8,6 +8,7 @@ import axi.{AXIBundle, AXIConfig, AXIMux, DecoupledIOToAXI}
 import interconnect.Interconnect
 import chisel3.util.{SRAM, Cat, log2Ceil, log2Up}
 import memory.MemDemux
+import csr.HWBarrier
 
 class Cluster extends Module {
 
@@ -41,6 +42,11 @@ class Cluster extends Module {
     new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = 512), 2)
   )
   memMux_1.io.outs(0) <> mem_to_axi_1.io.bus
+
+  // Cluster hw barrier
+  val barrier = Module(new HWBarrier(2));
+  barrier.io.ins <> Seq(core_0.io.csr, core_1.io.csr)
+  // barrier.io.in
 
   // Instruction Cache
   val icache = Module(new ICache(2))

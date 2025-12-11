@@ -4,9 +4,18 @@ int main() {
 
     int hart = hartid();
 
-    for(int i = 0; i < 100; i++) {
-        printf("Hello World! %d\n", i);
+    if (hart == 1) {
+        for(int i = 0; i < 100; i++) {
+            printf("Hello World! %d\n", i);
+        }
     }
+    cluster_sync();
+    if (hart == 0) {
+        for(int i = 0; i < 100; i++) {
+            printf("Hello World! %d\n", i);
+        }
+    }
+    cluster_sync();
 
     // Exit with code 0
     htif_exit(0);
