@@ -29,7 +29,7 @@ class AXIMux(cfg: AXIConfig, numIns: Int) extends Module {
   }
 
   // AW arbitration
-  val awArb = Module(new LockingRRArbiter(new AWChan(cfg), numIns, 16));
+  val awArb = Module(new RRArbiter(new AWChan(cfg), numIns));
   awArb.io.in <> io.ins.map(_.aw);
   io.out.aw <> awArb.io.out;
 

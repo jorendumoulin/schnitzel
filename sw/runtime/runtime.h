@@ -6,6 +6,7 @@
 void putchar_(char ch);
 void htif_exit(int exit_code);
 int hartid();
+void cluster_sync();
 
 int printf(const char *format, ...);
 

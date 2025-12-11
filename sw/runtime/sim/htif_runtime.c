@@ -15,6 +15,10 @@ int hartid() {
     return result;
 };
 
+void cluster_sync() {
+    __asm__ volatile ("csrr x0, 0x800");
+};
+
 volatile uintptr_t tohost __attribute__((section(".tohost"), used));
 volatile uintptr_t fromhost __attribute__((section(".fromhost"), used));
 

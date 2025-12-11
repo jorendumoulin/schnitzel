@@ -4,6 +4,8 @@ import chisel3._
 import chisel3.util.HasBlackBoxResource
 import chisel3.util.Fill
 import chisel3.util.Counter
+import csr.CsrIO
+import csr.CsrOp
 
 class Core(hartId: Int) extends Module {
 
@@ -20,6 +22,8 @@ class Core(hartId: Int) extends Module {
         CoreConfig.addrWidth,
         CoreConfig.dataWidth
       ) // Decoupled data memory interface
+
+    val csr = new CsrIO()
   })
 
   val ibex = Module(new ibex_wrapper())
@@ -56,7 +60,11 @@ class Core(hartId: Int) extends Module {
   val (_, counterWrap) = Counter(ibex.io.csr_ext_valid_o, 4)
 
   // CSR interface
-  ibex.io.csr_ext_ready_i := counterWrap
-  ibex.io.csr_ext_rdata_i := 177.U
+  ibex.io.csr_ext_ready_i := io.csr.req.ready
+  io.csr.req.valid := ibex.io.csr_ext_valid_o
+  io.csr.req.bits.addr := ibex.io.csr_ext_addr_o
+  io.csr.req.bits.wdata := ibex.io.csr_ext_wdata_o
+  io.csr.req.bits.op := ibex.io.csr_ext_op_o.asTypeOf(io.csr.req.bits.op)
+  ibex.io.csr_ext_rdata_i := io.csr.rsp.rdata
 
 }
