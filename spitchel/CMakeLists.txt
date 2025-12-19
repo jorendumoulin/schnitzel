@@ -11,6 +11,8 @@ message(STATUS "PROJECT_ROOT in root subdir: ${GENERATED_DIR}")
 #file(MAKE_DIRECTORY ${GENERATED_DIR})
 #file(MAKE_DIRECTORY ${VERILATED_DIR})
 
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -O3)
+
 # Generate Verilog from Chisel
 #add_custom_command(
 #  OUTPUT ${GENERATED_DIR}/Core.sv
