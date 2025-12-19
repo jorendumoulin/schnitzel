@@ -27,8 +27,7 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   io.axi.aw.bits.user := 0.U;
   io.axi.aw.valid := io.bus.req.valid && io.bus.req.bits.wen;
 
-  // val wIndex = Reg(UInt(log2Ceil(axiConfig.dataWidth / dataWidth).W))
-  val wIndex = Reg(UInt(4.W))
+  val wIndex = Reg(UInt(log2Ceil(axiConfig.dataWidth / dataWidth).W))
   when(io.axi.aw.fire) {
     wIndex := io.bus.req.bits.addr(5, 2)
   }
@@ -77,7 +76,7 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   io.axi.ar.valid := io.bus.req.valid && ~io.bus.req.bits.wen;
   val arReady = io.axi.ar.ready
 
-  val rIndex = Reg(UInt(4.W))
+  val rIndex = Reg(UInt(log2Ceil(axiConfig.dataWidth / dataWidth).W))
   when(io.axi.ar.fire) {
     rIndex := io.bus.req.bits.addr(5, 2)
   }

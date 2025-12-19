@@ -5,6 +5,7 @@ generate-verilog: flatten-ibex
     ./mill schnitzel.runMain spitchel.EmitVerilog
 
 verilate: generate-verilog
+    OBJCACHE=ccache \
     verilator --cc --build -j $(nproc) \
         --top-module Top \
         -Mdir ./verilated \
@@ -13,3 +14,6 @@ verilate: generate-verilog
         -Wno-UNOPTFLAT \
         -Wno-MULTIDRIVEN \
         ./generated/*.sv
+
+make-sim: verilate
+    make -C ./build/ -j

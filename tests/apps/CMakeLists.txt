@@ -25,3 +25,15 @@ target_link_options(csr_test.elf PRIVATE
     -T link.ld
     -L${RUNTIME_PATH}
 )
+
+add_executable(dma_test.elf dma_test.c)
+target_include_directories(dma_test.elf PRIVATE ${RUNTIME_PATH})
+target_link_libraries(dma_test.elf PRIVATE runtime)
+
+target_link_options(dma_test.elf PRIVATE
+    -nostdlib
+    -nostartfiles
+    -fuse-ld=lld
+    -T link.ld
+    -L${RUNTIME_PATH}
+)

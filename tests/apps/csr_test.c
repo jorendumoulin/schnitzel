@@ -2,11 +2,13 @@
 
 int main() {
     printf("Hello World! %d\n", 1);
-    printf("Hello World! %d\n", 2);
 
 
     unsigned long value = 17;
     printf("value starts at %lu\n", value);
+
+    #define write_csr(reg, val) ({ \
+      asm volatile ("csrw %0, %1" :: "rK"(val)); })
 
     unsigned long csr = 0x300; // Example CSR address (mstatus)
     __asm__ volatile ("csrr %0, %1" : "=r" (value) : "i" (csr));

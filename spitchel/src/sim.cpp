@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 Sim::Sim(const std::vector<std::string> &args)
     : dut(nullptr), context(nullptr), trace(nullptr), cycle_count(0),
@@ -217,9 +218,10 @@ int Sim::handle_host() {
     case 64: {
       // _putchar
       memory.read_chunk(syscall_mem[2], syscall_mem[3], putc_buffer);
-      printf("(hart %d) ", syscall_mem[4]);
+      std::string a;
       for (int i = 0; i < syscall_mem[3]; i++)
-        printf("%c", putc_buffer[i]);
+        a += putc_buffer[i];
+      printf("(hart %d) %s", syscall_mem[4], a.c_str());
       memory.write_word(tohost_addr, 0);
       // dummy response
       memory.write_word(fromhost_addr, 1);
