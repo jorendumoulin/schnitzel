@@ -2,7 +2,7 @@ package cluster
 
 import chisel3._
 
-import icache.ICache
+import icache.InstructionCache
 import core.{Core, DecoupledBusIO, CoreConfig}
 import axi.{AXIBundle, AXIConfig, AXIMux, DecoupledIOToAXI}
 import interconnect.Interconnect
@@ -11,6 +11,7 @@ import memory.MemDemux
 import csr.HWBarrier
 import dma.Dma
 import csr.CsrDemux
+import icache.InstructionCache
 
 class Cluster extends Module {
 
@@ -20,7 +21,7 @@ class Cluster extends Module {
 
   // Define the first RISC-V Core:
   // RISC-V Core
-  val core_0 = Module(new Core(0))
+  val core_0 = Module(new Core(2))
 
   // Split data interface into AXI <> TCDM
   val memMux_0 = Module(new MemDemux(CoreConfig.addrWidth, CoreConfig.dataWidth, 0x10000000));
@@ -58,7 +59,7 @@ class Cluster extends Module {
   // barrier.io.in
 
   // Instruction Cache
-  val icache = Module(new ICache(2))
+  val icache = Module(new InstructionCache(2))
   icache.io.imems <> VecInit(Seq(core_0.io.imem, core_1.io.imem));
 
   // TCDM
