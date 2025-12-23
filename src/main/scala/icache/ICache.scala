@@ -17,7 +17,7 @@ import chisel3.util.log2Up
 // axi = Filling up the cache with received outside data
 object ICacheState extends ChiselEnum { val serve, req, axi = Value }
 
-class ICache(numInp: Int = 1) extends Module {
+class InstructionCache(numInp: Int = 1) extends Module {
 
   val cfg = ICacheConfig;
 
