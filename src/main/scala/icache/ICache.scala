@@ -28,6 +28,7 @@ class InstructionCache(numInp: Int = 1) extends Module {
     // val axi = new DecoupledBusIO(32, 512);
     val axi = new AXIBundle(AXIConfig(dataWidth = 512))
   })
+  dontTouch(io)
 
   // FSM state of icache
   val state = RegInit(ICacheState.serve);

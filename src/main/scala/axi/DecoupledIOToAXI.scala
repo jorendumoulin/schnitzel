@@ -16,8 +16,8 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   // AW Channel
   io.axi.aw.bits.id := id.U;
   io.axi.aw.bits.addr := Cat(io.bus.req.bits.addr(addrWidth - 1, addrAlignment), 0.U(addrAlignment.W));
-  io.axi.aw.bits.len := log2Ceil(dataWidth / 8).U; // nb bytes
-  io.axi.aw.bits.size := 0.U; // nb beats
+  io.axi.aw.bits.len := 0.U; // nb bytes
+  io.axi.aw.bits.size := log2Ceil(dataWidth / 8).U; // nb bytes per beat
   io.axi.aw.bits.burst := 0.U; // type of beat
   io.axi.aw.bits.lock := 0.U;
   io.axi.aw.bits.cache := 0.U;
@@ -64,8 +64,8 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   // AR Channel
   io.axi.ar.bits.id := id.U;
   io.axi.ar.bits.addr := Cat(io.bus.req.bits.addr(addrWidth - 1, addrAlignment), 0.U(addrAlignment.W));
-  io.axi.ar.bits.len := log2Ceil(dataWidth / 8).U; // nb bytes
-  io.axi.ar.bits.size := 0.U; // nb beats
+  io.axi.ar.bits.len := 0.U; // = (burst size - 1)
+  io.axi.ar.bits.size := log2Ceil(dataWidth / 8).U; // nb beats
   io.axi.ar.bits.burst := 0.U; // type of beat
   io.axi.ar.bits.lock := 0.U;
   io.axi.ar.bits.cache := 0.U;
@@ -77,6 +77,7 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   val arReady = io.axi.ar.ready
 
   val rIndex = Reg(UInt(log2Ceil(axiConfig.dataWidth / dataWidth).W))
+  val expectingR = RegInit(false.B)
   when(io.axi.ar.fire) {
     rIndex := io.bus.req.bits.addr(5, 2)
   }
@@ -84,7 +85,8 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   io.bus.req.ready := Mux(io.bus.req.bits.wen, awReady, arReady);
 
   // R channel
-  io.bus.rsp.valid := io.axi.r.valid || io.axi.b.valid; io.axi.r.ready := io.bus.rsp.ready;
+  when(io.axi.ar.fire) { expectingR := true.B }.elsewhen(io.bus.rsp.fire) { expectingR := false.B }
+  io.bus.rsp.valid := io.axi.r.valid || io.axi.b.valid; io.axi.r.ready := io.bus.rsp.ready && expectingR;
   val rdata = io.axi.r.bits.data.asTypeOf(Vec((axiConfig.dataWidth / dataWidth), UInt(dataWidth.W)))
   io.bus.rsp.bits.data := rdata(rIndex)
 

@@ -10,7 +10,7 @@ int main() {
         }
     }
     cluster_sync();
-    if (hart == 0) {
+    if (hart == 2) {
         for(int i = 0; i < 100; i++) {
             printf("Hello World! %d\n", i);
         }

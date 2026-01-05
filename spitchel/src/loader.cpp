@@ -1,8 +1,10 @@
 #include "loader.h"
+#include "dynamic_memory.h"
 #include <elfio/elfio.hpp>
 #include <string>
+#include <vector>
 
-void Loader::load_program(std::string program, Memory &memory) {
+void Loader::load_program(std::string program, DynamicMemory &memory) {
   ELFIO::elfio reader;
   if (!reader.load(program)) {
     fprintf(stderr, "Failed to load ELF program: %s\n", program.c_str());

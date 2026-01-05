@@ -11,15 +11,17 @@ class AXIMux(cfg: AXIConfig, numIns: Int) extends Module {
     val out = new AXIBundle(cfg);
   })
 
+  val log = SimLog.file("hello")
+
   // AR arbitration
   val arArb = Module(new RRArbiter(new ARChan(cfg), numIns));
   arArb.io.in <> io.ins.map(_.ar);
   io.out.ar <> arArb.io.out;
 
   // R routing
+  io.out.r.ready := false.B;
   for (i <- 0 until numIns) {
     io.ins(i).r.bits <> io.out.r.bits;
-    io.out.r.ready := false.B;
     when(io.ins(i).ar.bits.id === io.out.r.bits.id) {
       io.ins(i).r.valid := io.out.r.valid;
       io.out.r.ready := io.ins(i).r.ready;
