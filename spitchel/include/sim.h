@@ -3,11 +3,13 @@
 #ifndef __SPITCHEL_H
 #define __SPITCHEL_H
 
+#include "axi_interface.h"
+#include "dynamic_memory.h"
 #include <VTop.h>
 #include <cstdint>
 #include <elfio/elfio.hpp>
 #include <loader.h>
-#include <memory.h>
+#include <memory>
 #include <string>
 #include <vector>
 #include <verilated.h>
@@ -54,6 +56,11 @@ public:
   /** Set maximum number of cycles to simulate (0 = unlimited) */
   void set_max_cycles(uint64_t cycles) { max_cycles = cycles; }
 
+  /** Add an AXI interface to this simulation
+   * @param axi_interface Pointer to AXI interface (takes ownership)
+   */
+  void add_axi_interface(std::unique_ptr<AxiInterface> axi_interface);
+
 protected:
   /** Reset the core to initial state */
   void reset();
@@ -72,7 +79,7 @@ private:
   /** VCD trace file */
   VerilatedVcdC *trace;
 
-  Memory memory;
+  DynamicMemory memory;
   Loader loader;
 
   // ========================================
@@ -95,22 +102,11 @@ private:
   bool sim_finished;
 
   // ========================================
-  // Bus interface state
+  // AXI interfaces
   // ========================================
 
-  /** Pending wide axi request */
-  bool axi_wide_req_pending;
-  size_t axi_wide_req_addr;
-
-  /** Pending axi_2 request */
-  // bool dmem_req_wen;
-  // uint64_t dmem_req_wdata;
-
-  /** Pending data memory request */
-  bool dmem_req_pending;
-  size_t dmem_req_addr;
-  bool dmem_req_wen;
-  uint64_t dmem_req_wdata;
+  /** AXI interfaces attached to this simulation */
+  std::vector<std::unique_ptr<AxiInterface>> axi_interfaces;
 
   // ========================================
   // Core interaction methods
@@ -121,44 +117,6 @@ private:
 
   /** Advance simulation by one clock cycle */
   void tick();
-
-  /** Handle axi wide requests */
-  void handle_axi_wide();
-  bool axi_wide_response_next;
-  VlWide<16> axi_wide_response_data;
-
-  bool axi_wide_2_req_pending;
-  bool axi_wide_2_write_rsp_pending = false;
-  int axi_wide_2_write_rsp_id;
-  int axi_wide_2_write_b_id;
-  size_t axi_wide_2_req_addr;
-  void handle_axi_wide_2();
-  bool axi_wide_2_response_next = false;
-  int axi_wide_2_response_id_next;
-  uint64_t axi_wide_2_write_addr;
-  bool axi_wide_2_write_pending = false;
-  VlWide<16> axi_wide_2_response_data;
-
-  void handle_axi_narrow();
-  bool axi_narrow_response_next;
-  uint64_t axi_narrow_response_data;
-
-  bool axi_narrow_2_req_pending;
-  bool axi_narrow_2_write_rsp_pending = false;
-  int axi_narrow_2_write_rsp_id;
-  int axi_narrow_2_write_b_id;
-  size_t axi_narrow_2_req_addr;
-  void handle_axi_narrow_2();
-  bool axi_narrow_2_response_next = false;
-  int axi_narrow_2_response_id_next;
-  uint64_t axi_narrow_2_write_addr;
-  bool axi_narrow_2_write_pending = false;
-  uint64_t axi_narrow_2_response_data;
-
-  /** Handle data memory bus requests */
-  void handle_dmem();
-  bool dmem_response_next;
-  uint32_t dmem_response_data;
 
   int handle_host();
 

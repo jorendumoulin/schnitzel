@@ -1,3 +1,13 @@
+
+This project simulates a SoC with verilator, and this simulation attaches through one or more axi interfaces to a simulated memory.
+A very basic implementation of this is found in [@sim.h](file:///home/joren/phd/schnitzel/spitchel/include/sim.h) and [@sim.cpp](file:///home/joren/phd/schnitzel/spitchel/src/sim.cpp) .
+
+Currently, the system has following limitations:
+- the memory is allocated all at once. there should be a mechanism to dynamically allocate memory as soon as there is a write request to that region. reading from regions that have not explicitly been written should result in an error.
+- the two axi interfaces are defined separately, resulting in a lot of code duplication. There should be a system where i can dynamically add one ore more axi interfaces, and then connect this interface to the verilated model. Difficult here is that for narrow axi interfaces, verilator will issue a VlWide<16> (512 bit) vs for narrow axi interfaces a QData object.
+- the axi interface is incomplete. there should be full support for bursts, with correct handling of lengths, strobes, different burst mechanisms, different burst sizes, ...
+- overall it is quite messy. axi should probably be refactored into a separate file.
+
 Chisel Project Template
 =======================
 

@@ -1,13 +1,13 @@
 #ifndef __LOADER_H
 #define __LOADER_H
 
-#include "memory.h"
+#include "dynamic_memory.h"
 #include <string>
 
 class Loader {
 public:
   // Load a RISC-V ELF program into memory
-  void load_program(std::string program, Memory &memory);
+  void load_program(std::string program, DynamicMemory &memory);
 
   // Get entry point address
   size_t get_entry_point() { return entry_point; };
@@ -17,9 +17,9 @@ public:
   size_t get_fromhost() { return fromhost_addr; };
 
 private:
-  size_t entry_point;
-  size_t tohost_addr;
-  size_t fromhost_addr;
+  size_t entry_point = 0;
+  size_t tohost_addr = 0;
+  size_t fromhost_addr = 0;
 };
 
 #endif // __LOADER_H

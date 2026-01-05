@@ -8,7 +8,7 @@ Memory::Memory(size_t size) { mem.resize(size); }
 
 void Memory::read_chunk(size_t taddr, size_t len, void *dst) {
   if ((taddr + len) > 1024 * 1024 * 1024) {
-    printf("illegal read %p %d, ignoring\n;", taddr, len);
+    printf("illegal read %zu %zu, ignoring\n", taddr, len);
     return;
   }
   memcpy(dst, &mem[taddr], len);
@@ -16,7 +16,7 @@ void Memory::read_chunk(size_t taddr, size_t len, void *dst) {
 
 void Memory::write_chunk(size_t taddr, size_t len, const void *src) {
   if ((taddr + len) > 1024 * 1024 * 1024) {
-    printf("illegal write, ignoring\n;");
+    printf("illegal write, ignoring\n");
     return;
   }
   memcpy(&mem[taddr], src, len);
