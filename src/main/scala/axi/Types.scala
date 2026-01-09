@@ -20,7 +20,7 @@ case class AXIConfig(
   def strbWidth: Int = dataWidth / 8
 }
 
-class AWChan(cfg: AXIConfig = AXIConfig()) extends Bundle {
+class AChan(cfg: AXIConfig = AXIConfig()) extends Bundle {
   val id = UInt(cfg.idWidth.W)
   val addr = UInt(cfg.addrWidth.W)
   val len = UInt(cfg.lenWidth.W)
@@ -32,7 +32,12 @@ class AWChan(cfg: AXIConfig = AXIConfig()) extends Bundle {
   val qos = UInt(cfg.qosWidth.W)
   val region = UInt(cfg.regionWidth.W)
   val user = UInt(cfg.userWidth.W)
+
+  def bytesPerBeat: UInt = (1.U << size)
+
 }
+
+class AWChan(cfg: AXIConfig) extends AChan
 
 class WChan(cfg: AXIConfig) extends Bundle {
   val data = UInt(cfg.dataWidth.W)
@@ -47,19 +52,7 @@ class BChan(cfg: AXIConfig) extends Bundle {
   val user = UInt(cfg.userWidth.W)
 }
 
-class ARChan(cfg: AXIConfig) extends Bundle {
-  val id = UInt(cfg.idWidth.W)
-  val addr = UInt(cfg.addrWidth.W)
-  val len = UInt(cfg.lenWidth.W)
-  val size = UInt(cfg.sizeWidth.W)
-  val burst = UInt(cfg.burstWidth.W)
-  val lock = Bool()
-  val cache = UInt(cfg.cacheWidth.W)
-  val prot = UInt(cfg.protWidth.W)
-  val qos = UInt(cfg.qosWidth.W)
-  val region = UInt(cfg.regionWidth.W)
-  val user = UInt(cfg.userWidth.W)
-}
+class ARChan(cfg: AXIConfig) extends AChan
 
 class RChan(cfg: AXIConfig) extends Bundle {
   val id = UInt(cfg.idWidth.W)

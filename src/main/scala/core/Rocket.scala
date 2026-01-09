@@ -52,6 +52,7 @@ class SnaxSystem extends BlackBox with HasBlackBoxResource {
     val debug_clockeddmi_dmi = Flipped(new DebugDmi)
 
     val mem_axi4_0 = new AXIBundle(new AXIConfig(userWidth = 0, regionWidth = 0));
+    val mmio_axi4_0 = new AXIBundle(new AXIConfig(userWidth = 0, regionWidth = 0, addrWidth = 31));
 
   })
 
@@ -61,10 +62,11 @@ class SnaxSystem extends BlackBox with HasBlackBoxResource {
 }
 
 class BigCore extends Module {
-  val io = IO(new Bundle { val axi = new AXIBundle(new AXIConfig) })
+  val io = IO(new Bundle { val axi = new AXIBundle(new AXIConfig); val mmio_axi = new AXIBundle(new AXIConfig(addrWidth = 31)) })
   val rocket = Module(new SnaxSystem)
   rocket.io := DontCare
   rocket.io.mem_axi4_0 <> io.axi
+  rocket.io.mmio_axi4_0 <> io.mmio_axi
 
   rocket.io.debug_clock := clock
   rocket.io.debug_reset := reset.asBool

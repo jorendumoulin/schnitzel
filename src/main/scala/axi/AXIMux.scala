@@ -36,10 +36,11 @@ class AXIMux(cfg: AXIConfig, numIns: Int) extends Module {
   io.out.aw <> awArb.io.out;
 
   // W routing
-  val w_choice = Reg(chiselTypeOf(awArb.io.chosen))
-  when(io.out.aw.fire) {
-    w_choice := awArb.io.chosen
-  }
+  val w_choice = awArb.io.chosen
+  // val w_choice = Reg(chiselTypeOf(awArb.io.chosen))
+  // when(io.out.aw.fire) {
+  //  w_choice := awArb.io.chosen
+  // }
   io.out.w <> io.ins(w_choice).w;
   for (i <- 0 until numIns) {
     when(i.U === w_choice) {
@@ -50,9 +51,9 @@ class AXIMux(cfg: AXIConfig, numIns: Int) extends Module {
   }
 
   // B routing
+  io.out.b.ready := false.B;
   for (i <- 0 until numIns) {
     io.ins(i).b.bits <> io.out.b.bits;
-    io.out.b.ready := false.B;
     when(io.ins(i).aw.bits.id === io.out.b.bits.id) {
       io.ins(i).b.valid := io.out.b.valid;
       io.out.b.ready := io.ins(i).b.ready;

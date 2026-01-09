@@ -27,21 +27,23 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   io.axi.aw.bits.user := 0.U;
   io.axi.aw.valid := io.bus.req.valid && io.bus.req.bits.wen;
 
-  val wIndex = Reg(UInt(log2Ceil(axiConfig.dataWidth / dataWidth).W))
-  when(io.axi.aw.fire) {
-    wIndex := io.bus.req.bits.addr(5, 2)
-  }
+  // val wIndex = Reg(UInt(log2Ceil(axiConfig.dataWidth / dataWidth).W))
+  // when(io.axi.aw.fire) {
+  //  wIndex := io.bus.req.bits.addr(5, 2)
+  // }
+  val wIndex = io.bus.req.bits.addr(5, 2)
 
   // Data queue:& ~((axiConfig.dataWidth / 8 - 1).U);
   class DataQueue extends Bundle {
     val wdata = chiselTypeOf(io.bus.req.bits.wdata)
     val ben = chiselTypeOf(io.bus.req.bits.ben)
   }
-  val data_queue = Module(new Queue(new DataQueue, 2))
+  val data_queue = Module(new Queue(new DataQueue, 2, flow = true))
   data_queue.io.enq.bits.wdata := io.bus.req.bits.wdata
   data_queue.io.enq.bits.ben := io.bus.req.bits.ben
   val awReady = io.axi.aw.ready && data_queue.io.enq.ready;
-  data_queue.io.enq.valid := io.axi.aw.fire
+  val stale_data = RegNext(io.bus.req.valid && ~io.axi.w.fire)
+  data_queue.io.enq.valid := io.bus.req.valid && io.bus.req.bits.wen && ~stale_data
 
   // W channel
   data_queue.io.deq.ready := io.axi.w.ready;
