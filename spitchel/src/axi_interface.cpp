@@ -99,6 +99,125 @@ uint64_t AxiInterface::calculate_wrap_boundary(uint64_t addr,
   }
 }
 
+// MMIO AXI Interface Implementation
+// MMIOAxiInterface::MMIOAxiInterface(const std::string &name)
+//     : AxiInterface(name, 64) {}
+// 
+// void MMIOAxiInterface::handle_responses(VTop *dut, DynamicMemory &memory) {
+//   if (dut->io_mmio_axi_r_ready and dut->io_mmio_axi_r_valid)
+//     read_request.remaining_beats--;
+// }
+// 
+// void MMIOAxiInterface::handle_transactions(VTop *dut, DynamicMemory &memory) {
+//   // Handle read address channel
+//   dut->io_narrow_axi_ar_ready = 1;
+//   if (dut->io_mmio_axi_ar_valid) {
+//     read_addr = dut->io_mmio_axi_ar_bits_addr;
+//     read_id = dut->io_mmio_axi_ar_bits_id;
+//     read_len = dut->io_mmio_axi_ar_bits_len;
+//     read_size = static_cast<AxiBurstSize>(dut->io_mmio_axi_ar_bits_size);
+//     read_burst = static_cast<AxiBurstType>(dut->io_mmio_axi_ar_bits_burst);
+//     read_req_pending = true;
+//     read_transfer_count = 0;
+//   }
+// 
+//   // Handle read data channel
+//   if (read_response_pending) {
+//     dut->io_mmio_axi_r_valid = 1;
+//     dut->io_mmio_axi_r_bits_id = response_id;
+//     dut->io_mmio_axi_r_bits_resp = static_cast<uint8_t>(AxiResp::OKAY);
+//     dut->io_mmio_axi_r_bits_last = (read_transfer_count >= read_len);
+// 
+//     // Read data from memory
+//     uint64_t current_addr = calculate_burst_address(
+//         read_addr, read_burst, read_size, read_transfer_count);
+//     uint64_t data = 0;
+//     memory.read_chunk(current_addr, sizeof(data), &data);
+//     dut->io_mmio_axi_r_bits_data = data;
+// 
+//     if (read_transfer_count >= read_len) {
+//       read_response_pending = false;
+//       read_req_pending = false;
+//     } else {
+//       read_transfer_count++;
+//     }
+//   } else {
+//     dut->io_mmio_axi_r_valid = 0;
+//   }
+// 
+//   // Handle read request processing
+//   if (read_req_pending && !read_response_pending) {
+//     read_response_pending = true;
+//     response_id = read_id;
+//   }
+// 
+//   // Handle write address channel
+//   dut->io_mmio_axi_aw_ready = 1;
+//   if (dut->io_mmio_axi_aw_valid) {
+//     write_addr = dut->io_mmio_axi_aw_bits_addr;
+//     write_id = dut->io_mmio_axi_aw_bits_id;
+//     write_len = dut->io_mmio_axi_aw_bits_len;
+//     write_size = static_cast<AxiBurstSize>(dut->io_mmio_axi_aw_bits_size);
+//     write_burst = static_cast<AxiBurstType>(dut->io_mmio_axi_aw_bits_burst);
+//     write_addr_pending = true;
+//     write_transfer_count = 0;
+//   }
+// 
+//   // Handle write data channel
+//   dut->io_mmio_axi_w_ready = 1;
+//   if (dut->io_mmio_axi_w_valid) {
+//     write_data = dut->io_mmio_axi_w_bits_data;
+//     write_strb = dut->io_mmio_axi_w_bits_strb;
+//     write_last = dut->io_mmio_axi_w_bits_last;
+//     write_data_pending = true;
+//   }
+// 
+//   // Handle write response channel
+//   if (write_response_pending) {
+//     dut->io_mmio_axi_b_valid = 1;
+//     dut->io_mmio_axi_b_bits_id = response_id;
+//     dut->io_mmio_axi_b_bits_resp = static_cast<uint8_t>(AxiResp::OKAY);
+//     write_response_pending = false;
+//     write_addr_pending = false;
+//     write_data_pending = false;
+//   } else {
+//     dut->io_mmio_axi_b_valid = 0;
+//   }
+// 
+//   // Handle write transaction processing
+//   if (write_addr_pending && write_data_pending) {
+//     // Write data to memory
+//     uint64_t current_addr = calculate_burst_address(
+//         write_addr, write_burst, write_size, write_transfer_count);
+// 
+//     // For narrow interface, we write 8 bytes (64 bits) at a time
+//     // Apply strobe before writing
+//     uint64_t current_data = 0;
+//     memory.read_chunk(current_addr, sizeof(current_data), &current_data);
+// 
+//     // Apply byte strobes
+//     for (int i = 0; i < 8; i++) {
+//       if (write_strb & (1 << i)) {
+//         uint8_t byte = (write_data >> (i * 8)) & 0xFF;
+//         uint8_t *byte_ptr = reinterpret_cast<uint8_t *>(&current_data);
+//         byte_ptr[i] = byte;
+//       }
+//     }
+// 
+//     memory.write_chunk(current_addr, sizeof(current_data), &current_data);
+// 
+//     if (write_last || write_transfer_count >= write_len) {
+//       write_response_pending = true;
+//       response_id = write_id;
+//       write_addr_pending = false;
+//       write_data_pending = false;
+//     } else {
+//       write_transfer_count++;
+//       write_data_pending = false; // Wait for next data beat
+//     }
+//   }
+// }
+
 // Narrow AXI Interface Implementation
 NarrowAxiInterface::NarrowAxiInterface(const std::string &name)
     : AxiInterface(name, 64) {}
@@ -149,9 +268,12 @@ void NarrowAxiInterface::handle_transactions(VTop *dut, DynamicMemory &memory) {
   if (read_req_pending && !read_response_pending) {
     read_response_pending = true;
     response_id = read_id;
-  }
+  }TETRA
 
   // Handle write address channel
+  if (write_addr_pending || write_data_pending || write_response_pending) {
+  dut->io_narrow_axi_aw_ready = 0;
+  } else {
   dut->io_narrow_axi_aw_ready = 1;
   if (dut->io_narrow_axi_aw_valid) {
     write_addr = dut->io_narrow_axi_aw_bits_addr;
@@ -162,14 +284,19 @@ void NarrowAxiInterface::handle_transactions(VTop *dut, DynamicMemory &memory) {
     write_addr_pending = true;
     write_transfer_count = 0;
   }
+  }
 
   // Handle write data channel
-  dut->io_narrow_axi_w_ready = 1;
-  if (dut->io_narrow_axi_w_valid) {
-    write_data = dut->io_narrow_axi_w_bits_data;
-    write_strb = dut->io_narrow_axi_w_bits_strb;
-    write_last = dut->io_narrow_axi_w_bits_last;
-    write_data_pending = true;
+  if (write_addr_pending) {
+    dut->io_narrow_axi_w_ready = 1;
+    if (dut->io_narrow_axi_w_valid) {
+      write_data = dut->io_narrow_axi_w_bits_data;
+      write_strb = dut->io_narrow_axi_w_bits_strb;
+      write_last = dut->io_narrow_axi_w_bits_last;
+      write_data_pending = true;
+    }
+  } else {
+    dut->io_narrow_axi_w_ready = 0;
   }
 
   // Handle write response channel

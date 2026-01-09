@@ -3,7 +3,7 @@
 #ifndef __SPITCHEL_H
 #define __SPITCHEL_H
 
-#include "axi_interface.h"
+// #include "axi_interface.h"
 #include "dynamic_memory.h"
 #include <VTop.h>
 #include <cstdint>
@@ -59,7 +59,7 @@ public:
   /** Add an AXI interface to this simulation
    * @param axi_interface Pointer to AXI interface (takes ownership)
    */
-  void add_axi_interface(std::unique_ptr<AxiInterface> axi_interface);
+  // void add_axi_interface(std::unique_ptr<AxiInterface> axi_interface);
 
 protected:
   /** Reset the core to initial state */
@@ -106,7 +106,7 @@ private:
   // ========================================
 
   /** AXI interfaces attached to this simulation */
-  std::vector<std::unique_ptr<AxiInterface>> axi_interfaces;
+  // std::vector<std::unique_ptr<AxiInterface>> axi_interfaces;
 
   // ========================================
   // Core interaction methods
@@ -125,6 +125,15 @@ private:
 
   /** Cleanup verilated core */
   void cleanup_core();
+
+  void wide_mem_response();
+  void wide_mem_transaction();
+
+  // Wide Memory interface (512 bits)
+  uint64_t wide_addr = 0;
+  uint64_t wide_strb = 0;
+  alignas(8) uint8_t wide_data[64];
+  bool wide_response_pending = false;
 
   // ========================================
   // Debugging/logging helpers

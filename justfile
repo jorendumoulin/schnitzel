@@ -13,6 +13,14 @@ verilate: generate-verilog
         --prefix VTop \
         -Wno-UNOPTFLAT \
         -Wno-MULTIDRIVEN \
+        -Wno-LATCH \
+        -Wno-BLKANDNBLK \
+        -Wno-SELRANGE \
+        -Wno-SYMRSVDWORD \
+        -Wno-CMPCONST \
+        -Wno-UNSIGNED \
+        -Wno-WIDTH \
+        -Wno-ASCRANGE \
         ./generated/*.sv
 
 make-sim: verilate

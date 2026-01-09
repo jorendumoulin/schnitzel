@@ -8,14 +8,27 @@ FLATTENED_VERILOG := CVA6WrapperFlattened.sv
 .PHONY: default clean
 default: $(FLATTENED_VERILOG)
 
+CVA6_PKGS := \
+    $(cva6)/core/include/config_pkg.sv \
+		$(dir)/cv64a6_imafdc_sv39_config_pkg.sv \
+    $(cva6)/core/include/riscv_pkg.sv \
+    $(cva6)/core/include/ariane_pkg.sv \
+    $(cva6)/vendor/pulp-platform/axi/src/axi_pkg.sv \
+    $(cva6)/core/include/wt_cache_pkg.sv \
+    $(cva6)/core/include/std_cache_pkg.sv \
+    $(cva6)/core/include/instr_tracer_pkg.sv \
+    $(cva6)/core/include/build_config_pkg.sv \
+    $(cva6)/core/include/aes_pkg.sv \
+    $(cva6)/core/include/triggers_pkg.sv \
+		$(cva6)/core/cvfpu/src/fpnew_pkg.sv \
+    $(cva6)/vendor/pulp-platform/common_cells/src/cf_math_pkg.sv
+
 CVA6_VSRCS := \
-    $(dir)/cv64a6_imafdc_sv39_config_pkg.sv \
     $(cva6)/vendor/pulp-platform/fpga-support/rtl/SyncDpRam.sv \
     $(cva6)/vendor/pulp-platform/fpga-support/rtl/AsyncDpRam.sv \
     $(cva6)/vendor/pulp-platform/fpga-support/rtl/AsyncThreePortRam.sv \
     $(cva6)/vendor/pulp-platform/fpga-support/rtl/SyncThreePortRam.sv \
     $(cva6)/vendor/pulp-platform/fpga-support/rtl/SyncDpRam_ind_r_w.sv \
-    $(cva6)/core/cvfpu/src/fpnew_pkg.sv \
     $(cva6)/core/cvfpu/src/fpnew_cast_multi.sv \
     $(cva6)/core/cvfpu/src/fpnew_classifier.sv \
     $(cva6)/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/clk/rtl/gated_clk_cell.v \
@@ -59,20 +72,9 @@ CVA6_VSRCS := \
     $(cva6)/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/norm_div_sqrt_mvp.sv \
     $(cva6)/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/nrbd_nrsc_mvp.sv \
     $(cva6)/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/preprocess_mvp.sv \
-    $(cva6)/core/include/config_pkg.sv \
-    $(cva6)/core/include/riscv_pkg.sv \
-    $(cva6)/core/include/ariane_pkg.sv \
-    $(cva6)/vendor/pulp-platform/axi/src/axi_pkg.sv \
-    $(cva6)/core/include/wt_cache_pkg.sv \
-    $(cva6)/core/include/std_cache_pkg.sv \
-    $(cva6)/core/include/instr_tracer_pkg.sv \
-    $(cva6)/core/include/build_config_pkg.sv \
-    $(cva6)/core/include/aes_pkg.sv \
-    $(cva6)/core/include/triggers_pkg.sv \
     $(cva6)/core/cvxif_compressed_if_driver.sv \
     $(cva6)/core/cvxif_issue_register_commit_if_driver.sv \
     $(cva6)/core/cvxif_fu.sv \
-    $(cva6)/vendor/pulp-platform/common_cells/src/cf_math_pkg.sv \
     $(cva6)/vendor/pulp-platform/common_cells/src/fifo_v3.sv \
     $(cva6)/vendor/pulp-platform/common_cells/src/lfsr.sv \
     $(cva6)/vendor/pulp-platform/common_cells/src/lfsr_8bit.sv \
@@ -157,7 +159,11 @@ CVA6_VSRCS := \
     $(cva6)/common/local/util/sram_cache.sv \
     $(cva6)/core/pmp/src/pmp.sv \
     $(cva6)/core/pmp/src/pmp_entry.sv \
-    $(cva6)/core/pmp/src/pmp_data_if.sv
+    $(cva6)/core/pmp/src/pmp_data_if.sv \
+		$(cva6)/core/cva6_mmu/cva6_mmu.sv \
+		$(cva6)/core/cva6_mmu/cva6_ptw.sv \
+		$(cva6)/core/cva6_mmu/cva6_tlb.sv \
+		$(cva6)/core/cva6_mmu/cva6_shared_tlb.sv
 
 
 # -F ${HPDCACHE_DIR}/rtl/hpdcache.Flist
@@ -176,11 +182,7 @@ CVA6_VSRCS := \
 # // NOTE: pmp.sv modified for DSIM (unchanged for other simulators)
 
 # // MMU
-# ${CVA6_REPO_DIR}/core/cva6_mmu/cva6_mmu.sv
-# ${CVA6_REPO_DIR}/core/cva6_mmu/cva6_ptw.sv
-# ${CVA6_REPO_DIR}/core/cva6_mmu/cva6_tlb.sv
-# ${CVA6_REPO_DIR}/core/cva6_mmu/cva6_shared_tlb.sv
-#
+
 # // end of manifest
 
 
@@ -270,7 +272,7 @@ CVA6_VSRCS := \
 
 CVA6_WRAPPER := $(dir)/CVA6Wrapper.sv
 
-CVA6_SRCS := $(CVA6_VSRCS) $(CVA6_WRAPPER)
+CVA6_SRCS := $(CVA6_PKGS) $(CVA6_VSRCS) $(CVA6_WRAPPER)
 
 CVA6_INCLUDES := \
     -I$(cva6)/core/include/ \

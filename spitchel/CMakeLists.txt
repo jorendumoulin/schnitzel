@@ -55,7 +55,7 @@ add_executable(spitchel
   src/memory.cpp
   src/loader.cpp
   src/dynamic_memory.cpp
-  src/axi_interface.cpp
+  # src/axi_interface.cpp
 )
 
 # add_dependencies(spitchel verilate)

@@ -1,8 +1,8 @@
 module cva6_wrapper #(
-  parameter AXI_ADDRESS_WIDTH = 0,
-  parameter AXI_DATA_WIDTH = 0,
-  parameter AXI_USER_WIDTH = 0,
-  parameter AXI_ID_WIDTH = 0
+  parameter AXI_ADDRESS_WIDTH = 64,
+  parameter AXI_DATA_WIDTH = 64,
+  parameter AXI_USER_WIDTH = 64,
+  parameter AXI_ID_WIDTH = 4
 ) (
     input clk_i,
     input rst_ni,
@@ -21,7 +21,7 @@ module cva6_wrapper #(
     output [2:0] axi_aw_bits_prot,
     output [3:0] axi_aw_bits_qos,
     output [3:0] axi_aw_bits_region,
-    output [5:0] axi_aw_bits_atop,
+    //output [5:0] axi_aw_bits_atop,
     output [AXI_USER_WIDTH-1:0] axi_aw_bits_user,
 
     input axi_w_ready,
@@ -170,7 +170,7 @@ module cva6_wrapper #(
     // output [3:0] axi_aw_bits_region,
     assign axi_aw_bits_region = axi_req.aw.region;
     // output [5:0] axi_aw_bits_atop,
-    // TODO: what to do with atop?
+    // TODO: what to do with atop? ignore?
     // output [AXI_USER_WIDTH-1:0] axi_aw_bits_user,
     assign axi_aw_bits_user = axi_req.aw.user;
 

@@ -1,5 +1,5 @@
 #include "sim.h"
-#include "axi_interface.h"
+// #include "axi_interface.h"
 #include "dynamic_memory.h"
 #include <cstdarg>
 #include <cstdint>
@@ -18,8 +18,8 @@ Sim::Sim(const std::vector<std::string> &args)
   loader.load_program(args[0], memory);
 
   // Add default AXI interfaces
-  add_axi_interface(std::make_unique<WideAxiInterface>("wide_axi"));
-  add_axi_interface(std::make_unique<NarrowAxiInterface>("narrow_axi"));
+  // add_axi_interface(std::make_unique<WideAxiInterface>("wide_axi"));
+  // add_axi_interface(std::make_unique<NarrowAxiInterface>("narrow_axi"));
 }
 
 Sim::~Sim() { cleanup_core(); }
@@ -33,7 +33,6 @@ void Sim::init_core() {
   // Initialize signals (all default to 0 in verilator)
   dut->clock = 0;
   dut->reset = 0;
-  dut->io_axi_ar_ready = 0;
 
   dut->eval();
 }
@@ -53,6 +52,11 @@ void Sim::reset() {
   dut->reset = 1;
   tick();
   tick();
+  tick();
+  tick();
+  tick();
+  tick();
+  tick();
   dut->reset = 0;
   tick();
 
@@ -61,14 +65,71 @@ void Sim::reset() {
   sim_finished = false;
 }
 
+// Present the response just before falling edge
+void Sim::wide_mem_response() {
+  dut->io_mem_rsp_valid = wide_response_pending;
+  memcpy(dut->io_mem_rsp_bits_data, wide_data, 64);
+}
+
+// Execute transaction just after the falling edge
+void Sim::wide_mem_transaction() {
+  dut->io_mem_req_ready = 0;
+  if (wide_response_pending) {
+    // If not ready for response do nothing, we must stall;
+    if (not dut->io_mem_rsp_ready) {
+      return;
+    } else { // Otherwise, the response is processed
+      wide_response_pending = false;
+    }
+  }
+  dut->io_mem_req_ready = 1;
+  if (dut->io_mem_req_valid) {
+    if (dut->io_mem_req_bits_wen) {
+      // Execute write
+      alignas(8) uint8_t current_data[64], read_data[64];
+      memcpy(read_data, dut->io_mem_req_bits_wdata, 64);
+      wide_strb = dut->io_mem_req_bits_ben;
+      wide_addr = dut->io_mem_req_bits_addr;
+      memory.read_chunk(wide_addr, 64, current_data);
+
+      // printf("(%d) Writing data to addr %p\n", cycle_count, wide_addr);
+      // printf("(%d) before:", cycle_count);
+      // for (int i = 0; i < 64; i++)
+      //   printf("%x ", current_data[i]);
+      // printf("\n");
+      //  Apply byte strobes (64 bytes total)
+      for (int i = 0; i < 64; i++) {
+        if (wide_strb & (1ULL << i)) {
+          current_data[i] = read_data[i];
+        }
+      }
+      // printf("(%d) after:", cycle_count);
+      // for (int i = 0; i < 16; i++) {
+      //   for (int j = 0; j < 4; j++) {
+      //     printf("%02x", current_data[63 - (4 * i + j)]);
+      //   }
+      //   printf(" ");
+      // }
+      // printf("\n");
+      memory.write_chunk(wide_addr, 64, current_data);
+    } else {
+      // Execute read
+      wide_addr = dut->io_mem_req_bits_addr;
+      memory.read_chunk(wide_addr, 64, wide_data);
+    }
+    wide_response_pending = true;
+  }
+}
+
 void Sim::tick() {
 
   // Just before rising edge,
   // process axi responses
   // important to not change any values here:
-  for (auto &axi_interface : axi_interfaces) {
-    axi_interface->handle_responses(dut, memory);
-  }
+  // for (auto &axi_interface : axi_interfaces) {
+  //  axi_interface->handle_responses(dut, memory);
+  //
+  //}
 
   // Drive high phase
   dut->clock = 1;
@@ -79,13 +140,16 @@ void Sim::tick() {
   context->timeInc(1);
 
   // Then, setup new axi transactions
-  for (auto &axi_interface : axi_interfaces) {
-    axi_interface->handle_transactions(dut, memory);
-  }
+  // for (auto &axi_interface : axi_interfaces) {
+  //  axi_interface->handle_transactions(dut, memory);
+  //}
 
+  wide_mem_response();
   // Drive low phase
   dut->clock = 0;
   dut->eval();
+  wide_mem_transaction();
+
   if (trace) {
     trace->dump(context->time());
   }
@@ -94,9 +158,9 @@ void Sim::tick() {
   cycle_count++;
 }
 
-void Sim::add_axi_interface(std::unique_ptr<AxiInterface> axi_interface) {
-  axi_interfaces.push_back(std::move(axi_interface));
-}
+// void Sim::add_axi_interface(std::unique_ptr<AxiInterface> axi_interface) {
+//   axi_interfaces.push_back(std::move(axi_interface));
+// }
 
 // Bootloader binary provided by cmake build process
 extern unsigned char bootrom_data[];
@@ -120,11 +184,16 @@ int Sim::handle_host() {
   size_t tohost_addr = loader.get_tohost();
   size_t fromhost_addr = loader.get_fromhost();
 
+  if (verbose) {
+    printf("(%d) Looking at thost addr %p, fromhost adddr %p\n", cycle_count,
+           tohost_addr, fromhost_addr);
+  }
+
   uint32_t tohost = memory.read_word(tohost_addr);
   if (tohost != 0) {
     // Handle host request
     if (verbose) {
-      log("Host interaction: tohost=0x%x\n", tohost);
+      printf("Host interaction: tohost=0x%x\n", tohost);
     }
 
     uint32_t syscall_mem[8];
