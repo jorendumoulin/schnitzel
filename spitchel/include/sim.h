@@ -135,6 +135,15 @@ private:
   alignas(8) uint8_t wide_data[64];
   bool wide_response_pending = false;
 
+  void narrow_mem_response();
+  void narrow_mem_transaction();
+
+  // Narrow Memory interface (64 bits)
+  uint64_t narrow_addr = 0;
+  uint64_t narrow_strb = 0;
+  uint64_t narrow_data = 0;
+  bool narrow_response_pending = false;
+
   // ========================================
   // Debugging/logging helpers
   // ========================================

@@ -121,6 +121,62 @@ void Sim::wide_mem_transaction() {
   }
 }
 
+// Present the response just before falling edge
+void Sim::narrow_mem_response() {
+  dut->io_narrow_mem_rsp_valid = narrow_response_pending;
+  dut->io_narrow_mem_rsp_bits_data = narrow_data;
+}
+
+// Execute transaction just after the falling edge
+void Sim::narrow_mem_transaction() {
+  dut->io_narrow_mem_req_ready = 0;
+  if (narrow_response_pending) {
+    // If not ready for response do nothing, we must stall;
+    if (not dut->io_narrow_mem_rsp_ready) {
+      return;
+    } else { // Otherwise, the response is processed
+      narrow_response_pending = false;
+    }
+  }
+  dut->io_narrow_mem_req_ready = 1;
+  if (dut->io_narrow_mem_req_valid) {
+    if (dut->io_narrow_mem_req_bits_wen) {
+      // Execute write
+      alignas(8) uint8_t current_data[8], write_data[8];
+      memcpy(write_data, &dut->io_narrow_mem_req_bits_wdata, 8);
+      narrow_strb = dut->io_narrow_mem_req_bits_ben;
+      narrow_addr = dut->io_narrow_mem_req_bits_addr;
+      memory.read_chunk(narrow_addr, 8, current_data);
+
+      // printf("(%d) Writing data to addr %p\n", cycle_count, wide_addr);
+      // printf("(%d) before:", cycle_count);
+      // for (int i = 0; i < 64; i++)
+      //   printf("%x ", current_data[i]);
+      // printf("\n");
+      //  Apply byte strobes (64 bytes total)
+      for (int i = 0; i < 8; i++) {
+        if (wide_strb & (1ULL << i)) {
+          current_data[i] = write_data[i];
+        }
+      }
+      // printf("(%d) after:", cycle_count);
+      // for (int i = 0; i < 16; i++) {
+      //   for (int j = 0; j < 4; j++) {
+      //     printf("%02x", current_data[63 - (4 * i + j)]);
+      //   }
+      //   printf(" ");
+      // }
+      // printf("\n");
+      memory.write_chunk(narrow_addr, 8, current_data);
+    } else {
+      // Execute read
+      narrow_addr = dut->io_narrow_mem_req_bits_addr;
+      memory.read_chunk(narrow_addr, 8, &narrow_data);
+    }
+    narrow_response_pending = true;
+  }
+}
+
 void Sim::tick() {
 
   // Just before rising edge,
@@ -145,10 +201,12 @@ void Sim::tick() {
   //}
 
   wide_mem_response();
+  narrow_mem_response();
   // Drive low phase
   dut->clock = 0;
   dut->eval();
   wide_mem_transaction();
+  narrow_mem_transaction();
 
   if (trace) {
     trace->dump(context->time());

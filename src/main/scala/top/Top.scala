@@ -14,6 +14,7 @@ class Top extends Module {
 
   val io = IO(new Bundle {
     val mem = new DecoupledBusIO(addrWidth = 32, dataWidth = 512)
+    val narrow_mem = new DecoupledBusIO(addrWidth = 32, dataWidth = 64)
     // val axi = new AXIBundle(AXIConfig(dataWidth = 512))
     // val narrow_axi = new AXIBundle(AXIConfig(dataWidth = 64))
     // val mmio_axi = new AXIBundle(AXIConfig(addrWidth = 31, dataWidth = 64))
@@ -28,7 +29,9 @@ class Top extends Module {
   // io.narrow_axi <> manager.io.axi
   // io.mmio_axi <> manager.io.mmio_axi
 
-  // val manager = Module(new CVA6)
-  // io.narrow_axi <> manager.io.axi
+  val manager = Module(new CVA6)
+  val managerToMem = Module(new AxiToMem(addrWidth = 32, dataWidth = 64, axiConfig = AXIConfig(dataWidth = 64)))
+  managerToMem.io.axi <> manager.io.axi
+  io.narrow_mem <> managerToMem.io.mem
 
 }
