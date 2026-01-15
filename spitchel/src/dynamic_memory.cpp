@@ -1,4 +1,5 @@
 #include "dynamic_memory.h"
+#include <cstdio>
 #include <cstring>
 
 DynamicMemory::DynamicMemory(size_t page_size) : page_size(page_size) {}
@@ -17,8 +18,11 @@ bool DynamicMemory::read_chunk(size_t addr, size_t len, void *dst) {
       dst_bytes[i] = it->second[offset_in_page];
     } else {
       // Page doesn't exist, return zero
+      // printf("page doesn't exist :( \n");
       dst_bytes[i] = 0;
     }
+    // printf("reading from addr %p page %d with offset %d data %02x\n",
+    //        current_addr, page_index, offset_in_page, dst_bytes[i]);
   }
 
   return true;
@@ -31,11 +35,15 @@ void DynamicMemory::write_chunk(size_t addr, size_t len, const void *src) {
     size_t current_addr = addr + i;
     size_t page_index = current_addr / page_size;
     size_t offset_in_page = current_addr % page_size;
-
+    // if (len == 8) {
+    //   printf("writing to addr %p page %d with offset %d data %02x\n",
+    //          current_addr, page_index, offset_in_page, src_bytes[i]);
+    // }
     // Get or create the page
     auto &page = get_or_create_page(current_addr);
     page[offset_in_page] = src_bytes[i];
   }
+  // printf("\n");
 }
 
 uint32_t DynamicMemory::read_word(size_t addr) {

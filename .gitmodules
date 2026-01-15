@@ -6,7 +6,7 @@
 	url = git@github.com:eyalroz/printf
 [submodule "submodules/picolibc"]
 	path = submodules/picolibc
-	url = https://github.com/picolibc/picolibc.git
+	url = git@github.com:picolibc/picolibc
 [submodule "submodules/cva6"]
 	path = submodules/cva6
 	url = git@github.com:openhwgroup/cva6

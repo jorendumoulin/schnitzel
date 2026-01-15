@@ -6,7 +6,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <memory>
 #include <string>
 
 Sim::Sim(const std::vector<std::string> &args)
@@ -15,7 +14,8 @@ Sim::Sim(const std::vector<std::string> &args)
       sim_finished(false) {
 
   init_core();
-  loader.load_program(args[0], memory);
+  for (auto prog : args)
+    loader.load_program(prog, memory);
 
   // Add default AXI interfaces
   // add_axi_interface(std::make_unique<WideAxiInterface>("wide_axi"));
@@ -146,23 +146,34 @@ void Sim::narrow_mem_transaction() {
       memcpy(write_data, &dut->io_narrow_mem_req_bits_wdata, 8);
       narrow_strb = dut->io_narrow_mem_req_bits_ben;
       narrow_addr = dut->io_narrow_mem_req_bits_addr;
+
+      // Allign address to 8 bytes:
+
+      // printf("(%d) Writing data to addr %p\n", cycle_count, narrow_addr);
+      narrow_addr = (narrow_addr >> 3) << 3;
+      // printf("(%d) Aligned address: %p\n", cycle_count, narrow_addr);
+      // printf("(%d) strobe: %02x\n", cycle_count, narrow_strb);
+      // printf("(%d) before:", cycle_count);
+
       memory.read_chunk(narrow_addr, 8, current_data);
 
-      // printf("(%d) Writing data to addr %p\n", cycle_count, wide_addr);
-      // printf("(%d) before:", cycle_count);
-      // for (int i = 0; i < 64; i++)
-      //   printf("%x ", current_data[i]);
+      // for (int i = 0; i < 2; i++) {
+      //   for (int j = 0; j < 4; j++) {
+      //     printf("%02x", current_data[4 * i + 3 - j]);
+      //   }
+      //   printf(" ");
+      // }
       // printf("\n");
-      //  Apply byte strobes (64 bytes total)
+      //   Apply byte strobes (64 bytes total)
       for (int i = 0; i < 8; i++) {
-        if (wide_strb & (1ULL << i)) {
+        if (narrow_strb & (1ULL << i)) {
           current_data[i] = write_data[i];
         }
       }
       // printf("(%d) after:", cycle_count);
-      // for (int i = 0; i < 16; i++) {
+      // for (int i = 0; i < 2; i++) {
       //   for (int j = 0; j < 4; j++) {
-      //     printf("%02x", current_data[63 - (4 * i + j)]);
+      //     printf("%02x", current_data[4 * i + 3 - j]);
       //   }
       //   printf(" ");
       // }
@@ -172,6 +183,17 @@ void Sim::narrow_mem_transaction() {
       // Execute read
       narrow_addr = dut->io_narrow_mem_req_bits_addr;
       memory.read_chunk(narrow_addr, 8, &narrow_data);
+      // printf("(%d) Reading data from addr %p\n", cycle_count, narrow_addr);
+      // printf("(%d) read: ", cycle_count);
+      uint8_t *read_data = reinterpret_cast<uint8_t *>(&narrow_data);
+
+      // for (int i = 0; i < 2; i++) {
+      //   for (int j = 0; j < 4; j++) {
+      //     printf("%02x", read_data[4 * i + 3 - j]);
+      //   }
+      //   printf(" ");
+      // }
+      // printf("\n");
     }
     narrow_response_pending = true;
   }
@@ -284,6 +306,22 @@ int Sim::handle_host() {
     default: {
       if (verbose) {
         log("Unknown host syscall mem: %d\n", syscall_mem[0]);
+        log("sycall_mem[0] @ %p: %d\n", tohost + 0 * sizeof(uint32_t),
+            syscall_mem[0]);
+        log("sycall_mem[1] @ %p: %d\n", tohost + 1 * sizeof(uint32_t),
+            syscall_mem[1]);
+        log("sycall_mem[2] @ %p: %d\n", tohost + 2 * sizeof(uint32_t),
+            syscall_mem[2]);
+        log("sycall_mem[3] @ %p: %d\n", tohost + 3 * sizeof(uint32_t),
+            syscall_mem[3]);
+        log("sycall_mem[4] @ %p: %d\n", tohost + 4 * sizeof(uint32_t),
+            syscall_mem[4]);
+        log("sycall_mem[5] @ %p: %d\n", tohost + 5 * sizeof(uint32_t),
+            syscall_mem[5]);
+        log("sycall_mem[6] @ %p: %d\n", tohost + 6 * sizeof(uint32_t),
+            syscall_mem[6]);
+        log("sycall_mem[7] @ %p: %d\n", tohost + 7 * sizeof(uint32_t),
+            syscall_mem[7]);
       }
       break;
     }
@@ -336,6 +374,18 @@ int Sim::run() {
 
     // Clock tick
     tick();
+
+    if (cycle_count % 20 == 0) {
+      size_t pa = 0x60000338;
+      uint32_t a = memory.read_word(pa);
+      printf("%d: Data at %p:  %x\n", cycle_count * 2, pa, a);
+      size_t pb = 0x60400000;
+      uint32_t b = memory.read_word(pb);
+      printf("Data at %p:  %x\n", pb, b);
+      size_t pc = 0x60400004;
+      uint32_t c = memory.read_word(pc);
+      printf("Data at %p:  %x\n", pc, c);
+    }
 
     // Check max cycles limit
     if (max_cycles > 0 && cycle_count >= max_cycles) {

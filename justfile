@@ -21,7 +21,9 @@ verilate: generate-verilog
         -Wno-UNSIGNED \
         -Wno-WIDTH \
         -Wno-ASCRANGE \
+        -CFLAGS "-O3" \
         ./generated/*.sv
+
 
 make-sim: verilate
     make -C ./build/ -j
