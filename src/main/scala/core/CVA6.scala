@@ -26,12 +26,12 @@ class cva6_wrapper extends BlackBox with HasBlackBoxResource {
 }
 
 class CVA6 extends Module {
-  val io = IO(new Bundle { val axi = new AXIBundle(new AXIConfig)})
+  val io = IO(new Bundle { val axi = new AXIBundle(new AXIConfig) })
   val cva6 = Module(new cva6_wrapper)
   cva6.io.axi <> io.axi
 
   cva6.io.clk_i := clock
   cva6.io.rst_ni := ~reset.asBool
-  cva6.io.boot_addr_i := 0x80000000L.U
+  cva6.io.boot_addr_i := 0x60000000L.U
   cva6.io.hart_id_i := 0.U
 }

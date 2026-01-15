@@ -1,5 +1,6 @@
 #include "sim.h"
 #include <argparse/argparse.hpp>
+#include <string>
 #include <vector>
 
 int main(int argc, char *argv[]) {
@@ -19,7 +20,9 @@ int main(int argc, char *argv[]) {
 
   program.add_argument("--vcd").flag().help("enable vcd tracing");
 
-  program.add_argument("program").help("target program to simulate");
+  program.add_argument("program")
+      .help("target program to simulate")
+      .nargs(argparse::nargs_pattern::at_least_one);
 
   // Parse command-line arguments
   try {
@@ -31,8 +34,7 @@ int main(int argc, char *argv[]) {
 
   try {
     // Create simulator
-    std::vector<std::string> program_args;
-    program_args.push_back(program.get("program"));
+    auto program_args = program.get<std::vector<std::string>>("program");
     Sim sim(program_args);
 
     // Configure

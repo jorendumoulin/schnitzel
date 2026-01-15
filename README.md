@@ -3,10 +3,16 @@ This project simulates a SoC with verilator, and this simulation attaches throug
 A very basic implementation of this is found in [@sim.h](file:///home/joren/phd/schnitzel/spitchel/include/sim.h) and [@sim.cpp](file:///home/joren/phd/schnitzel/spitchel/src/sim.cpp) .
 
 Currently, the system has following limitations:
+
 - the memory is allocated all at once. there should be a mechanism to dynamically allocate memory as soon as there is a write request to that region. reading from regions that have not explicitly been written should result in an error.
 - the two axi interfaces are defined separately, resulting in a lot of code duplication. There should be a system where i can dynamically add one ore more axi interfaces, and then connect this interface to the verilated model. Difficult here is that for narrow axi interfaces, verilator will issue a VlWide<16> (512 bit) vs for narrow axi interfaces a QData object.
 - the axi interface is incomplete. there should be full support for bursts, with correct handling of lengths, strobes, different burst mechanisms, different burst sizes, ...
 - overall it is quite messy. axi should probably be refactored into a separate file.
+
+Why not use 0x8000000?
+riscv-unknown-gcc seems to be compiled with -mcmodel=medlow
+it seems like a pain to compile this ourselves to get a functioning flow with -mcmodel=medany,
+so the easier solution is to keep the full address space < 2GB instead, and compile with -mcmodel=medlow
 
 Chisel Project Template
 =======================
@@ -28,7 +34,7 @@ We recommend using Java 11 or later LTS releases. While Chisel itself works with
 SBT is the most common build tool in the Scala community. You can download it [here](https://www.scala-sbt.org/download.html).
 Mill is another Scala/Java build tool preferred by Chisel's developers.
 This repository includes a bootstrap script `./mill` so that no installation is necessary.
-You can read more about Mill on its website: https://mill-build.org.
+You can read more about Mill on its website: <https://mill-build.org>.
 
 #### Verilator
 
@@ -47,7 +53,6 @@ For more information, see ["Creating a repository from a template"](https://docs
 
 After using the template to create your own blank project, please wait a minute or two for the `Template cleanup` workflow to run which will removes some template-specific stuff from the repository (like the LICENSE).
 Refresh the repository page in your browser until you see a 2nd commit by `actions-user` titled `Template cleanup`.
-
 
 #### Clone your repository
 
@@ -77,6 +82,7 @@ The Unlicense is stripped when creating a repository from this template so that 
 For more information about a license, check out the [Github Docs](https://docs.github.com/en/free-pro-team@latest/github/building-a-strong-community/adding-a-license-to-a-repository).
 
 #### Commit your changes
+
 ```sh
 git commit -m 'Starting schnitzel'
 git push origin main
@@ -87,35 +93,39 @@ git push origin main
 You should now have a working Chisel3 project.
 
 You can run the included test with:
+
 ```sh
 sbt test
 ```
 
 Alternatively, if you use Mill:
+
 ```sh
 ./mill schnitzel.test
 ```
 
 You should see a whole bunch of output that ends with something like the following lines
+
 ```
 [info] Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0
 [info] All tests passed.
 [success] Total time: 5 s, completed Dec 16, 2020 12:18:44 PM
 ```
+
 If you see the above then...
 
-### It worked!
+### It worked
 
 You are ready to go. We have a few recommended practices and things to do.
 
-* Use packages and following conventions for [structure](https://www.scala-sbt.org/1.x/docs/Directories.html) and [naming](http://docs.scala-lang.org/style/naming-conventions.html)
-* Package names should be clearly reflected in the testing hierarchy
-* Build tests for all your work
-* Read more about testing in SBT in the [SBT docs](https://www.scala-sbt.org/1.x/docs/Testing.html)
-* This template includes a [test dependency](https://www.scala-sbt.org/1.x/docs/Library-Dependencies.html#Per-configuration+dependencies) on [ScalaTest](https://www.scalatest.org/). This, coupled with `svsim` (included with Chisel) and `verilator`, are a starting point for testing Chisel generators.
-  * You can remove this dependency in the build.sbt file if you want to
-* Change the name of your project in the build.sbt file
-* Change your README.md
+- Use packages and following conventions for [structure](https://www.scala-sbt.org/1.x/docs/Directories.html) and [naming](http://docs.scala-lang.org/style/naming-conventions.html)
+- Package names should be clearly reflected in the testing hierarchy
+- Build tests for all your work
+- Read more about testing in SBT in the [SBT docs](https://www.scala-sbt.org/1.x/docs/Testing.html)
+- This template includes a [test dependency](https://www.scala-sbt.org/1.x/docs/Library-Dependencies.html#Per-configuration+dependencies) on [ScalaTest](https://www.scalatest.org/). This, coupled with `svsim` (included with Chisel) and `verilator`, are a starting point for testing Chisel generators.
+  - You can remove this dependency in the build.sbt file if you want to
+- Change the name of your project in the build.sbt file
+- Change your README.md
 
 ## Problems? Questions?
 
