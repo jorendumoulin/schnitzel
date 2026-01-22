@@ -3,7 +3,7 @@
 
 // Number of hardware threads (harts) the program will use.
 #ifndef NUM_HARTS
-#define NUM_HARTS 3 // TODO: replace with actual number of harts if available
+#define NUM_HARTS 3 // TODO: replace with parametrized number of harts
 #endif
 
 // Putchar buffer size per hart.
@@ -53,12 +53,16 @@ static void flush_buffer(struct putc_buffer *buf) {
   h->syscall_mem[3] = h->size;              /* length */
   h->syscall_mem[4] = hart;                 /* length */
 
-  /* Trigger the host by writing the pointer to syscall_mem into tohost */
-  tohost = (uintptr_t)h->syscall_mem;
-
-  /* Busy-wait for host response */
-  while (fromhost == 0)
-    ;
+  while (1) {
+    /* Trigger the host by writing the pointer to syscall_mem into tohost */
+    tohost = (uintptr_t)h->syscall_mem;
+    /* Busy-wait for host response */
+    while (fromhost == 0)
+      ;
+    /* Make sure the response is targeted at this hartid */
+    // TODO:
+    break;
+  }
 
   /* Reset the host signal and our buffer */
   fromhost = 0;
@@ -66,8 +70,7 @@ static void flush_buffer(struct putc_buffer *buf) {
 }
 
 void putchar_(char ch) {
-  unsigned int hart =
-      hartid(); // TODO: replace with snrt_hartid() or equivalent
+  unsigned int hart = hartid();
 
   struct putc_buffer *buf = &putc_buffers[hart];
   struct putc_buffer_hdr *h = &buf->hdr;
