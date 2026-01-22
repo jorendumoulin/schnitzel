@@ -294,8 +294,8 @@ int Sim::handle_host() {
         a += putc_buffer[i];
       printf("(hart %d) %s", syscall_mem[4], a.c_str());
       memory.write_word(tohost_addr, 0);
-      // dummy response
-      memory.write_word(fromhost_addr, 1);
+      // write hart response to fromhost
+      memory.write_word(fromhost_addr, syscall_mem[4]);
       break;
     }
     case 93: {
@@ -374,18 +374,6 @@ int Sim::run() {
 
     // Clock tick
     tick();
-
-    if (cycle_count % 20 == 0) {
-      size_t pa = 0x60000338;
-      uint32_t a = memory.read_word(pa);
-      printf("%d: Data at %p:  %x\n", cycle_count * 2, pa, a);
-      size_t pb = 0x60400000;
-      uint32_t b = memory.read_word(pb);
-      printf("Data at %p:  %x\n", pb, b);
-      size_t pc = 0x60400004;
-      uint32_t c = memory.read_word(pc);
-      printf("Data at %p:  %x\n", pc, c);
-    }
 
     // Check max cycles limit
     if (max_cycles > 0 && cycle_count >= max_cycles) {
