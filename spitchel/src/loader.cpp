@@ -31,8 +31,8 @@ void Loader::load_program(std::string program, DynamicMemory &memory) {
     // This populates the "Flash" so Picolibc's memcpy has a source.
     if (fsize > 0) {
       memory.write_chunk(laddr, fsize, data);
-      printf("  Segment %d: Loaded 0x%lx bytes to LMA 0x%lx (VMA 0x%lx)\n", i,
-             fsize, laddr, vaddr);
+      // printf("  Segment %d: Loaded 0x%lx bytes to LMA 0x%lx (VMA 0x%lx)\n",
+      // i, fsize, laddr, vaddr);
     }
 
     // 2. Zero-fill the BSS at the VIRTUAL address
