@@ -1,7 +1,10 @@
 flatten-ibex:
     make -C ./src/main/resources/ibex
 
-generate-verilog: flatten-ibex
+flatten-cva6:
+    make -C ./src/main/resources/cva6
+
+generate-verilog: flatten-ibex flatten-cva6
     ./mill schnitzel.runMain spitchel.EmitVerilog
 
 verilate: generate-verilog
