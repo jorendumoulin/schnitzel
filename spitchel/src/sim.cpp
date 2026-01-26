@@ -146,10 +146,12 @@ void Sim::narrow_mem_transaction() {
       memcpy(write_data, &dut->io_narrow_mem_req_bits_wdata, 8);
       narrow_strb = dut->io_narrow_mem_req_bits_ben;
       narrow_addr = dut->io_narrow_mem_req_bits_addr;
+      uint64_t *all_data = (uint64_t *)write_data;
 
       // Allign address to 8 bytes:
 
       // printf("(%d) Writing data to addr %p\n", cycle_count, narrow_addr);
+      // printf("(%d) Writing data %x\n", cycle_count, *write_data);
       narrow_addr = (narrow_addr >> 3) << 3;
       // printf("(%d) Aligned address: %p\n", cycle_count, narrow_addr);
       // printf("(%d) strobe: %02x\n", cycle_count, narrow_strb);

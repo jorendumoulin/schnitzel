@@ -1,6 +1,8 @@
 #include <stdio.h>
 
 int main() {
-  printf("Hello from CVA6 with picolibc!\n");
+  for (int i = 0; i < 100; i++) {
+    printf("Hello World! %d\n", i);
+  }
   return 0;
 }
