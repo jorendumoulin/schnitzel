@@ -1,6 +1,6 @@
 [workspace]
-authors = ["Josse Van Delm <josse.vandelm@gmail.com>"]
-channels = ["conda-forge", "JosseVanDelm"]
+authors = ["Joren Dumoulin <joren.dumoulin@kuleuven.be>"]
+channels = ["conda-forge"]
 name = "schnitzel"
 platforms = ["linux-64"]
 version = "0.1.0"
@@ -19,3 +19,16 @@ gxx = ">=15.2.0,<15.3"
 cpp-argparse = ">=3.2,<4"
 ninja = ">=1.13.2,<2"
 riscv-gnu-toolchain = "==2026.01.23nightly"
+[system-requirements]
+libc = { family = "glibc", version = "2.34" }
+
+[tasks]
+
+[dependencies]
+python = ">=3.12,<3.13"
+gcc = ">=14,<15"
+gxx = ">=14,<15"
+
+[pypi-dependencies]
+executorch = ">=1.0.1, <2"
+torchgen = ">=0.0.1, <0.0.2"

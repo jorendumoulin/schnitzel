@@ -2,6 +2,9 @@
 
 int main() {
 
+  for (;;)
+    ;
+
   int hart = hartid();
 
   if (hart == 1) {
