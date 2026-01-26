@@ -10,3 +10,6 @@
 [submodule "submodules/cva6"]
 	path = submodules/cva6
 	url = git@github.com:openhwgroup/cva6
+[submodule "submodules/executorch"]
+	path = submodules/executorch
+	url = git@github.com:pytorch/executorch.git
