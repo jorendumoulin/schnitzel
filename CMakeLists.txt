@@ -9,6 +9,7 @@ set(TOOLCHAIN_ROOT ${PROJECT_ROOT}/cmake)
 set(GENERATED_DIR ${PROJECT_ROOT}/generated)
 set(VERILATED_DIR ${PROJECT_ROOT}/verilated)
 
+add_subdirectory(host)
 add_subdirectory(sw)
 add_subdirectory(tests/apps)
 add_subdirectory(spitchel)

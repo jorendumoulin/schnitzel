@@ -11,6 +11,7 @@ struct putc_buffer_hdr {
 };
 
 int hartid() {
+  return 0;
   int result;
   __asm__ volatile("csrr %0, mhartid" : "=r"(result));
   return result;
@@ -38,17 +39,15 @@ static void flush_buffer(struct putc_buffer *buf) {
     return;
   }
 
-  int hart = hartid();
-
   /* Prepare an HTIF-style "write" syscall */
-  h->syscall_mem[0] = 64;                   /* syscall: write */
-  h->syscall_mem[1] = 1;                    /* fd = stdout */
-  h->syscall_mem[2] = (uintptr_t)buf->data; /* pointer to data */
-  h->syscall_mem[3] = h->size;              /* length */
-  h->syscall_mem[4] = hart;                 /* length */
+  h->syscall_mem[0] = 64;                             /* syscall: write */
+  h->syscall_mem[1] = 1;                              /* fd = stdout */
+  h->syscall_mem[2] = (uint32_t)(uintptr_t)buf->data; /* pointer to data */
+  h->syscall_mem[3] = h->size;                        /* length */
+  h->syscall_mem[4] = 0;                              /* length */
 
   /* Trigger the host by writing the pointer to syscall_mem into tohost */
-  tohost = (uint32_t)h->syscall_mem;
+  tohost = (uint32_t)(uintptr_t)h->syscall_mem;
 
   /* Busy-wait for host response */
   while (fromhost == 0)
