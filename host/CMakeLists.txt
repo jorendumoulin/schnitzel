@@ -1,55 +1,79 @@
-set(CMAKE_C_COMPILER   riscv64-unknown-elf-gcc)
-set(CMAKE_CXX_COMPILER riscv64-unknown-elf-g++)
+cmake_minimum_required(VERSION 3.20)
 
-# Remove standard cmake flags
-set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
-set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
-
-# Include paths for picolibc:
-if(PICOLIBC_PREFIX)
-  set(PICOLIBC_SYSROOT "${PICOLIBC_PREFIX}/picolibc/riscv64-unknown-elf")
-else()
-  set(PICOLIBC_SYSROOT "/usr/local/picolibc/riscv64-unknown-elf")
+if(NOT CMAKE_TOOLCHAIN_FILE)
+  set(CMAKE_TOOLCHAIN_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/toolchain.cmake"
+      CACHE FILEPATH "Toolchain file")
 endif()
-include_directories(SYSTEM ${PICOLIBC_SYSROOT}/include)
 
-# Default compile options
-add_compile_options(
-  -ftls-model=local-exec
-  -mstack-protector-guard=global
+project(host C CXX ASM)
+
+add_library(host STATIC
+    crt0.S
+    syscalls.c
+    host.c
+)
+target_link_options(host INTERFACE
+    # Supply a custom startup and linker script:
+    -T ${CMAKE_CURRENT_SOURCE_DIR}/link.ld
+    -nostartfiles
+    # Disable warning about load with rwx permisisons
+    -Wl,--no-warn-rwx-segments
+    # Overwrite newlib's _write stub:
+    -Wl,--wrap=_write
+    -Wl,--undefined=__wrap__write
 )
 
-# Library paths
-link_directories(
-  ${PICOLIBC_SYSROOT}/lib/${CMAKE_SYSTEM_PROCESSOR}
-  ${PICOLIBC_SYSROOT}/lib
-  ${CMAKE_SOURCE_DIR}/host
+
+add_executable(hello_world hello_world.cpp)
+target_link_libraries(hello_world PRIVATE host)
+
+
+# Add these flags to your C and CXX flags
+# add_compile_options(-ffunction-sections -fdata-sections)
+# add_compile_options(-fno-exceptions -fno-rtti)
+
+# target_link_options(executorch_test PRIVATE -Wl,--gc-sections)
+
+# Configure and include executorch:
+set(EXECUTORCH_BUILD_CPUINFO OFF CACHE BOOL "Disable cpuinfo (requires pthreads)" FORCE)
+set(EXECUTORCH_BUILD_PTHREADPOOL OFF CACHE BOOL "Disable pthreadpool (requires pthreads)" FORCE)
+set(EXECUTORCH_PAL_DEFAULT minimal CACHE STRING "")
+set(EXECUTORCH_DTYPE_SELECTIVE_BUILD ON CACHE BOOL "")
+set(EXECUTORCH_ENABLE_LOGGING OFF CACHE BOOL "")
+set(EXECUTORCH_SELECT_ALL_OPS OFF CACHE BOOL "")
+set(EXECUTORCH_BUILD_EXECUTOR_RUNNER OFF CACHE BOOL "")
+
+# set(EXECUTORCH_USE_DL OFF CACHE BOOL "" FORCE)
+# set(EXECUTORCH_ENABLE_DTYPE_SELECTIVE_BUILD ON CACHE BOOL "" FORCE)
+# add_definitions(-Wno-error=unterminated-string-initialization)
+add_subdirectory("../submodules/executorch/" "executorch")
+
+add_executable(executorch_test main.cpp)
+
+# Project-specific includes
+target_include_directories(executorch_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules
+    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules/executorch/third-party
+    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules/executorch/runtime/core/portable_type/c10
 )
 
-# libc/libgcc linker group:
-link_libraries(
-  -Wl,--start-group
-  gcc
-  c
-  -Wl,--end-group
+target_compile_definitions(executorch_test PRIVATE
+    C10_USING_CUSTOM_GENERATED_MACROS
+    EXECUTORCH_ENABLE_LOGGING=OFF
+    EXECUTORCH_PAL_DEFAULT=minimal
 )
 
-# Other link options:
-add_link_options(
-  -Tlink.ld
-  -Wl,--gc-sections
-  -nostartfiles
-  -nostdlib
-  ${PICOLIBC_SYSROOT}/lib/crt0.o
-)
+target_compile_options(executorch_test PRIVATE -Os -ffunction-sections -fdata-sections)
 
-# Testing executable
-add_executable(picolibc_test
-  host.c
-  test.c
-  retarget.c
-)
-
-target_include_directories(picolibc_test PRIVATE
-  ${CMAKE_SOURCE_DIR}/submodules/picolibc/libc/stdio
+target_link_libraries(
+    executorch_test
+    PRIVATE
+        host
+        executorch         # Core Runtime
+        executorch_core
+        portable_kernels    # Clean C++ math ops (no FFT/Eigen dependencies)
+        -Wl,--whole-archive
+        portable_ops_lib
+        -Wl,--no-whole-archive
 )

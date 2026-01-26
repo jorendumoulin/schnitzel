@@ -3,7 +3,7 @@ ENTRY(_start)
 MEMORY
 {
     HTIF   (rwx): ORIGIN = 0x2000, LENGTH = 4K
-    RAM    (rwx): ORIGIN = 0x60000000, LENGTH = 1024K
+    RAM    (rwx): ORIGIN = 0x60000000, LENGTH = 100M
 }
 
 SECTIONS
@@ -11,6 +11,8 @@ SECTIONS
     /* Start of RAM */
     . = ORIGIN(RAM);
     PROVIDE(__stack = ORIGIN(RAM) + LENGTH(RAM));
+    /* Stack top symbol */
+    _stack_top = ORIGIN(RAM) + LENGTH(RAM);
 
     .text : {
         *(.text.init)
@@ -34,7 +36,7 @@ SECTIONS
     __data_size = SIZEOF(.data);
 
     .sdata : {
-        __global_pointer$ = . + 0x800;
+        __global_pointer = . + 0x800;
         *(.sdata*)
     } > RAM
 
@@ -57,4 +59,5 @@ SECTIONS
     /* HTIF communication */
     .tohost : ALIGN(8) {} > HTIF
     .fromhost : ALIGN(8) {} > HTIF
+
 }

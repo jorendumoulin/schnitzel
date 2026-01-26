@@ -1,0 +1,125 @@
+cmake_minimum_required(VERSION 3.20)
+
+set(PICOLIBC_SYSROOT "/usr/local/picolibc/riscv64-unknown-elf" CACHE PATH "Picolibc sysroot")
+set(GCC_TOOLCHAIN "/home/joren/Downloads/riscv" CACHE PATH "GCC toolchain path")
+
+set(CMAKE_C_COMPILER clang)
+set(CMAKE_CXX_COMPILER clang++)
+set(CMAKE_DL_LIBS "")
+
+project(riscv64gc_project C CXX)
+
+set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_SYSTEM_PROCESSOR riscv64)
+
+# Target and sysroot flags
+add_compile_options(
+    --target=riscv64-unknown-elf
+    --sysroot=${PICOLIBC_SYSROOT}
+    --gcc-toolchain=${GCC_TOOLCHAIN}
+    -march=rv64gc
+    -mabi=lp64d
+    -Wno-error=unterminated-string-initialization
+)
+
+# C++ specific flags
+add_compile_options(
+    $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
+    $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
+    $<$<COMPILE_LANGUAGE:CXX>:-isystem${GCC_TOOLCHAIN}/riscv64-unknown-elf/include/c++/15.2.0>
+    $<$<COMPILE_LANGUAGE:CXX>:-isystem${GCC_TOOLCHAIN}/riscv64-unknown-elf/include/c++/15.2.0/riscv64-unknown-elf>
+)
+
+add_link_options(
+    --target=riscv64-unknown-elf
+    --sysroot=${PICOLIBC_SYSROOT}
+    --gcc-toolchain=${GCC_TOOLCHAIN}
+    -march=rv64gc
+    -mabi=lp64d
+    -nostdlib
+    -nostartfiles
+    -L${PICOLIBC_SYSROOT}/lib
+    -L${GCC_TOOLCHAIN}/lib/gcc/riscv64-unknown-elf/15.2.0
+    -L${GCC_TOOLCHAIN}/riscv64-unknown-elf/lib
+)
+
+link_libraries(
+  -Wl,--start-group
+  c
+  m
+  gcc
+  stdc++
+  -Wl,--end-group
+)
+# Link libraries
+# target_link_libraries(your_program
+#     -Wl,--start-group
+#     c
+#     m
+#     gcc
+#     stdc++
+#     -Wl,--end-group
+# )
+
+
+
+
+add_executable(main
+    retarget.c
+    host.c
+    test.cpp
+)
+
+
+add_executable(executorch_test
+    retarget.c
+    host.c
+    main.cpp
+)
+
+# Project-specific includes
+target_include_directories(executorch_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules
+    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules/executorch/third-party
+    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules/executorch/runtime/core/portable_type/c10
+)
+
+set(EXECUTORCH_USE_DL OFF CACHE BOOL "" FORCE)
+
+add_subdirectory("../submodules/executorch/" "executorch")
+
+#
+# # Project-specific defines
+target_compile_definitions(executorch_test PRIVATE
+    C10_USING_CUSTOM_GENERATED_MACROS
+    EXECUTORCH_ENABLE_LOGGING=OFF
+    EXECUTORCH_PAL_DEFAULT=minimal
+)
+
+target_link_libraries(
+    executorch_test
+    PRIVATE
+        executorch         # Core Runtime
+        portable_kernels    # Clean C++ math ops (no FFT/Eigen dependencies)
+        portable_ops_lib
+)
+
+# Link libraries
+# target_link_libraries(your_program
+#     -Wl,--start-group
+#     c
+#     m
+#     gcc
+#     stdc++
+#     -Wl,--end-group
+# )
+
+# # Add startup files
+# target_link_options(your_program PRIVATE
+#     ${PICOLIBC_LIB_DIR}/crt0.o
+#     ${GCC_TOOLCHAIN_ROOT}/lib/gcc/riscv64-unknown-elf/${GCC_VERSION}/crtbegin.o
+# )
+#
+# set_target_properties(your_program PROPERTIES
+#     LINK_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GCC_TOOLCHAIN_ROOT}/lib/gcc/riscv64-unknown-elf/${GCC_VERSION}/crtend.o"
+# )
