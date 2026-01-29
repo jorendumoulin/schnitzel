@@ -1,6 +1,6 @@
 [workspace]
 authors = ["Josse Van Delm <josse.vandelm@gmail.com>"]
-channels = ["conda-forge"]
+channels = ["conda-forge", "JosseVanDelm"]
 name = "schnitzel"
 platforms = ["linux-64"]
 version = "0.1.0"
@@ -18,7 +18,9 @@ gcc = ">=15.2.0,<15.3"
 gxx = ">=15.2.0,<15.3"
 cpp-argparse = ">=3.2,<4"
 ninja = ">=1.13.2,<2"
+riscv-gnu-toolchain = "==2026.01.23nightly"
+
 
 [activation.env]
-PATH = "${PATH}:/home/josse/riscv/riscv/bin"
+#PATH = "${PATH}:/home/josse/riscv/riscv/bin"
 PICOLIBC_PREFIX = "/home/josse/riscv"
