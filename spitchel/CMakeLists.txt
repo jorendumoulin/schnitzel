@@ -4,6 +4,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find dependencies
 find_package(verilator HINTS $ENV{VERILATOR_ROOT})
 find_package(PkgConfig REQUIRED)
+find_package(Threads REQUIRED)
 #pkg_check_modules(FESVR REQUIRED riscv-fesvr)
 
 message(STATUS "PROJECT_ROOT in root subdir: ${GENERATED_DIR}")
@@ -69,6 +70,7 @@ target_include_directories(spitchel PRIVATE
 )
 
 target_link_libraries(spitchel PRIVATE
+  Threads::Threads
   ${VERILATED_DIR}/VTop__ALL.a
   ${FESVR_LIBRARIES}
   bootrom_data
