@@ -19,8 +19,3 @@ gxx = ">=15.2.0,<15.3"
 cpp-argparse = ">=3.2,<4"
 ninja = ">=1.13.2,<2"
 riscv-gnu-toolchain = "==2026.01.23nightly"
-
-
-[activation.env]
-#PATH = "${PATH}:/home/josse/riscv/riscv/bin"
-PICOLIBC_PREFIX = "/home/josse/riscv"
