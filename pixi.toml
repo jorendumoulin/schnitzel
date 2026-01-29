@@ -1,0 +1,24 @@
+[workspace]
+authors = ["Josse Van Delm <josse.vandelm@gmail.com>"]
+channels = ["conda-forge"]
+name = "schnitzel"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+verilator = "==5.044"
+ccache = ">=4.12.2,<5"
+openjdk = ">=25.0.1,<26"
+clang = ">=21.1.8,<22"
+elfio = ">=3.12,<4"
+cmake = ">=4.2.3,<5"
+gcc = ">=15.2.0,<15.3"
+gxx = ">=15.2.0,<15.3"
+cpp-argparse = ">=3.2,<4"
+ninja = ">=1.13.2,<2"
+
+[activation.env]
+PATH = "${PATH}:/home/josse/riscv/riscv/bin"
+PICOLIBC_PREFIX = "/home/josse/riscv"
