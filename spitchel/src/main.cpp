@@ -18,7 +18,9 @@ int main(int argc, char *argv[]) {
       .default_value(0)
       .help("maximum simulation cycles (0 for unlimited)");
 
-  program.add_argument("--vcd").flag().help("enable vcd tracing");
+  program.add_argument("--vcd")
+        .flag()
+        .help("enable vcd tracing");
 
   program.add_argument("program")
       .help("target program to simulate")
@@ -40,7 +42,10 @@ int main(int argc, char *argv[]) {
     // Configure
     sim.set_verbose(program.get<bool>("verbose"));
     sim.set_max_cycles(max_cycles);
-    sim.enable_trace("./sim.vcd");
+    if (program.get<bool>("vcd")) {
+        sim.enable_trace("./sim.vcd");
+    }
+
 
     // Run simulation
     return sim.run();
