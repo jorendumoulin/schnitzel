@@ -6,11 +6,13 @@ set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 
 # Include paths for picolibc:
-if(PICOLIBC_PREFIX)
-  set(PICOLIBC_SYSROOT "${PICOLIBC_PREFIX}/picolibc/riscv64-unknown-elf")
-else()
-  set(PICOLIBC_SYSROOT "/usr/local/picolibc/riscv64-unknown-elf")
-endif()
+#if(PICOLIBC_PREFIX)
+#  set(PICOLIBC_SYSROOT "${PICOLIBC_PREFIX}/picolibc/riscv64-unknown-elf")
+#else()
+#  set(PICOLIBC_SYSROOT "/usr/local/picolibc/riscv64-unknown-elf")
+#endif()
+set(PICOLIBC_PREFIX /home/josse/riscv/)
+set(PICOLIBC_SYSROOT /home/josse/riscv/picolibc/riscv64-unknown-elf/)
 include_directories(SYSTEM ${PICOLIBC_SYSROOT}/include)
 
 # Default compile options
@@ -52,4 +54,7 @@ add_executable(picolibc_test
 
 target_include_directories(picolibc_test PRIVATE
   ${CMAKE_SOURCE_DIR}/submodules/picolibc/libc/stdio
+  ${PICOLIBC_SYSROOT}/include
+  ${CMAKE_SOURCE_DIR}/submodules/picolibc/libc/include
+  ${CMAKE_SOURCE_DIR}/submodules/picolibc/build-riscv64-unknown-elf/
 )
