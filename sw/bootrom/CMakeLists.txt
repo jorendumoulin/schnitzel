@@ -11,6 +11,11 @@ target_link_options(bootrom PRIVATE
 
 # Dump bootrom as binary after building
 add_custom_command(
-    TARGET bootrom POST_BUILD
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/bootrom.bin"
     COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:bootrom> ${CMAKE_CURRENT_BINARY_DIR}/bootrom.bin
+    DEPENDS bootrom
+    COMMENT "Extracting binary bootrom"
+    VERBATIM
 )
+
+add_custom_target(bootrom_bin_gen ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/bootrom.bin")
