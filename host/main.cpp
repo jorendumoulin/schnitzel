@@ -15,15 +15,14 @@ using namespace executorch::runtime;
 using namespace executorch::extension;
 using executorch::runtime::runtime_init;
 
-extern void register_all_kernels();
-
 // 1. Memory for the method's internal state (metadata, tensors)
-uint8_t method_allocator_pool[1024];
-uint8_t activation_pool[128];
+uint8_t method_allocator_pool[10 * 1024];
+uint8_t activation_pool[10 * 1024];
 
 int main() {
   et_pal_init();
   runtime_init();
+  // register_all_kernels();
 
   if (registry_has_op_function("aten::add.out")) {
     printf("aten::add.out present\n");
@@ -80,6 +79,7 @@ int main() {
   }
 
   printf("Running method_res...\n");
+  printf("Running method_res for sure now!\n");
   Method &method = method_res.get();
 
   // Create input tensor: [1, 28, 28]
@@ -92,6 +92,8 @@ int main() {
                         input_sizes, // [1, 28, 28]
                         input_data, dim_order);
   Tensor input(&input_impl);
+
+  printf("Setting input...\n");
 
   auto abc = method.set_input(&input, 0);
 

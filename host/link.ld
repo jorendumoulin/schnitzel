@@ -3,7 +3,7 @@ ENTRY(_start)
 MEMORY
 {
     HTIF   (rwx): ORIGIN = 0x2000, LENGTH = 4K
-    RAM    (rwx): ORIGIN = 0x60000000, LENGTH = 100M
+    RAM    (rwx): ORIGIN = 0x60000000, LENGTH = 200M
 }
 
 SECTIONS
@@ -21,6 +21,20 @@ SECTIONS
 
     .rodata : {
         *(.rodata*)
+    } > RAM
+
+    .init_array : ALIGN(4) {
+        __init_array_start = .;
+        KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
+        KEEP (*(.init_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .ctors))
+        __init_array_end = .;
+    } > RAM
+
+    .fini_array : ALIGN(4) {
+        __fini_array_start = .;
+        KEEP (*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
+        KEEP (*(.fini_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .dtors))
+        __fini_array_end = .;
     } > RAM
 
     /* Flash copy of .data */
