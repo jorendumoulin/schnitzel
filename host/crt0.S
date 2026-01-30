@@ -16,6 +16,12 @@ _start:
   la a2, __data_size
   beqz a2, 1f                    # Skip if size is 0
   call memcpy
+
+  /* 3. Enable FPU */
+  li t0, 0x00006000
+  csrs sstatus, t0
+  csrs mstatus, t0
+  fscsr x0
 1:
 
   /* 3. Clear bss */
