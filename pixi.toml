@@ -1,9 +1,11 @@
 [workspace]
-authors = ["Joren Dumoulin <joren.dumoulin@kuleuven.be>"]
-channels = ["conda-forge"]
+channels = ["conda-forge", "JosseVanDelm"]
 name = "schnitzel"
 platforms = ["linux-64"]
 version = "0.1.0"
+
+[system-requirements]
+libc = { family = "glibc", version = "2.34" }
 
 [tasks]
 
@@ -14,20 +16,12 @@ openjdk = ">=25.0.1,<26"
 clang = ">=21.1.8,<22"
 elfio = ">=3.12,<4"
 cmake = ">=4.2.3,<5"
-gcc = ">=15.2.0,<15.3"
-gxx = ">=15.2.0,<15.3"
+gcc = ">=14,<15"
+gxx = ">=14,<15"
 cpp-argparse = ">=3.2,<4"
 ninja = ">=1.13.2,<2"
 riscv-gnu-toolchain = "==2026.01.23nightly"
-[system-requirements]
-libc = { family = "glibc", version = "2.34" }
-
-[tasks]
-
-[dependencies]
 python = ">=3.12,<3.13"
-gcc = ">=14,<15"
-gxx = ">=14,<15"
 
 [pypi-dependencies]
 executorch = ">=1.0.1, <2"
