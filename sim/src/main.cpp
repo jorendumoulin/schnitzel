@@ -8,7 +8,7 @@ int main(int argc, char *argv[]) {
   std::string version = "0.0.1";
 
   // Define command-line arguments
-  argparse::ArgumentParser program("spitchel", version);
+  argparse::ArgumentParser program("sim", version);
 
   program.add_argument("--verbose").flag().help("enable verbose output");
 
@@ -18,9 +18,7 @@ int main(int argc, char *argv[]) {
       .default_value(0)
       .help("maximum simulation cycles (0 for unlimited)");
 
-  program.add_argument("--vcd")
-        .flag()
-        .help("enable vcd tracing");
+  program.add_argument("--vcd").flag().help("enable vcd tracing");
 
   program.add_argument("program")
       .help("target program to simulate")
@@ -43,9 +41,8 @@ int main(int argc, char *argv[]) {
     sim.set_verbose(program.get<bool>("verbose"));
     sim.set_max_cycles(max_cycles);
     if (program.get<bool>("vcd")) {
-        sim.enable_trace("./sim.vcd");
+      sim.enable_trace("./sim.vcd");
     }
-
 
     // Run simulation
     return sim.run();

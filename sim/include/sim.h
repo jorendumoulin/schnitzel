@@ -1,7 +1,7 @@
 // See LICENSE for license details.
 
-#ifndef __SPITCHEL_H
-#define __SPITCHEL_H
+#ifndef __SIM_H
+#define __SIM_H
 
 // #include "axi_interface.h"
 #include "dynamic_memory.h"
@@ -155,4 +155,4 @@ private:
   void print_core_state();
 };
 
-#endif // __SPITCHEL_H
+#endif // __SIM_H

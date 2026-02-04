@@ -49,8 +49,8 @@ add_custom_command(
 add_library(bootrom_data STATIC ${CMAKE_BINARY_DIR}/sw/bootrom/bootrom.c)
 add_dependencies(bootrom_data bootrom)
 
-# Spitchel executable
-add_executable(spitchel
+# Sim executable
+add_executable(sim
   src/main.cpp
   src/sim.cpp
   src/memory.cpp
@@ -61,7 +61,7 @@ add_executable(spitchel
 
 # add_dependencies(spitchel verilate)
 
-target_include_directories(spitchel PRIVATE
+target_include_directories(sim PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${FESVR_INCLUDE_DIRS}
   ${VERILATOR_ROOT}/include
@@ -69,14 +69,14 @@ target_include_directories(spitchel PRIVATE
   ${VERILATED_DIR}
 )
 
-target_link_libraries(spitchel PRIVATE
+target_link_libraries(sim PRIVATE
   Threads::Threads
   ${VERILATED_DIR}/VTop__ALL.a
   ${FESVR_LIBRARIES}
   bootrom_data
 )
 
-target_sources(spitchel PRIVATE
+target_sources(sim PRIVATE
   ${VERILATOR_ROOT}/include/verilated.cpp
   ${VERILATOR_ROOT}/include/verilated_vcd_c.cpp
   ${VERILATOR_ROOT}/include/verilated_threads.cpp

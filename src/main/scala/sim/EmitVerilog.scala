@@ -1,4 +1,4 @@
-package spitchel
+package sim
 
 import chisel3._
 import circt.stage.ChiselStage
