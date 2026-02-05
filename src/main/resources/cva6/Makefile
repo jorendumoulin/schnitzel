@@ -3,7 +3,7 @@
 dir := $(abspath .)
 cva6 := $(dir)/../../../../submodules/cva6
 
-FLATTENED_VERILOG := CVA6WrapperFlattened.sv
+FLATTENED_VERILOG := cva6_wrapper_flattened.sv
 
 .PHONY: default clean
 default: $(FLATTENED_VERILOG)
@@ -270,7 +270,7 @@ CVA6_VSRCS := \
 #     $(cva6)/core/include/instr_tracer_pkg.sv \
 #     $(cva6)/common/local/util/instr_tracer.sv
 
-CVA6_WRAPPER := $(dir)/CVA6Wrapper.sv
+CVA6_WRAPPER := $(dir)/cva6_wrapper.sv
 
 CVA6_SRCS := $(CVA6_PKGS) $(CVA6_VSRCS) $(CVA6_WRAPPER)
 

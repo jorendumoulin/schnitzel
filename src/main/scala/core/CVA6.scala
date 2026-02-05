@@ -21,7 +21,7 @@ class cva6_wrapper extends BlackBox with HasBlackBoxResource {
   })
 
   // Add cva6 resources:
-  addResource("/cva6/CVA6WrapperFlattened.sv")
+  addResource("/cva6/cva6_wrapper_flattened.sv")
 
 }
 
