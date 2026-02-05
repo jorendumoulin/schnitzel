@@ -1,4 +1,4 @@
-module cva6_wrapper #(
+module cva6_wrapper_flattened #(
   parameter AXI_ADDRESS_WIDTH = 64,
   parameter AXI_DATA_WIDTH = 64,
   parameter AXI_USER_WIDTH = 64,

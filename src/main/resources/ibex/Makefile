@@ -3,7 +3,7 @@
 dir := $(abspath .)
 ibex := $(dir)/../../../../submodules/ibex
 
-FLATTENED_VERILOG := IbexWrapperFlattened.sv
+FLATTENED_VERILOG := ibex_wrapper_flattened.sv
 
 .PHONY: default clean
 default: $(FLATTENED_VERILOG)
@@ -58,7 +58,7 @@ IBEX_VSRCS := \
 	$(ibex)/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_generic_ram_1p.sv \
 	$(ibex)/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_generic_buf.sv
 
-IBEX_WRAPPER := $(dir)/IbexWrapper.sv
+IBEX_WRAPPER := $(dir)/ibex_wrapper.sv
 
 IBEX_SRCS := $(IBEX_PKGS) $(IBEX_VSRCS) $(IBEX_WRAPPER)
 

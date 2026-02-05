@@ -1,6 +1,6 @@
 // Simple wrapper exposing useful ports and configuring Ibex parameters to the 'small' configuration.
 
-module ibex_wrapper (
+module ibex_wrapper_flattened (
     // Clock and Reset
     input clk_i,
     input rst_ni,

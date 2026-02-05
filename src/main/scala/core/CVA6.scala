@@ -8,7 +8,7 @@ import axi.AXIConfig
 import chisel3._
 import circt.stage.ChiselStage
 
-class cva6_wrapper extends BlackBox with HasBlackBoxResource {
+class cva6_wrapper_flattened extends BlackBox with HasBlackBoxResource {
 
   val io = IO(new Bundle {
 
@@ -27,7 +27,7 @@ class cva6_wrapper extends BlackBox with HasBlackBoxResource {
 
 class CVA6 extends Module {
   val io = IO(new Bundle { val axi = new AXIBundle(new AXIConfig) })
-  val cva6 = Module(new cva6_wrapper)
+  val cva6 = Module(new cva6_wrapper_flattened)
   cva6.io.axi <> io.axi
 
   cva6.io.clk_i := clock
