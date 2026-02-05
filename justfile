@@ -5,7 +5,7 @@ flatten-cva6:
     make -C ./src/main/resources/cva6
 
 generate-verilog: flatten-ibex flatten-cva6
-    ./mill schnitzel.runMain spitchel.EmitVerilog
+    ./mill schnitzel.runMain sim.EmitVerilog
 
 verilate: generate-verilog
     OBJCACHE=ccache \

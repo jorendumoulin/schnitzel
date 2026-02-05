@@ -245,16 +245,16 @@ void Sim::tick() {
 // }
 
 // Bootloader binary provided by cmake build process
-extern unsigned char bootrom_data[];
-extern unsigned int bootrom_data_len;
+// extern unsigned char bootrom_data[];
+// extern unsigned int bootrom_data_len;
 
 void Sim::load_bootrom() {
   // Load bootrom at starting address 0x1080
-  memory.write_chunk(0x1080, bootrom_data_len, bootrom_data);
+  // memory.write_chunk(0x1080, bootrom_data_len, bootrom_data);
 
   // Overwrite starting address with entry point of binary
   uint32_t e = loader.get_entry_point();
-  memory.write_chunk(0x1080 + bootrom_data_len - 4, 4, &e);
+  // memory.write_chunk(0x1080 + bootrom_data_len - 4, 4, &e);
 
   if (verbose) {
     log("Finished loading program\n");
