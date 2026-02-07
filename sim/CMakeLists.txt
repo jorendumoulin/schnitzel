@@ -20,7 +20,7 @@ verilate(sim
         ${CMAKE_SOURCE_DIR}/generated/Top.sv
     TOP_MODULE Top
     PREFIX VTop
-    TRACE
+    TRACE_VCD
     THREADS ${CMAKE_HOST_SYSTEM_PROCESSOR_COUNT}
     VERILATOR_ARGS
         "-Wno-UNOPTFLAT" "-Wno-MULTIDRIVEN" "-Wno-LATCH"
