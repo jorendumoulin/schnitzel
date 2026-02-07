@@ -5,5 +5,5 @@ project(schnitzel)
 
 add_subdirectory(sim)
 # add_subdirectory(host)
-# add_subdirectory(sw)
+add_subdirectory(sw)
 # add_subdirectory(tests/apps)

@@ -1,9 +1,6 @@
     .section .init
     .globl _start
 _start:
-
-    # Set up stack pointer
-    # Get hartid:
     csrr a0, mhartid
     # Each hart gets its own stack space of 2KB
     li a1, 0x800        # 2KB per hart
