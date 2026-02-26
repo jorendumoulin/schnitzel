@@ -13,7 +13,6 @@ libc = { family = "glibc", version = "2.34" }
 verilator = "==5.044"
 ccache = ">=4.12.2,<5"
 openjdk = ">=25.0.1,<26"
-clang = ">=21.1.8,<22"
 elfio = ">=3.12,<4"
 cmake = ">=4.2.3,<5"
 gcc = ">=14,<15"
@@ -22,6 +21,8 @@ cpp-argparse = ">=3.2,<4"
 ninja = ">=1.13.2,<2"
 riscv-gnu-toolchain = "==2026.01.23nightly"
 python = ">=3.12,<3.13"
+clang = ">=21.1.8,<22"
+lld = ">=21.1.8,<22"
 
 [pypi-dependencies]
 executorch = ">=1.0.1, <2"
