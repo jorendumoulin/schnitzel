@@ -6,14 +6,30 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include <string>
 
-Sim::Sim(const std::vector<std::string> &args)
+Sim::Sim(const std::vector<std::string> &args, const std::string &vltargs)
     : dut(nullptr), context(nullptr), trace(nullptr), cycle_count(0),
       memory(4096), max_cycles(0), instr_count(0), verbose(false),
       sim_finished(false) {
 
-  init_core();
+  std::stringstream ss(vltargs);
+  std::vector<std::string> v_args_vec;
+  std::string tmp;
+  while (ss >> tmp) {
+    v_args_vec.push_back(tmp);
+  }
+  std::vector<char *> c_args;
+  // Add dummy name, so to verilator it looks like the original command was
+  // $ sim myarg1 myarg2
+  static char dummy_name[] = "sim";
+  c_args.push_back(dummy_name);
+
+  for (auto &arg : v_args_vec) {
+    c_args.push_back(arg.data());
+  }
+  init_core(c_args.size(), c_args.data());
   for (auto prog : args)
     loader.load_program(prog, memory);
 
@@ -24,9 +40,9 @@ Sim::Sim(const std::vector<std::string> &args)
 
 Sim::~Sim() { cleanup_core(); }
 
-void Sim::init_core() {
+void Sim::init_core(int argc, char **argv) {
   context = new VerilatedContext;
-  context->commandArgs(0, (char **)nullptr);
+  context->commandArgs(argc, argv);
 
   dut = new VTop(context);
 
