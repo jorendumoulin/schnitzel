@@ -16,8 +16,7 @@ jobs:
         run: git submodule update --init --recursive \
           submodules/cva6 \
           submodules/ibex \
-          submodules/printf \
-        run: 
+          submodules/printf
       - name: Generate Verilog
         run: just generate-verilog
       - name: Configure All Build Systems
