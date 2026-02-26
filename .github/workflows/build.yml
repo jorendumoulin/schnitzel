@@ -9,10 +9,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          submodules: recursive
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
           activate-environment: true
-      - name: build all
+      - name: Checkout Selective Submodules
+        run: git submodule update --init --recursive \
+          submodules/cva6 \
+          submodules/ibex \
+          submodules/printf \
+        run: 
+      - name: Generate Verilog
+        run: just generate-verilog
+      - name: Configure All Build Systems
+        run: just configure
+      - name: Build Everything
         run: just build

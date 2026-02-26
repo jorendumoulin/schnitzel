@@ -12,7 +12,7 @@ configure: generate-verilog
     cmake -B build/host -S sw/host -G Ninja
     cmake -B build/device -S sw/device -G Ninja
 
-build: generate-verilog
+build:
     cmake --build build/sim
     cmake --build build/host
     cmake --build build/device
