@@ -13,8 +13,6 @@ jobs:
           submodules: recursive
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
           activate-environment: true
       - name: build all
         run: just build
