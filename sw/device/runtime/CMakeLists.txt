@@ -3,9 +3,9 @@ add_library(device_runtime STATIC
   # start files
   crt0.S
   # putchar_ support via htif runtime:
-  ${CMAKE_SOURCE_DIR}/sw/common/htif/htif_runtime.c
+  ${SCHNITZEL_ROOT}/sw/common/htif/htif_runtime.c
   # printf implementation
-  ${CMAKE_SOURCE_DIR}/submodules/printf/src/printf/printf.c
+  ${SCHNITZEL_ROOT}/submodules/printf/src/printf/printf.c
 )
 
 # printf settings:
@@ -20,7 +20,7 @@ target_compile_definitions(device_runtime PRIVATE
 )
 
 target_include_directories(device_runtime PRIVATE
-  ${CMAKE_SOURCE_DIR}/submodules/printf/src
+  ${SCHNITZEL_ROOT}/submodules/printf/src
 )
 
 target_link_options(device_runtime INTERFACE

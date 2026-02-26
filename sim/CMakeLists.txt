@@ -1,4 +1,5 @@
-project(sim)
+cmake_minimum_required(VERSION 3.14)
+project(sim CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,7 +18,7 @@ target_compile_options(sim PRIVATE -O3)
 
 verilate(sim
     SOURCES
-        ${CMAKE_SOURCE_DIR}/generated/Top.sv
+        ${SCHNITZEL_ROOT}/generated/Top.sv
     TOP_MODULE Top
     PREFIX VTop
     TRACE_VCD
@@ -26,8 +27,5 @@ verilate(sim
         "-Wno-UNOPTFLAT" "-Wno-MULTIDRIVEN" "-Wno-LATCH"
         "-Wno-BLKANDNBLK" "-Wno-SELRANGE" "-Wno-SYMRSVDWORD"
         "-Wno-CMPCONST" "-Wno-UNSIGNED" "-Wno-WIDTH" "-Wno-ASCRANGE"
-        "-I${CMAKE_SOURCE_DIR}/generated/"
+        "-I${SCHNITZEL_ROOT}/generated/"
 )
-
-
-

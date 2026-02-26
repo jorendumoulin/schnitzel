@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.14)
+
 if(NOT CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime/cva6-toolchain.cmake"
@@ -11,7 +13,7 @@ add_library(host_runtime STATIC
   ./runtime/crt0.S
   ./runtime/syscalls.c
   # putchar_ support via htif runtime:
-  ${CMAKE_SOURCE_DIR}/sw/common/htif/htif_runtime.c
+  ${SCHNITZEL_ROOT}/sw/common/htif/htif_runtime.c
 )
 target_link_options(host_runtime INTERFACE
     # Supply a custom startup and linker script:
@@ -43,7 +45,7 @@ set(EXECUTORCH_BUILD_EXECUTOR_RUNNER OFF CACHE BOOL "")
 
 
 # Use gcc for compiling executorch subprojects:
-add_subdirectory("${CMAKE_SOURCE_DIR}/submodules/executorch/" "executorch")
+add_subdirectory("${SCHNITZEL_ROOT}/submodules/executorch/" "executorch")
 
 add_executable(executorch_test main.cpp)
 
