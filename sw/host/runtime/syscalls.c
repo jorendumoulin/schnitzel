@@ -60,3 +60,12 @@ int _read(int file, char *ptr, int len) {
   errno = EBADF;
   return -1;
 }
+
+int _getpid(void) { return 1; }
+
+int _isatty(int file) { return 1; }
+
+int _kill(int pid, int sig) {
+  errno = EINVAL;
+  return -1;
+}
