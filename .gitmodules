@@ -4,9 +4,6 @@
 [submodule "submodules/printf"]
 	path = submodules/printf
 	url = git@github.com:eyalroz/printf
-[submodule "submodules/picolibc"]
-	path = submodules/picolibc
-	url = git@github.com:picolibc/picolibc
 [submodule "submodules/cva6"]
 	path = submodules/cva6
 	url = git@github.com:openhwgroup/cva6
