@@ -18,7 +18,7 @@ target_compile_options(sim PRIVATE -O3)
 
 verilate(sim
     SOURCES
-        ${SCHNITZEL_ROOT}/generated/Top.sv
+        ${CMAKE_CURRENT_SOURCE_DIR}/../generated/Top.sv
     TOP_MODULE Top
     PREFIX VTop
     TRACE_VCD
@@ -27,5 +27,5 @@ verilate(sim
         "-Wno-UNOPTFLAT" "-Wno-MULTIDRIVEN" "-Wno-LATCH"
         "-Wno-BLKANDNBLK" "-Wno-SELRANGE" "-Wno-SYMRSVDWORD"
         "-Wno-CMPCONST" "-Wno-UNSIGNED" "-Wno-WIDTH" "-Wno-ASCRANGE"
-        "-I${SCHNITZEL_ROOT}/generated/"
+        "-I${CMAKE_CURRENT_SOURCE_DIR}/../generated/"
 )
