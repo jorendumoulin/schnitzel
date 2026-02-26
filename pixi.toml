@@ -23,6 +23,7 @@ riscv-gnu-toolchain = "==2026.01.23nightly"
 python = ">=3.12,<3.13"
 clang = ">=21.1.8,<22"
 lld = ">=21.1.8,<22"
+just = ">=1.46.0,<2"
 
 # Dependencies only needed for rtl development:
 [feature.rtl.dependencies]
