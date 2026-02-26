@@ -27,5 +27,5 @@ verilate(sim
         "-Wno-UNOPTFLAT" "-Wno-MULTIDRIVEN" "-Wno-LATCH"
         "-Wno-BLKANDNBLK" "-Wno-SELRANGE" "-Wno-SYMRSVDWORD"
         "-Wno-CMPCONST" "-Wno-UNSIGNED" "-Wno-WIDTH" "-Wno-ASCRANGE"
-        "-I${CMAKE_CURRENT_SOURCE_DIR}/../generated/"
+        "-Wno-IMPLICITSTATIC" "-I${CMAKE_CURRENT_SOURCE_DIR}/../generated/"
 )

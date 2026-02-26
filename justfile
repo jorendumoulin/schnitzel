@@ -7,26 +7,12 @@ flatten-cva6:
 generate-verilog: flatten-ibex flatten-cva6
     ./mill schnitzel.runMain sim.EmitVerilog
 
-verilate: generate-verilog
-    OBJCACHE=ccache \
-    verilator --cc --build -j $(nproc) \
-        --top-module Top \
-        -Mdir ./verilated \
-        --trace \
-        --prefix VTop \
-        -Wno-UNOPTFLAT \
-        -Wno-MULTIDRIVEN \
-        -Wno-LATCH \
-        -Wno-BLKANDNBLK \
-        -Wno-SELRANGE \
-        -Wno-SYMRSVDWORD \
-        -Wno-CMPCONST \
-        -Wno-UNSIGNED \
-        -Wno-WIDTH \
-        -Wno-ASCRANGE \
-        -CFLAGS "-O3" \
-        ./generated/*.sv
+configure: generate-verilog
+    cmake -B build/sim -S sim -G Ninja
+    cmake -B build/host -S sw/host -G Ninja
+    cmake -B build/device -S sw/device -G Ninja
 
-
-make-sim: verilate
-    make -C ./build/ -j
+build: generate-verilog
+    cmake --build build/sim
+    cmake --build build/host
+    cmake --build build/device
