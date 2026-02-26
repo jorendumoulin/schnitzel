@@ -1,7 +1,7 @@
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_PROCESSOR riscv)
 
-set(TOOLS /home/joren/Downloads/riscv)
+set(TOOLS $ENV{CONDA_PREFIX})
 set(CMAKE_C_COMPILER ${TOOLS}/bin/riscv64-unknown-elf-gcc)
 set(CMAKE_CXX_COMPILER ${TOOLS}/bin/riscv64-unknown-elf-g++)
 set(CMAKE_ASM_COMPILER ${TOOLS}/bin/riscv64-unknown-elf-gcc)
