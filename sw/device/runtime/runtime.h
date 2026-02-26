@@ -5,8 +5,8 @@
 
 void putchar_(char ch);
 void htif_exit(int exit_code);
-int hartid();
-void cluster_sync();
+int hart_id();
+void cluster_sync() { __asm__ volatile("csrr x0, 0x800"); }
 
 int printf(const char *format, ...);
 

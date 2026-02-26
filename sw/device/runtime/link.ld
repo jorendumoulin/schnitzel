@@ -1,13 +1,14 @@
 MEMORY
 {
   HTIF   (rwx): ORIGIN = 0x2000, LENGTH = 4K
-  DRAM   (rwx): ORIGIN = 0x10000, LENGTH = 1024K
+  DRAM   (rwx): ORIGIN = 0x10080, LENGTH = 1024K
   TCDM   (rwx): ORIGIN = 0x10000000, LENGTH = 32K
 }
 
 SECTIONS
 {
-  . = ORIGIN(DRAM);
+  /* Ibex seems to start at boot addr + 0x80 */
+  . = ORIGIN(DRAM) + 0x80;
 
   .text : {
     *(.init*)

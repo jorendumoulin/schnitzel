@@ -31,7 +31,7 @@ class Core(hartId: Int) extends Module {
   ibex.io.rst_ni := ~reset.asBool
 
   ibex.io.hart_id_i := hartId.U
-  ibex.io.boot_addr_i := 0x1000.U
+  ibex.io.boot_addr_i := 0x10000.U
 
   // Instruction memory interface
   io.imem.req.valid := ibex.io.instr_req_o

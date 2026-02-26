@@ -1,11 +1,8 @@
-#include "runtime.h"
+#include <runtime.h>
 
 int main() {
 
-  for (;;)
-    ;
-
-  int hart = hartid();
+  int hart = hart_id();
 
   if (hart == 1) {
     for (int i = 0; i < 100; i++) {
