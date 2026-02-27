@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../")
 
 if(NOT CMAKE_TOOLCHAIN_FILE)

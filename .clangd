@@ -1,0 +1,16 @@
+If:
+  PathMatch: sim/.*
+CompileFlags:
+  CompilationDatabase: build/sim
+
+---
+If:
+  PathMatch: sw/device/.*
+CompileFlags:
+  CompilationDatabase: build/device
+
+---
+If:
+  PathMatch: sw/(host|common)/.*
+CompileFlags:
+  CompilationDatabase: build/host
