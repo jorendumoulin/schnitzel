@@ -94,7 +94,7 @@ class Cluster extends Module {
   }
 
   // AXI Crossbar
-  val axiMux = Module(new AXIMux(AXIConfig(dataWidth = 512, idWidth = 4), AXIConfig(dataWidth = 512, idWidth = 6), 4))
+  val axiMux = Module(AXIMux(AXIConfig(dataWidth = 512, idWidth = 4), 4))
   axiMux.io.ins <> VecInit(icache.io.axi, mem_to_axi_0.io.axi, mem_to_axi_1.io.axi, dma.io.axi)
   axiMux.io.out <> io.axi
 
