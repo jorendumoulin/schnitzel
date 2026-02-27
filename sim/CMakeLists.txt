@@ -15,7 +15,6 @@ add_executable(sim
     src/dynamic_memory.cpp
 )
 target_include_directories(sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_compile_options(sim PRIVATE -O3)
 
 verilate(sim
     SOURCES
