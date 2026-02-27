@@ -24,6 +24,8 @@ int main(int argc, char *argv[]) {
       .help("target program to simulate")
       .nargs(argparse::nargs_pattern::at_least_one);
 
+  // This collects everything else and passes it to verilator context
+  program.add_argument("--vltargs").default_value(std::string(""));
   // Parse command-line arguments
   try {
     program.parse_args(argc, argv);
@@ -35,7 +37,8 @@ int main(int argc, char *argv[]) {
   try {
     // Create simulator
     auto program_args = program.get<std::vector<std::string>>("program");
-    Sim sim(program_args);
+    auto verilator_args = program.get<std::string>("vltargs");
+    Sim sim(program_args, verilator_args);
 
     // Configure
     sim.set_verbose(program.get<bool>("verbose"));

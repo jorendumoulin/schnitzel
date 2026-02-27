@@ -35,7 +35,7 @@ public:
   /** Constructor with vector of arguments
    * @param args Command line arguments
    */
-  Sim(const std::vector<std::string> &args);
+  Sim(const std::vector<std::string> &args, const std::string &vltargs);
 
   /** Destructor */
   virtual ~Sim();
@@ -121,7 +121,7 @@ private:
   int handle_host();
 
   /** Initialize the verilated core */
-  void init_core();
+  void init_core(int argc, char **argv);
 
   /** Cleanup verilated core */
   void cleanup_core();
