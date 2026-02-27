@@ -12,6 +12,7 @@ import csr.HWBarrier
 import dma.Dma
 import csr.CsrDemux
 import icache.InstructionCache
+import accelerator.AluAccelerator
 
 class Cluster extends Module {
 
@@ -33,12 +34,12 @@ class Cluster extends Module {
   )
   memMux_0.io.outs(0) <> mem_to_axi_0.io.bus
 
-  val csrDemux = Module(new CsrDemux(0x900))
-  csrDemux.io.in <> core_0.io.csr
+  val csrDemux_0 = Module(new CsrDemux(0x900))
+  csrDemux_0.io.in <> core_0.io.csr
 
   // Attach dma to fist core:
   val dma = Module(new Dma(addrWidth = 32, dataWidth = 64, AXIConfig(dataWidth = 512), 3))
-  dma.io.csr <> csrDemux.io.outs(1)
+  dma.io.csr <> csrDemux_0.io.outs(1)
 
   // Second core:
   val core_1 = Module(new Core(1))
@@ -53,21 +54,33 @@ class Cluster extends Module {
   )
   memMux_1.io.outs(0) <> mem_to_axi_1.io.bus
 
+  val csrDemux_1 = Module(new CsrDemux(0x900))
+  csrDemux_1.io.in <> core_1.io.csr
+
+  // Attach accelerator to second core:
+  val aluAccelerator = Module(new AluAccelerator(addrWidth = 32, dataWidth = 64))
+  aluAccelerator.io.csr <> csrDemux_1.io.outs(1)
+
   // Cluster hw barrier
   val barrier = Module(new HWBarrier(2));
-  barrier.io.ins <> Seq(csrDemux.io.outs(0), core_1.io.csr)
-  // barrier.io.in
+  barrier.io.ins <> Seq(csrDemux_0.io.outs(0), csrDemux_1.io.outs(0))
 
   // Instruction Cache
   val icache = Module(new InstructionCache(2))
   icache.io.imems <> VecInit(Seq(core_0.io.imem, core_1.io.imem));
 
+  // Acce
+  val accPorts = aluAccelerator.io.aData ++ aluAccelerator.io.bData ++ aluAccelerator.io.cData
+
   // TCDM
   val numBanks = 32
   val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM.masked(1024, Vec(4, UInt(8.W)), 0, 0, 1)));
   val tcdm_ports = VecInit(tcdm_sram.map(sram => sram.readwritePorts(0)));
-  val interconnect = Module(new Interconnect(10, numBanks, CoreConfig.addrWidth, CoreConfig.dataWidth));
-  interconnect.io.ins <> VecInit(Seq(memMux_0.io.outs(1), memMux_1.io.outs(1))) ++ dma.io.data
+
+  val interconnect = Module(new Interconnect(22, numBanks, CoreConfig.addrWidth, CoreConfig.dataWidth));
+
+  interconnect.io.ins <> VecInit(Seq(memMux_0.io.outs(1), memMux_1.io.outs(1))) ++ dma.io.data ++ accPorts
+
   interconnect.io.outs.zip(tcdm_ports).foreach { case (out, port) =>
     port.enable := out.req.valid
     port.address := out.req.bits.addr(CoreConfig.addrWidth - 1, log2Up(numBanks) + log2Up(CoreConfig.dataWidth / 8))

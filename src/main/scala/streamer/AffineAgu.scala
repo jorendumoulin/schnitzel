@@ -3,32 +3,66 @@ package streamer
 import chisel3._
 import chisel3.util.{Decoupled, Queue}
 
+/** Configuration parameters for the Affine Address Generation Unit (AGU). * Defines the iteration space and memory
+  * layout for both temporal (time-multiplexed) and spatial (parallel) address calculations.
+  * @param nTemporalDims
+  *   Number of nested loops for temporal address generation.
+  * @param spatialDimSizes
+  *   A sequence representing the sizes of each spatial dimension.
+  */
 class AffineAguConfig(val nTemporalDims: Int, val spatialDimSizes: Seq[Int]) extends Bundle {
+
+  /** The starting memory address for the affine sequence. */
   val baseAddr = UInt(32.W)
+
+  /** The step size for each temporal dimension. */
   val temporalStrides = Vec(nTemporalDims, UInt(32.W))
+
+  /** The loop bounds (maximum iterations) for each temporal dimension. */
   val temporalBounds = Vec(nTemporalDims, UInt(32.W))
+
+  /** The step size for each spatial dimension in the output vector. */
   val spatialStrides = Vec(spatialDimSizes.length, UInt(32.W))
+
+  /** Calculates the total number of 32-bit words required for this config. Useful for memory-mapping and CSR offset
+    * calculations.
+    */
+  def numRegs: Int = {
+    1 + (nTemporalDims * 2) + spatialDimSizes.length
+  }
 }
 
+/** Affine Address Generation Unit (AGU). This module generates a stream of addresses based on nested loop parameters.
+  * It combines a temporal iteration (looping over time) with a spatial expansion (generating multiple parallel
+  * addresses per cycle).
+  * @param nTemporalDims
+  *   Number of nested loops to iterate through.
+  * @param spatialDimSizes
+  *   Dimensions of the spatial hardware array (e.g., Seq(4, 4) for a 16-lane output).
+  * @param queueDepth
+  *   The depth of the internal Decoupled queues for each address output.
+  */
 class AffineAgu(
     nTemporalDims: Int,
     spatialDimSizes: Seq[Int],
     queueDepth: Int = 2
 ) extends Module {
-  // Calculate total number of spatial outputs
+
+  /** Total number of parallel address outputs calculated as the product of all spatial dimensions. */
   val numSpatialOutputs = spatialDimSizes.fold(1)(_ * _)
 
   val io = IO(new Bundle {
-    // Control signals
+
+    /** Pulse high to begin address generation. */
     val start = Input(Bool())
 
-    // Configuration inputs
+    /** Runtime configuration for strides, bounds, and base address. */
     val config = Input(new AffineAguConfig(nTemporalDims, spatialDimSizes))
 
-    // Address outputs (decoupled with queues)
+    /** Vector of Decoupled interfaces providing calculated addresses. */
     val addrs = Vec(numSpatialOutputs, Decoupled(UInt(32.W)))
 
-    // Status output
+    /** High when the AGU is idle and has finished its current iteration bounds. */
     val done = Output(Bool())
   })
 
