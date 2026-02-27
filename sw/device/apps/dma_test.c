@@ -2,116 +2,51 @@
 
 int main() {
 
-  int hart = hartid();
+  int hart = hart_id();
 
   if (hart == 0) {
-    unsigned long csr;
-    unsigned long value;
 
     // Configure Streamer:
-    csr = 0x900;
-    value = 0x10000000;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
+    write_csr(0x900, 0x10000000);
     // 4 Temporal strides:
-    csr = 0x901;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x902;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x903;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x904;
-    value = 0x200;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
+    write_csr(0x901, 0x0);
+    write_csr(0x902, 0x0);
+    write_csr(0x903, 0x0);
+    write_csr(0x904, 0x200);
     // 4 Temporal bounds:
-    csr = 0x905;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x906;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x907;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x908;
-    value = 0x8;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
+    write_csr(0x905, 0x0);
+    write_csr(0x906, 0x0);
+    write_csr(0x907, 0x0);
+    write_csr(0x908, 0x8);
 
     // 3 Spatial strides:
-    csr = 0x909;
-    value = 0x20;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x90a;
-    value = 0x10;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x90b;
-    value = 0x8;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
+    write_csr(0x909, 0x20);
+    write_csr(0x90a, 0x10);
+    write_csr(0x90b, 0x8);
 
     // Configure Streamer:
-    csr = 0x90c;
-    value = 0x20000;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
+    write_csr(0x90c, 0x20000);
 
     // 4 Temporal strides:
-    csr = 0x90d;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x90e;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x90f;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x910;
-    value = 0x200;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
+    write_csr(0x90d, 0x0);
+    write_csr(0x90e, 0x0);
+    write_csr(0x90f, 0x0);
+    write_csr(0x910, 0x200);
 
     // 4 Temporal bounds:
-    csr = 0x911;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x912;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x913;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x914;
-    value = 0x8;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
+    write_csr(0x911, 0x0);
+    write_csr(0x912, 0x0);
+    write_csr(0x913, 0x0);
+    write_csr(0x914, 0x8);
 
     // Set direction:
-    csr = 0x915;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
+    write_csr(0x915, 0x0);
 
     // Set start:
-    csr = 0x916;
-    value = 0x1;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
+    write_csr(0x916, 0x1);
 
     // Await start:
-    csr = 0x916;
-    __asm__ volatile("csrr %0, %1" : "=r"(value) : "i"(csr));
+    read_csr(0x916);
   }
 
   cluster_sync();
