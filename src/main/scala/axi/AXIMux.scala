@@ -11,8 +11,6 @@ class AXIMux(cfg: AXIConfig, numIns: Int) extends Module {
     val out = new AXIBundle(cfg);
   })
 
-  val log = SimLog.file("hello")
-
   // AR arbitration
   val arArb = Module(new RRArbiter(new ARChan(cfg), numIns));
   arArb.io.in <> io.ins.map(_.ar);
