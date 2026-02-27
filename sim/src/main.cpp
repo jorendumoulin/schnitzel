@@ -12,11 +12,10 @@ int main(int argc, char *argv[]) {
 
   program.add_argument("--verbose").flag().help("enable verbose output");
 
-  unsigned long max_cycles;
   program.add_argument("--max-cycles")
-      .store_into(max_cycles)
-      .default_value(0)
-      .help("maximum simulation cycles (0 for unlimited)");
+      .default_value(0UL)
+      .help("maximum simulation cycles (0 for unlimited)")
+      .scan<'u', unsigned long>();
 
   program.add_argument("--vcd").flag().help("enable vcd tracing");
 
@@ -42,7 +41,7 @@ int main(int argc, char *argv[]) {
 
     // Configure
     sim.set_verbose(program.get<bool>("verbose"));
-    sim.set_max_cycles(max_cycles);
+    sim.set_max_cycles(program.get<unsigned long>("max-cycles"));
     if (program.get<bool>("vcd")) {
       sim.enable_trace("./sim.vcd");
     }
