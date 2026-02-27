@@ -7,7 +7,10 @@ flatten-cva6:
 generate-verilog: flatten-ibex flatten-cva6
     ./mill schnitzel.runMain sim.EmitVerilog
 
-configure: generate-verilog
+generate-cluster: flatten-ibex
+    ./mill schnitzel.runMain sim.ClusterOnlyEmitVerilog
+
+configure:
     cmake -B build/sim -S sim -G Ninja
     cmake -B build/host -S sw/host -G Ninja
     cmake -B build/device -S sw/device -G Ninja
