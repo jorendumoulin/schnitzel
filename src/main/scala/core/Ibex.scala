@@ -45,6 +45,6 @@ class ibex_wrapper_flattened extends BlackBox with HasBlackBoxPath {
   })
 
   // Add ibex resources:
-  addPath("/home/joren/phd/schnitzel/src/main/resources/ibex/ibex_wrapper_flattened.sv")
+  addPath("src/main/resources/ibex/ibex_wrapper_flattened.sv")
 
 }

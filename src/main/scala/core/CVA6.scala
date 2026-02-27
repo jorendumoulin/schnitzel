@@ -21,7 +21,7 @@ class cva6_wrapper_flattened extends BlackBox with HasBlackBoxPath {
   })
 
   // Add cva6 resources:
-  addPath("/home/joren/phd/schnitzel/src/main/resources/cva6/cva6_wrapper_flattened.sv")
+  addPath("src/main/resources/cva6/cva6_wrapper_flattened.sv")
 
 }
 
