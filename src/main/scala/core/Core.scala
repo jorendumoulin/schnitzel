@@ -1,7 +1,6 @@
 package core
 
 import chisel3._
-import chisel3.util.HasBlackBoxResource
 import chisel3.util.Fill
 import chisel3.util.Counter
 import csr.CsrIO
