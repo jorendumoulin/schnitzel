@@ -37,7 +37,7 @@ class AChan(cfg: AXIConfig = AXIConfig()) extends Bundle {
 
 }
 
-class AWChan(cfg: AXIConfig) extends AChan
+class AWChan(cfg: AXIConfig) extends AChan(cfg)
 
 class WChan(cfg: AXIConfig) extends Bundle {
   val data = UInt(cfg.dataWidth.W)
@@ -52,7 +52,7 @@ class BChan(cfg: AXIConfig) extends Bundle {
   val user = UInt(cfg.userWidth.W)
 }
 
-class ARChan(cfg: AXIConfig) extends AChan
+class ARChan(cfg: AXIConfig) extends AChan(cfg)
 
 class RChan(cfg: AXIConfig) extends Bundle {
   val id = UInt(cfg.idWidth.W)
