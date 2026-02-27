@@ -48,11 +48,6 @@ class AffineAgu(
     queueDepth: Int = 2
 ) extends Module {
 
-  /** Auxiliary constructor to initialize the AGU using an existing config object. */
-  def this(config: AffineAguConfig, queueDepth: Int) = {
-    this(config.nTemporalDims, config.spatialDimSizes, queueDepth)
-  }
-
   /** Total number of parallel address outputs calculated as the product of all spatial dimensions. */
   val numSpatialOutputs = spatialDimSizes.fold(1)(_ * _)
 
