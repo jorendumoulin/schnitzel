@@ -17,7 +17,7 @@ class Top extends Module {
   })
 
   val cluster = Module(new Cluster())
-  val toMem = Module(new AxiToMem(addrWidth = 32, dataWidth = 512, axiConfig = AXIConfig(dataWidth = 512)))
+  val toMem = Module(new AxiToMem(addrWidth = 32, dataWidth = 512, axiConfig = AXIConfig(dataWidth = 512, idWidth = 6)))
   toMem.io.axi <> cluster.io.axi
   io.mem <> toMem.io.mem
 

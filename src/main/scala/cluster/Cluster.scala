@@ -17,7 +17,7 @@ import accelerator.AluAccelerator
 class Cluster extends Module {
 
   val io = IO(new Bundle {
-    val axi = new AXIBundle(AXIConfig(dataWidth = 512))
+    val axi = new AXIBundle(AXIConfig(idWidth = 6, dataWidth = 512))
   })
 
   // Define the first RISC-V Core:
@@ -94,7 +94,7 @@ class Cluster extends Module {
   }
 
   // AXI Crossbar
-  val axiMux = Module(new AXIMux(AXIConfig(dataWidth = 512), 4))
+  val axiMux = Module(new AXIMux(AXIConfig(dataWidth = 512, idWidth = 4), AXIConfig(dataWidth = 512, idWidth = 6), 4))
   axiMux.io.ins <> VecInit(icache.io.axi, mem_to_axi_0.io.axi, mem_to_axi_1.io.axi, dma.io.axi)
   axiMux.io.out <> io.axi
 
