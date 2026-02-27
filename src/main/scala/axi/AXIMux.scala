@@ -9,18 +9,18 @@ object AXIMux {
     new AXIMux(cfg, cfg.copy(idWidth = cfg.idWidth + log2Up(numIns)), numIns, maxWTrans)
 }
 
-// AXI Multiplexer: numIns master ports -> one slave port.
+// AXI Multiplexer: connects numIns master ports to one slave port.
 //
-// AR/AW: the winning master port index is prepended to the transaction ID before forwarding
-// to the slave, making every in-flight ID globally unique across all masters.  This allows
-// the slave (and any downstream crossbar) to reorder responses freely.
+// AR/AW channels: round-robin arbitration selects a master; the master index is prepended
+// to the transaction ID before forwarding to the slave, making every in-flight ID globally
+// unique across all masters. This allows the slave (and any downstream crossbar) to reorder
+// responses freely.
 //
-// R/B: the prepended upper bits of the returned ID select which master port to route the
-// response back to; those bits are stripped before presenting the original ID to the master.
-// No FIFO is required for R or B routing.
+// R/B channels: the upper ID bits identify which master originated the transaction; those
+// bits are stripped before presenting the original ID back to the master. No FIFO needed.
 //
-// W: the W channel carries no ID, so a FIFO still records the AW arbitration result and
-// gates the AW channel when full.
+// W channel: carries no ID, so a FIFO records AW arbitration winners and gates AW when full.
+// W data is routed based on the FIFO head (the pending AW winner).
 //
 // inCfg  -- AXIConfig for the ins ports (master-facing, narrower ID)
 // outCfg -- AXIConfig for the out port  (slave-facing,  wider ID)
@@ -41,14 +41,13 @@ class AXIMux(inCfg: AXIConfig, outCfg: AXIConfig, numIns: Int, maxWTrans: Int = 
 
   val idxBits = log2Up(numIns)
 
-  // AR channel
+  // AR channel: round-robin arbitration between masters, prepend master index to ID
   val arArb = Module(new RRArbiter(new ARChan(inCfg), numIns))
   arArb.io.in <> io.ins.map(_.ar)
   io.out.ar <> arArb.io.out
-  // prepend master index to id:
   io.out.ar.bits.id := Cat(arArb.io.chosen, arArb.io.out.bits.id)
 
-  // R channel: upper ID bits select the master port; strip them before returning
+  // R channel: route response back to original master using upper ID bits (no FIFO needed)
   val rSel = io.out.r.bits.id(outCfg.idWidth - 1, inCfg.idWidth)
 
   io.out.r.ready := false.B
@@ -62,22 +61,24 @@ class AXIMux(inCfg: AXIConfig, outCfg: AXIConfig, numIns: Int, maxWTrans: Int = 
     io.out.r.ready := io.ins(rSel).r.ready
   }
 
-  // AW channel:
-  // wFifo: records the AW arbitration winner; W data is routed from that port
-  // popped on the last w beat.
+  // AW channel: arbitrate and record winner in FIFO; W data follows via FIFO
+  // The FIFO stores which master won AW arbitration; W beats are drained in order.
   val wFifo = Module(new Queue(UInt(idxBits.W), maxWTrans))
   val awArb = Module(new RRArbiter(new AWChan(inCfg), numIns))
   awArb.io.in <> io.ins.map(_.aw)
 
+  // Only assert AW when both arbiter has a winner AND FIFO has space
   io.out.aw.valid := awArb.io.out.valid && wFifo.io.enq.ready
   io.out.aw.bits := awArb.io.out.bits
   io.out.aw.bits.id := Cat(awArb.io.chosen, awArb.io.out.bits.id)
   awArb.io.out.ready := io.out.aw.ready && wFifo.io.enq.ready
 
+  // Record AW winner in FIFO when AW fires
   wFifo.io.enq.valid := awArb.io.out.fire
   wFifo.io.enq.bits := awArb.io.chosen
 
-  // W channel: steer write data from the master recorded at the W FIFO head
+  // W channel: steer data from the master recorded at FIFO head
+  // Two cases: (1) new AW winner has W data ready, or (2) draining pending W from FIFO
   val wSel = wFifo.io.deq.bits
 
   val awWins = awArb.io.out.valid && wFifo.io.enq.ready
@@ -90,10 +91,12 @@ class AXIMux(inCfg: AXIConfig, outCfg: AXIConfig, numIns: Int, maxWTrans: Int = 
   for (i <- 0 until numIns) {
     io.ins(i).w.ready := false.B
   }
+  // Priority: new AW winner with W data > draining pending W from FIFO
   when(awWins && awWinnerHasW) {
     io.out.w.valid := io.ins(awWinner).w.valid
     io.out.w.bits := io.ins(awWinner).w.bits
     io.ins(awWinner).w.ready := io.out.w.ready
+    // Pop FIFO on last beat of write transaction
     wFifo.io.deq.ready := io.out.w.fire && io.out.w.bits.last
   }.elsewhen(wFifo.io.deq.valid && !awWins) {
     io.out.w.valid := io.ins(wSel).w.valid
@@ -102,7 +105,7 @@ class AXIMux(inCfg: AXIConfig, outCfg: AXIConfig, numIns: Int, maxWTrans: Int = 
     wFifo.io.deq.ready := io.out.w.fire && io.out.w.bits.last
   }
 
-  // B channel: upper ID bits select the master port; strip them before returning
+  // B channel: route response back to original master using upper ID bits (no FIFO needed)
   val bSel = io.out.b.bits.id(outCfg.idWidth - 1, inCfg.idWidth)
 
   io.out.b.ready := false.B
