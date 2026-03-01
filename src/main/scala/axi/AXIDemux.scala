@@ -48,6 +48,7 @@ class AXIDemux(cfg: AXIConfig, numOuts: Int, addrMap: Seq[(Long, Long)]) extends
   // -----------------------------------------------------------------------
   // Defaults: nothing valid / nothing ready
   // -----------------------------------------------------------------------
+  io.outs := DontCare
   for (i <- 0 until numOuts) {
     io.outs(i).ar.valid := false.B
     io.outs(i).aw.valid := false.B
