@@ -14,7 +14,7 @@ class HWBarrier(numInp: Int) extends Module {
   })
 
   // All inputs should be syncinc to be ready
-  val sync = io.ins.map { csr => csr.req.bits.addr === 0x800.U && csr.req.valid }.reduce(_ && _)
+  val sync = io.ins.map { csr => csr.req.bits.addr === 0x0.U && csr.req.valid }.reduce(_ && _)
   io.ins.foreach(_.req.ready := sync)
   io.ins.foreach(_.rsp.rdata := DontCare)
 

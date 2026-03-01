@@ -10,14 +10,17 @@ import chisel3.util.{SRAM, Cat, log2Ceil, log2Up}
 import memory.MemDemux
 import csr.HWBarrier
 import dma.Dma
-import csr.CsrDemux
+import csr.{CsrDemux, CsrCombiner, CsrOp, CsrReq}
+import chisel3.util.Decoupled
 import icache.InstructionCache
 import accelerator.AluAccelerator
+import csr.CsrIO
 
 class Cluster extends Module {
 
   val io = IO(new Bundle {
     val axi = new AXIBundle(AXIConfig(idWidth = 6, dataWidth = 512))
+    val csr = new CsrIO()
   })
 
   // Define the first RISC-V Core:
@@ -34,12 +37,12 @@ class Cluster extends Module {
   )
   memMux_0.io.outs(0) <> mem_to_axi_0.io.bus
 
-  val csrDemux_0 = Module(new CsrDemux(0x900))
+  val csrDemux_0 = Module(new CsrDemux(3, Seq((0x800L, 0x10L), (0x810L, 0x10L))))
   csrDemux_0.io.in <> core_0.io.csr
 
-  // Attach dma to fist core:
+  // Attach dma to first core:
   val dma = Module(new Dma(addrWidth = 32, dataWidth = 64, AXIConfig(dataWidth = 512), 3))
-  dma.io.csr <> csrDemux_0.io.outs(1)
+  dma.io.csr <> csrDemux_0.io.outs(2)
 
   // Second core:
   val core_1 = Module(new Core(1))
@@ -54,16 +57,22 @@ class Cluster extends Module {
   )
   memMux_1.io.outs(0) <> mem_to_axi_1.io.bus
 
-  val csrDemux_1 = Module(new CsrDemux(0x900))
+  val csrDemux_1 = Module(new CsrDemux(3, Seq((0x800L, 0x10L), (0x810L, 0x10L))))
   csrDemux_1.io.in <> core_1.io.csr
 
   // Attach accelerator to second core:
   val aluAccelerator = Module(new AluAccelerator(addrWidth = 32, dataWidth = 64))
-  aluAccelerator.io.csr <> csrDemux_1.io.outs(1)
+  aluAccelerator.io.csr <> csrDemux_1.io.outs(2)
 
-  // Cluster hw barrier
+// Global synchronization CSR (0x800) - coupled and sent externally
+  val csrCombiner = Module(new CsrCombiner(2))
+  csrCombiner.io.ins(0) <> csrDemux_0.io.outs(0)
+  csrCombiner.io.ins(1) <> csrDemux_1.io.outs(0)
+  csrCombiner.io.out <> io.csr
+
+  // Cluster hw barrier (local synchronization 0x810)
   val barrier = Module(new HWBarrier(2));
-  barrier.io.ins <> Seq(csrDemux_0.io.outs(0), csrDemux_1.io.outs(0))
+  barrier.io.ins <> Seq(csrDemux_0.io.outs(1), csrDemux_1.io.outs(1))
 
   // Instruction Cache
   val icache = Module(new InstructionCache(2))
