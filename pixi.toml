@@ -24,6 +24,7 @@ python = ">=3.12,<3.13"
 clang = ">=21.1.8,<22"
 lld = ">=21.1.8,<22"
 just = ">=1.46.0,<2"
+lit = ">=22.1.0,<23"
 
 # Dependencies only needed for rtl development:
 [feature.rtl.dependencies]
@@ -39,3 +40,6 @@ torchgen = ">=0.0.1, <0.0.2"
 [environments]
 default = ["rtl"]
 all = ["rtl", "executorch"]
+
+[pypi-dependencies]
+filecheck = ">=1.0.3, <2"

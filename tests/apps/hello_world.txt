@@ -1,0 +1,12 @@
+// RUN: ./build/sim/sim ./build/device/apps/hello_world.elf ./build/host/apps/hello_world.elf | filecheck %s
+
+// CHECK:      (hart 0) Hello World! 0
+// CHECK-NEXT: (hart 0) Hello World! 1
+// CHECK-NEXT: (hart 0) Hello World! 2
+// CHECK-NEXT: (hart 1) Hello World! 0
+// CHECK-NEXT: (hart 1) Hello World! 1
+// CHECK-NEXT: (hart 1) Hello World! 2
+// CHECK-NEXT: (hart 2) Hello World! 0
+// CHECK-NEXT: (hart 2) Hello World! 1
+// CHECK-NEXT: (hart 2) Hello World! 2
+
