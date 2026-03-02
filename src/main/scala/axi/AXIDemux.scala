@@ -48,8 +48,13 @@ class AXIDemux(cfg: AXIConfig, numOuts: Int, addrMap: Seq[(Long, Long)]) extends
   // -----------------------------------------------------------------------
   // Defaults: nothing valid / nothing ready
   // -----------------------------------------------------------------------
-  io.outs := DontCare
   for (i <- 0 until numOuts) {
+    // Connect input through to output:
+    io.outs(i).aw.bits := io.in.aw.bits
+    io.outs(i).ar.bits := io.in.ar.bits
+    io.outs(i).w.bits := io.in.w.bits
+
+    // But deassert valid / ready
     io.outs(i).ar.valid := false.B
     io.outs(i).aw.valid := false.B
     io.outs(i).w.valid := false.B
@@ -101,8 +106,9 @@ class AXIDemux(cfg: AXIConfig, numOuts: Int, addrMap: Seq[(Long, Long)]) extends
   // -----------------------------------------------------------------------
   // W channel: route data to the pending write port
   // -----------------------------------------------------------------------
-  io.outs(wSel).w.valid := io.in.w.valid && wPending
-  io.in.w.ready := io.outs(wSel).w.ready && wPending
+  val activeSel = Mux(wPending, wSel, awSel);
+  io.outs(activeSel).w.valid := io.in.w.valid
+  io.in.w.ready := io.outs(activeSel).w.ready
 
   // Unblock AW channel on last write:
   when(io.in.w.fire && io.in.w.bits.last) { wPending := false.B }
