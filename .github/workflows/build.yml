@@ -46,9 +46,7 @@ jobs:
         with:
           name: build-outputs
           path: build
-      - name: Debug File Structure
-        run: |
-          echo "Current directory: $(pwd)"
-          find . -maxdepth 4 -not -path '*/.*'
+      - name: Grant Execute Permissions
+        run: chmod +x ./build/sim/sim
       - name: Run App Tests
         run: lit tests/apps -v
