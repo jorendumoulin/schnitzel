@@ -6,6 +6,7 @@
 void putchar_(char ch);
 void htif_exit(int exit_code);
 int hart_id();
+void global_sync() { __asm__ volatile("csrr x0, 0x800"); }
 void cluster_sync() { __asm__ volatile("csrr x0, 0x810"); }
 
 int printf(const char *format, ...);

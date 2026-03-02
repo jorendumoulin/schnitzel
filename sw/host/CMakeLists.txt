@@ -19,6 +19,9 @@ add_library(host_runtime STATIC
   # putchar_ support via htif runtime:
   ${ROOT}/sw/common/htif/htif_runtime.c
 )
+target_include_directories(host_runtime PRIVATE
+  ${ROOT}/sw/host/runtime/
+)
 target_link_options(host_runtime INTERFACE
     # Supply a custom startup and linker script:
     -T ${CMAKE_CURRENT_SOURCE_DIR}/runtime/link.ld

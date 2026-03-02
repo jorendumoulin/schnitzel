@@ -2,7 +2,8 @@ ENTRY(_start)
 
 MEMORY
 {
-    HTIF   (rwx): ORIGIN = 0x2000, LENGTH = 4K
+    HTIF   (rwx): ORIGIN = 0x2000, LENGTH = 1K
+    SYNC   (rwx): ORIGIN = 0x3000, LENGTH = 1K
     RAM    (rwx): ORIGIN = 0x60000000, LENGTH = 200M
 }
 
@@ -73,5 +74,8 @@ SECTIONS
     /* HTIF communication */
     .tohost : ALIGN(8) {} > HTIF
     .fromhost : ALIGN(8) {} > HTIF
+
+    /* Cluster syncrhonization */
+    .global_sync : ALIGN(8) {} > SYNC
 
 }
