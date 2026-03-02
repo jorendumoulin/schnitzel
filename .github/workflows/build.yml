@@ -46,4 +46,4 @@ jobs:
         with:
           name: build-outputs
       - name: Run App Tests
-        run: lit tests/apps
+        run: lit tests/apps -v
