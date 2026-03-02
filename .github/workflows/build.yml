@@ -45,7 +45,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: build-outputs
-          path: .
+          path: build
       - name: Debug File Structure
         run: |
           echo "Current directory: $(pwd)"
