@@ -80,3 +80,17 @@ class Streamer(
   rspQueues.foreach(_.io.deq.ready := io.read.ready && allRspValid)
 
 }
+
+object Streamer {
+  def apply(
+      nTemporalDims: Int,
+      spatialDimSizes: Seq[Int],
+      queueDepth: Int = 2,
+      addrWidth: Int = 32,
+      dataWidth: Int = 64,
+      dir: Option[StreamerDir.Type] = None
+  ): Streamer = {
+    // Extract parameters from the config object automatically
+    new Streamer(nTemporalDims, spatialDimSizes, queueDepth, addrWidth, dataWidth)
+  }
+}
