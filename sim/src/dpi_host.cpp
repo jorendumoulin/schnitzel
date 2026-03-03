@@ -32,7 +32,7 @@ void dpi_handle_host() {
     printf("(hart %d) %.*s", syscall_mem[4], syscall_mem[3], putc_buffer);
     fflush(stdout);
     g_dpi_memory.write_word(tohost_addr, 0);
-    g_dpi_memory.write_word(fromhost_addr, syscall_mem[4]);
+    g_dpi_memory.write_word(fromhost_addr, 1);
     break;
   case 93:
     dpi_set_exit(true);

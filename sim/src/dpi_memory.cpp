@@ -41,6 +41,9 @@ void dpi_mem_write_512(uint32_t addr, uint32_t *data, uint32_t *ben) {
 }
 
 void dpi_mem_read_64(uint32_t addr, uint32_t *data) {
+  // allign address:
+  addr = (addr >> 3) << 3;
+
   g_dpi_memory.read_chunk(addr, 8, data);
   // printf("read from addr %p\n", addr);
   // for (int i = 0; i < 2; i++)
@@ -56,6 +59,8 @@ void dpi_mem_write_64(uint32_t addr, uint32_t *data, uint32_t *ben) {
   uint8_t strobe = (uint8_t)(*ben);
   // printf("strobe = %x\n", strobe);
   alignas(8) uint8_t current[8], wdata[8];
+  // allign address:
+  addr = (addr >> 3) << 3;
   g_dpi_memory.read_chunk(addr, 8, current);
   memcpy(wdata, data, 8);
 
