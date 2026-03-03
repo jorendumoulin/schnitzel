@@ -2,6 +2,7 @@ package streamer
 
 import chisel3._
 import chisel3.util.{Decoupled, Queue}
+import chisel3.util.Counter
 
 /** Configuration parameters for the Affine Address Generation Unit (AGU). * Defines the iteration space and memory
   * layout for both temporal (time-multiplexed) and spatial (parallel) address calculations.
@@ -99,7 +100,14 @@ class AffineAgu(
   )
 
   // Pass outputs to queues for fine-grained prefetching
-  val queues = Seq.fill(numSpatialOutputs)(Module(new Queue(UInt(32.W), queueDepth)))
+  val queues = Seq.fill(numSpatialOutputs)(Module(new Queue(UInt(32.W), 10)))
+  queues.foreach { q =>
+    dontTouch(q.io.enq)
+    dontTouch(q.io.deq)
+    dontTouch(q.io.count)
+    dontTouch(q.do_deq)
+    dontTouch(q.do_enq)
+  }
   queues.zip(addresses).foreach { case (queue, address) => queue.io.enq.bits := address }
   queues.zip(io.addrs).foreach { case (queue, output) => queue.io.deq <> output }
   // Push new address to address queues if all queues can accept new data:
