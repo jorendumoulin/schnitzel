@@ -25,11 +25,24 @@ bool DynamicMemory::read_chunk(size_t addr, size_t len, void *dst) {
     //        current_addr, page_index, offset_in_page, dst_bytes[i]);
   }
 
+  if (addr == 0x2000)
+    return true;
+
+  printf("read chunk at addr %p len %d\n", addr, len);
+  for (int i = 0; i < len; i++)
+    printf("%x", ((uint8_t *)dst)[i]);
+  printf("\n");
+
   return true;
 }
 
 void DynamicMemory::write_chunk(size_t addr, size_t len, const void *src) {
   const uint8_t *src_bytes = static_cast<const uint8_t *>(src);
+
+  printf("write chunk at addr %p len %d\n", addr, len);
+  for (int i = 0; i < len; i++)
+    printf("%x", ((uint8_t *)src)[i]);
+  printf("\n");
 
   for (size_t i = 0; i < len; i++) {
     size_t current_addr = addr + i;

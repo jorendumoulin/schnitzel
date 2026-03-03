@@ -11,6 +11,10 @@ void Memory::read_chunk(size_t taddr, size_t len, void *dst) {
     printf("illegal read %zu %zu, ignoring\n", taddr, len);
     return;
   }
+  printf("read chunk at addr %p len %d\n", taddr, len);
+  for (int i = 0; i < len; i++)
+    printf("%x", ((uint8_t *)dst)[i]);
+  printf("\n");
   memcpy(dst, &mem[taddr], len);
 }
 
@@ -19,6 +23,10 @@ void Memory::write_chunk(size_t taddr, size_t len, const void *src) {
     printf("illegal write, ignoring\n");
     return;
   }
+  printf("write chunk at addr %p len %d\n", taddr, len);
+  for (int i = 0; i < len; i++)
+    printf("%x", ((uint8_t *)src)[i]);
+  printf("\n");
   memcpy(&mem[taddr], src, len);
 }
 
