@@ -41,25 +41,15 @@ void dpi_mem_write_512(uint32_t addr, uint32_t *data, uint32_t *ben) {
 }
 
 void dpi_mem_read_64(uint32_t addr, uint32_t *data) {
-  // allign address:
+  // align address:
   addr = (addr >> 3) << 3;
-
   g_dpi_memory.read_chunk(addr, 8, data);
-  // printf("read from addr %p\n", addr);
-  // for (int i = 0; i < 2; i++)
-  //   printf("%x\n", data[i]);
 }
 
 void dpi_mem_write_64(uint32_t addr, uint32_t *data, uint32_t *ben) {
-  // printf("write to addr %p\n", addr);
-  // for (int i = 0; i < 2; i++)
-  //   printf("%x\n", data[i]);
-  // uint8_t strobe = 0;
-  // memcpy(&strobe, ben, 1);
   uint8_t strobe = (uint8_t)(*ben);
-  // printf("strobe = %x\n", strobe);
   alignas(8) uint8_t current[8], wdata[8];
-  // allign address:
+  // align address:
   addr = (addr >> 3) << 3;
   g_dpi_memory.read_chunk(addr, 8, current);
   memcpy(wdata, data, 8);
@@ -70,7 +60,6 @@ void dpi_mem_write_64(uint32_t addr, uint32_t *data, uint32_t *ben) {
     }
   }
   g_dpi_memory.write_chunk(addr, 8, current);
-  ;
 
   if (addr <= g_tohost_addr && g_tohost_addr < addr + 8) {
     extern void dpi_handle_host();
