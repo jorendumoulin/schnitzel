@@ -14,8 +14,6 @@ void dpi_handle_host() {
   if (tohost == 0)
     return;
 
-  printf("tohost message at %p\n", tohost);
-
   uint32_t syscall_mem[8];
   for (int i = 0; i < 8; i++) {
     syscall_mem[i] = g_dpi_memory.read_word(tohost + i * 4);
@@ -26,8 +24,6 @@ void dpi_handle_host() {
 
   switch (syscall_mem[0]) {
   case 64:
-    for (int i = 0; i < 8; i++)
-      printf("syscall[%d]=%d\n", i, syscall_mem[i]);
     g_dpi_memory.read_chunk(syscall_mem[2], syscall_mem[3], putc_buffer);
     printf("(hart %d) %.*s", syscall_mem[4], syscall_mem[3], putc_buffer);
     fflush(stdout);
