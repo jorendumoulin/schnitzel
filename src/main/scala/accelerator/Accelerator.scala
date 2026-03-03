@@ -5,7 +5,7 @@ import core.DecoupledBusIO
 import streamer.{Streamer, AffineAguConfig, StreamerDir}
 import chisel3.util.DecoupledIO
 
-class Accelerator(addrWidth: Int, dataWidth: Int) extends Module {
+abstract class Accelerator(addrWidth: Int, dataWidth: Int) extends Module {
   def setupStreamer(
       config: AffineAguConfig,
       dir: StreamerDir.Type,
