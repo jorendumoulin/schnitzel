@@ -61,7 +61,7 @@ class Cluster extends Module {
   csrDemux_1.io.in <> core_1.io.csr
 
   // Attach accelerator to second core:
-  val aluAccelerator = Module(new AluAccelerator(addrWidth = 32, dataWidth = 64))
+  val aluAccelerator = Module(new AluAccelerator())
   aluAccelerator.io.csr <> csrDemux_1.io.outs(2)
 
 // Global synchronization CSR (0x800) - coupled and sent externally
@@ -79,7 +79,7 @@ class Cluster extends Module {
   icache.io.imems <> VecInit(Seq(core_0.io.imem, core_1.io.imem));
 
   // Accelerator
-  val accPorts = aluAccelerator.io.tcdm.a ++ aluAccelerator.io.tcdm.b ++ aluAccelerator.io.tcdm.c
+  val accPorts = aluAccelerator.io.tcdm.flatten
 
   // TCDM
   val numBanks = 32
