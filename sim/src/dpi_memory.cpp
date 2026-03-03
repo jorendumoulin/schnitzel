@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <svdpi.h>
+#include <sys/types.h>
 
 DynamicMemory g_dpi_memory(4096);
 static Loader g_loader;
@@ -39,14 +40,17 @@ void dpi_mem_write_512(uint32_t addr, uint32_t *data, uint32_t *ben) {
   }
 }
 
-void dpi_mem_read_64(uint32_t addr, svBitVecVal *data) {
+void dpi_mem_read_64(uint32_t addr, uint32_t *data) {
   g_dpi_memory.read_chunk(addr, 8, data);
 }
 
-void dpi_mem_write_64(uint32_t addr, const svBitVecVal *data,
-                      const svBitVecVal *ben) {
-  uint8_t strobe = 0;
-  memcpy(&strobe, ben, 1);
+void dpi_mem_write_64(uint32_t addr, uint32_t *data, uint32_t *ben) {
+  printf("write to addr %p\n", addr);
+  for (int i = 0; i < 2; i++)
+    printf("%d\n", data[i]);
+  // uint8_t strobe = 0;
+  // memcpy(&strobe, ben, 1);
+  uint8_t strobe = (uint8_t)(*ben);
 
   alignas(8) uint8_t current[8], wdata[8];
   g_dpi_memory.read_chunk(addr, 8, current);
