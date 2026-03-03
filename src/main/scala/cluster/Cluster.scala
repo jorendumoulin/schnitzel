@@ -78,8 +78,8 @@ class Cluster extends Module {
   val icache = Module(new InstructionCache(2))
   icache.io.imems <> VecInit(Seq(core_0.io.imem, core_1.io.imem));
 
-  // Acce
-  val accPorts = aluAccelerator.io.aData ++ aluAccelerator.io.bData ++ aluAccelerator.io.cData
+  // Accelerator
+  val accPorts = aluAccelerator.io.tcdm.a ++ aluAccelerator.io.tcdm.b ++ aluAccelerator.io.tcdm.c
 
   // TCDM
   val numBanks = 32

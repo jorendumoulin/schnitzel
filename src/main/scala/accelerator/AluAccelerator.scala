@@ -13,25 +13,32 @@ import dataclass.data
 // Accelerator instantiates streamer <-> datapath <-> streamer
 class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Accelerator(addrWidth, dataWidth) {
 
-  val parallelUnroll = 4 // Hardcode spatial unrolling
-  val numPorts = parallelUnroll
+  val temporalUnroll = 1
+  val spatialUnroll = 4 // Hardcode spatial unrolling
+  val numPorts = spatialUnroll
 
   // warning: using this to reinterpret the vec of values, results in the
   // opposite ordering of signals as they are presented here:
   // additionally, all signals here should be 32 bits.
-  class CsrVals extends Bundle {
-    val aStreamerConfig = new AffineAguConfig(1, Seq(parallelUnroll))
-    val bStreamerConfig = new AffineAguConfig(1, Seq(parallelUnroll))
-    val cStreamerConfig = new AffineAguConfig(1, Seq(parallelUnroll))
+  class AluExtraConfigs extends Bundle {
     val select = Input(UInt(32.W))
+    val numRegs = 1
+  }
+  class CsrVals extends Bundle {
+    val aStreamer = new AffineAguConfig(temporalUnroll, Seq(spatialUnroll))
+    val bStreamer = new AffineAguConfig(temporalUnroll, Seq(spatialUnroll))
+    val cStreamer = new AffineAguConfig(temporalUnroll, Seq(spatialUnroll))
+    val extra = new AluExtraConfigs
     def numRegs =
-      aStreamerConfig.numRegs + bStreamerConfig.numRegs + cStreamerConfig.numRegs + 1 // one extra for select
+      aStreamer.numRegs + bStreamer.numRegs + cStreamer.numRegs + extra.numRegs
   }
 
   val io = IO(new Bundle {
-    val aData = Vec(numPorts, new DecoupledBusIO(addrWidth, dataWidth));
-    val bData = Vec(numPorts, new DecoupledBusIO(addrWidth, dataWidth));
-    val cData = Vec(numPorts, new DecoupledBusIO(addrWidth, dataWidth));
+    val tcdm = new Bundle {
+      val a = Vec(numPorts, new DecoupledBusIO(addrWidth, dataWidth))
+      val b = Vec(numPorts, new DecoupledBusIO(addrWidth, dataWidth))
+      val c = Vec(numPorts, new DecoupledBusIO(addrWidth, dataWidth))
+    }
     val csr = Flipped(new CsrIO)
   })
 
@@ -41,17 +48,17 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Accelerator(addrWid
   val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
   dontTouch(csrVals)
 
-  val aluArray = Module(new AluArray(parallelUnroll, dataWidth))
-  val truncated_sel = csrVals.select.asTypeOf(UInt(2.W))
+  val aluArray = Module(new AluArray(spatialUnroll, dataWidth))
+  val truncated_sel = csrVals.extra.select.asTypeOf(UInt(2.W))
   aluArray.io.sel := truncated_sel
 
   val queueDepth = 3
   // Use streamers for tcdm requests
   val aStreamer =
-    setupStreamer(csrVals.aStreamerConfig, StreamerDir.read, io.aData, aluArray.io.A_in, csrStart)
+    setupStreamer(csrVals.aStreamer, StreamerDir.read, io.tcdm.a, aluArray.io.A_in, csrStart)
   val bStreamer =
-    setupStreamer(csrVals.bStreamerConfig, StreamerDir.read, io.bData, aluArray.io.B_in, csrStart)
+    setupStreamer(csrVals.bStreamer, StreamerDir.read, io.tcdm.b, aluArray.io.B_in, csrStart)
   val cStreamer =
-    setupStreamer(csrVals.cStreamerConfig, StreamerDir.write, io.cData, aluArray.io.C_out, csrStart)
+    setupStreamer(csrVals.cStreamer, StreamerDir.write, io.tcdm.c, aluArray.io.C_out, csrStart)
   csrItf.io.done := cStreamer.io.done
 }
