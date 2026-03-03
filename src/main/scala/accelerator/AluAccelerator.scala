@@ -32,12 +32,11 @@ object AluAcceleratorConfig {
 }
 
 class AluAccelerator(cfg: AcceleratorConfig = AluAcceleratorConfig.default()) extends Accelerator(cfg) {
-  val spatialUnroll = 4
-  val numPorts = spatialUnroll
-  val aluArray = Module(new AluArray(spatialUnroll, cfg.dataWidth))
-  override def datapathInputs: Seq[DecoupledIO[Vec[UInt]]] = Seq(aluArray.io.A_in, aluArray.io.B_in)
-  override def datapathOutputs: Seq[DecoupledIO[Vec[UInt]]] = Seq(aluArray.io.C_out)
-  aluArray.io.sel := extraCsrParams(0)(1, 0)
-  val writeDoneSignals = streamers.collect { case (s, dir) if dir == StreamerDir.write => s.io.done }
-  csrItf.io.done := writeDoneSignals.foldLeft(true.B)(_ && _)
+
+  val spatialWidth = cfg.streamers.head.affineConfig.spatialDimSizes.product
+  val aluArray = Module(new AluArray(spatialWidth, cfg.dataWidth))
+  aluArray.io.A_in <> datapathInputs(0)
+  aluArray.io.B_in <> datapathInputs(1)
+  datapathOutputs(0) <> aluArray.io.C_out
+  aluArray.io.sel := extraParams(0)(1, 0)
 }

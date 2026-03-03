@@ -3,9 +3,9 @@ package accelerator
 import chisel3._
 import core.DecoupledBusIO
 import streamer.{Streamer, AffineAguConfig, StreamerDir}
-import chisel3.util.DecoupledIO
-import chisel3.util.MixedVec
+import chisel3.util.{DecoupledIO, MixedVec, Decoupled}
 import csr.{CsrIO, CsrInterface}
+import scala.collection.mutable
 
 case class AcceleratorStreamer(
     name: String,
@@ -23,96 +23,70 @@ case class AcceleratorConfig(
 
 abstract class Accelerator(cfg: AcceleratorConfig) extends Module {
   val io = IO(new Bundle {
-    // Outputs to TCDM
     val tcdm = MixedVec(cfg.streamers.map { s =>
       Vec(s.affineConfig.spatialDimSizes.product, new DecoupledBusIO(cfg.addrWidth, cfg.dataWidth))
     })
-    // to interface with Control and status registers
     val csr = Flipped(new CsrIO)
   })
 
-  def datapathInputs: Seq[DecoupledIO[Vec[UInt]]]
-  def datapathOutputs: Seq[DecoupledIO[Vec[UInt]]]
-
-  val totalCsrRegs = cfg.streamers.map(s => s.affineConfig.numRegs).sum + cfg.extraParams
+  // 1. CSR Setup
+  val totalCsrRegs = cfg.streamers.map(_.affineConfig.numRegs).sum + cfg.extraParams
   val csrItf = Module(new CsrInterface(totalCsrRegs, 0x900))
   csrItf.io.csr <> io.csr
+  private val csrValues = csrItf.io.vals.reverse
 
-  private var regOffset = 0
-  lazy val streamers = {
-    var inIdx = 0
-    var outIdx = 0
-    cfg.streamers.zipWithIndex.map { case (accStreamer, i) =>
-      // Extract this streamer's slice of CSR values
-      val streamerCsr =
-        VecInit(csrItf.io.vals.slice(regOffset, regOffset + accStreamer.affineConfig.numRegs).reverse)
-          .asTypeOf(accStreamer.affineConfig)
-      regOffset += accStreamer.affineConfig.numRegs
-      val datapathPort = if (accStreamer.dir == StreamerDir.read) {
-        val p = datapathInputs(inIdx)
-        inIdx += 1
-        p
-      } else {
-        val p = datapathOutputs(outIdx)
-        outIdx += 1
-        p
-      }
-      val s = setupStreamer(
-        config = streamerCsr,
-        dir = accStreamer.dir,
-        tcdmSide = io.tcdm(i),
-        accSide = datapathPort,
-        start = csrItf.io.start
-      )
-      (s, accStreamer.dir)
-    }
-
+  // 2. CSR Slicing Logic
+  private var offset = 0
+  val streamerConfigs = cfg.streamers.map { s =>
+    val slice = VecInit(csrValues.slice(offset, offset + s.affineConfig.numRegs)).asTypeOf(s.affineConfig)
+    offset += s.affineConfig.numRegs
+    slice
   }
-  // After the streamers loop finishes, regOffset is at the start of the extra params
-  lazy val extraCsrParams = {
-    // We force the streamers to initialize first so regOffset is correct
-    val _ = streamers
+  val extraParams = VecInit(csrValues.slice(offset, offset + cfg.extraParams))
 
-    // Slice from the current offset to the end
-    val extraSlice = csrItf.io.vals.slice(regOffset, regOffset + cfg.extraParams)
+  // 3. Streamer Instantiation & Bridging
+  // These are the lists the Subclass will use to connect its Datapath
+  val datapathInputs = mutable.ListBuffer[DecoupledIO[Vec[UInt]]]()
+  val datapathOutputs = mutable.ListBuffer[DecoupledIO[Vec[UInt]]]()
+  val writeDoneSignals = mutable.ListBuffer[Bool]()
 
-    // Reverse it if you want to maintain the same ordering convention as the streamers
-    VecInit(extraSlice.reverse)
-  }
-
-  def setupStreamer(
-      config: AffineAguConfig,
-      dir: StreamerDir.Type,
-      tcdmSide: Vec[core.DecoupledBusIO],
-      accSide: DecoupledIO[Vec[UInt]],
-      start: Bool
-  ) = {
+  cfg.streamers.zipWithIndex.foreach { case (sCfg, i) =>
     val s = Module(
-      Streamer(config.nTemporalDims, config.spatialDimSizes, 3, cfg.addrWidth, cfg.dataWidth)
+      new Streamer(
+        sCfg.affineConfig.nTemporalDims,
+        sCfg.affineConfig.spatialDimSizes,
+        3,
+        cfg.addrWidth,
+        cfg.dataWidth
+      )
     )
-    // All streamers take the same start signal
-    s.io.tcdmReqs <> tcdmSide
-    s.io.start := start
-    // All streamers take their own config for CSR setup
-    s.io.config := config
-    s.io.dir := dir
-    // Streamer --> Acc
-    // If the streamer is a "read streamer", connect write to don't care
-    if (dir == StreamerDir.read) {
-      accSide.valid := s.io.read.valid
-      s.io.read.ready := accSide.ready
-      accSide.bits := s.io.read.bits.asTypeOf(accSide.bits)
-      s.io.write := DontCare
-    }
-    // Acc --> Streamer
-    // If the streamer is a "write streamer", connect read to don't care
-    else {
-      s.io.write.valid := accSide.valid
-      accSide.ready := s.io.write.ready
-      s.io.write.bits := accSide.bits.asTypeOf(s.io.write.bits)
-      s.io.read := DontCare
-    }
 
-    s
+    s.io.tcdmReqs <> io.tcdm(i)
+    s.io.config := streamerConfigs(i)
+    s.io.dir := sCfg.dir
+    s.io.start := csrItf.io.start
+
+    val numLanes = sCfg.affineConfig.spatialDimSizes.product
+
+    if (sCfg.dir == StreamerDir.read) {
+      s.io.write := DontCare
+      // Bridge: Streamer (UInt) -> Datapath (Vec[UInt])
+      val bridge = Wire(Decoupled(Vec(numLanes, UInt(cfg.dataWidth.W))))
+      bridge.valid := s.io.read.valid
+      s.io.read.ready := bridge.ready
+      bridge.bits := s.io.read.bits.asTypeOf(bridge.bits)
+      datapathInputs += bridge
+    } else {
+      s.io.read := DontCare
+      // Bridge: Datapath (Vec[UInt]) -> Streamer (UInt)
+      val bridge = Wire(Flipped(Decoupled(Vec(numLanes, UInt(cfg.dataWidth.W)))))
+      s.io.write.valid := bridge.valid
+      bridge.ready := s.io.write.ready
+      s.io.write.bits := bridge.bits.asUInt
+      datapathOutputs += bridge
+      writeDoneSignals += s.io.done
+    }
   }
+
+  csrItf.io.done := writeDoneSignals.toSeq.foldLeft(true.B)(_ && _)
 }
