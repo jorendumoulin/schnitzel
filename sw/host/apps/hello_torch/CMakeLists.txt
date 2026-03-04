@@ -4,7 +4,7 @@ set(EXECUTORCH_BUILD_PTHREADPOOL OFF CACHE BOOL "Disable pthreadpool (requires p
 set(EXECUTORCH_PAL_DEFAULT minimal CACHE STRING "")
 set(EXECUTORCH_DTYPE_SELECTIVE_BUILD OFF CACHE BOOL "")
 set(EXECUTORCH_ENABLE_LOGGING ON CACHE BOOL "")
-set(EXECUTORCH_SELECT_ALL_OPS ON CACHE BOOL "")
+set(EXECUTORCH_SELECT_OPS_LIST "aten::_to_copy.out,aten::add.out")
 set(EXECUTORCH_BUILD_EXECUTOR_RUNNER OFF CACHE BOOL "")
 
 # Use gcc for compiling executorch subprojects:
@@ -34,6 +34,5 @@ target_link_libraries(
     PRIVATE
         host_runtime
         executorch
-        portable_ops_lib
-        portable_kernels    # Clean C++ math ops (no FFT/Eigen dependencies)
+        executorch_selected_kernels
 )
