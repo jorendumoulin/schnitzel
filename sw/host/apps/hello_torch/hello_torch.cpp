@@ -1,4 +1,4 @@
-#include "model3_data.h"
+#include "model_data.h"
 #include <executorch/extension/data_loader/buffer_data_loader.h>
 #include <executorch/runtime/core/data_loader.h>
 #include <executorch/runtime/executor/memory_manager.h>
@@ -7,6 +7,8 @@
 #include <executorch/runtime/kernel/operator_registry.h>
 #include <executorch/runtime/platform/platform.h>
 #include <executorch/runtime/platform/runtime.h>
+#include <htif_runtime.h>
+#include <stdio.h>
 
 using executorch::aten::Tensor;
 using executorch::aten::TensorImpl;
@@ -29,13 +31,18 @@ int main() {
   } else {
     printf("aten::add.out not present\n");
   }
+  if (registry_has_op_function("my_ops::mul3.out")) {
+    printf("my_ops::mul3.out present\n");
+  } else {
+    printf("my_ops::mul3.out not present\n");
+  }
 
-  if (model3_pte == nullptr || model3_pte_len == 0) {
+  if (model_pte == nullptr || model_pte_len == 0) {
     printf("Error: Model buffer is empty!\n");
     return -1;
   }
 
-  BufferDataLoader loader(model3_pte, model3_pte_len);
+  BufferDataLoader loader(model_pte, model_pte_len);
 
   // Check if Program loaded correctly
   auto program_res = Program::load(&loader);
@@ -79,13 +86,13 @@ int main() {
   }
 
   printf("Running method_res...\n");
-  printf("Running method_res for sure now!\n");
   Method &method = method_res.get();
 
   // Create input tensor: [1, 28, 28]
-  TensorImpl::SizesType input_sizes[1] = {1};
+  TensorImpl::SizesType input_sizes[1] = {10};
   TensorImpl::DimOrderType dim_order[3] = {0};
-  float input_data[1] = {3.14};
+  float input_data[10] = {1.0,  0.5, 3.2,   5.6,   2.1,
+                          -3.4, 0.7, -0.13, -0.88, 0.22};
 
   TensorImpl input_impl(ScalarType::Float,
                         1,           // 3 dimensions: [batch, height, width]
@@ -108,6 +115,8 @@ int main() {
   printf("Success!\n");
   float *output_data =
       method.get_output(0).toTensor().mutable_data_ptr<float>();
-  printf("Result: %f\n", output_data[0]);
+  printf("Result: {%f, %f, %f}\n", output_data[0], output_data[1],
+         output_data[2]);
+  htif_exit(0);
   return 0;
 }
