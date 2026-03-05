@@ -1,4 +1,4 @@
-name: Build
+name: Simulate
 on:
   push:
     branches:
@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 jobs:
   build:
+    name: Build Simulator
     runs-on: ubuntu-latest
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -32,11 +33,39 @@ jobs:
         run: just build
       - uses: actions/upload-artifact@v4
         with:
-          name: build-outputs
+          name: build-simulator
+          path: build/
+  build-executorch:
+    name: Build Executorch App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          environments: 'all'
+          activate-environment: true
+          cache: true
+      - name: Generate Network
+        run: \
+          cd sw/host/apps/hello_torch && \
+          python model_dispatch.py && \
+          echo "alignas(16) " > model_data.h && \
+          xxd -i model.pte >> model_data.h && \
+          cd ../../../
+      - name: Configure Build
+        run: cmake -B build/host -S sw/host -G Ninja -DBUILD_TORCH_EXAMPLES=ON
+      - name: Build App
+        run: cmake --build build/host --target hello_torch.elf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-executorch
           path: build/
   run-apps:
+    name: Run Applications
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, build-executorch]
     steps:
       - uses: actions/checkout@v5
       - uses: prefix-dev/setup-pixi@v0.9.4
@@ -45,7 +74,11 @@ jobs:
           cache: true
       - uses: actions/download-artifact@v4
         with:
-          name: build-outputs
+          name: build-simulator
+          path: build
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-executorch
           path: build
       - name: Grant Execute Permissions
         run: chmod +x ./build/sim/sim
