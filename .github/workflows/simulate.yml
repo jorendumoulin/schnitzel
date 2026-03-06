@@ -1,0 +1,92 @@
+name: Simulate
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    name: Build Simulator
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ github.sha }}
+          restore-keys: ccache-
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          activate-environment: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+      - name: Checkout Selective Submodules
+        run: git submodule update --init --recursive --depth 1 submodules/cva6 submodules/ibex submodules/printf
+      - name: Generate Verilog
+        run: just generate-verilog
+      - name: Configure All Build Systems
+        run: just configure
+      - name: Build Everything
+        run: just build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-simulator
+          path: build/
+  build-executorch:
+    name: Build Executorch App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - name: Debug
+        run: |
+          cat /home/runner/work/schnitzel/schnitzel/submodules/executorch/shim_et/xplat/executorch/build/build_variables.bzl
+          python3 -c "exec(open('/home/runner/work/schnitzel/schnitzel/submodules/executorch/shim_et/xplat/executorch/build/build_variables.bzl').read())"
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          environments: 'all'
+          activate-environment: true
+          cache: true
+      - name: Generate Network
+        run: |
+          cd sw/host/apps/hello_torch
+          python model_dispatch.py
+          echo "alignas(16) " > model_data.h
+          xxd -i model.pte >> model_data.h
+          cd ../../../
+      - name: Configure Build
+        run: |
+          echo "python on path: $(which python3)"
+          cmake -B build/host -S sw/host -G Ninja -DBUILD_TORCH_EXAMPLES=ON -DPYTHON_EXECUTABLE=$(which python3)
+      - name: Build App
+        run: cmake --build build/host --target hello_torch.elf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-executorch
+          path: build/
+  run-apps:
+    name: Run Applications
+    runs-on: ubuntu-latest
+    needs: [build, build-executorch]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          activate-environment: true
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-simulator
+          path: build
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-executorch
+          path: build
+      - name: Grant Execute Permissions
+        run: chmod +x ./build/sim/sim
+      - name: Run App Tests
+        run: lit tests/apps -v

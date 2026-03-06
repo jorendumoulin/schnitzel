@@ -25,11 +25,6 @@ include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
 include(${EXECUTORCH_ROOT}/tools/cmake/Codegen.cmake)
 set(ENV{PYTHONPATH} "${EXECUTORCH_ROOT}")
 
-if(NOT PYTHON_EXECUTABLE)
-  set(PYTHON_EXECUTABLE /home/joren/phd/schnitzel/.pixi/envs/all/bin/python)
-  # resolve_python_executable()
-endif()
-
 set(_common_compile_options -Wno-deprecated-declarations -fPIC)
 
 # Let files say "include <executorch/path/to/header.h>".

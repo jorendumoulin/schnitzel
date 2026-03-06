@@ -39,6 +39,7 @@ int main() {
 
   if (model_pte == nullptr || model_pte_len == 0) {
     printf("Error: Model buffer is empty!\n");
+    htif_exit(-1);
     return -1;
   }
 
@@ -48,6 +49,7 @@ int main() {
   auto program_res = Program::load(&loader);
   if (!program_res.ok()) {
     printf("Program load failed: 0x%x\n", (unsigned int)program_res.error());
+    htif_exit(-1);
     return -1;
   }
   Program &program = program_res.get(); // Use .get() to access the object
@@ -82,6 +84,7 @@ int main() {
   auto method_res = program.load_method("forward", &memory_manager);
   if (!method_res.ok()) {
     printf("Method load failed: 0x%x\n", (unsigned int)method_res.error());
+    htif_exit(-1);
     return -1;
   }
 
@@ -109,6 +112,7 @@ int main() {
 
   if (err != Error::Ok) {
     printf("Execution failed: 0x%x\n", (unsigned int)err);
+    htif_exit(-1);
     return -1;
   }
 
