@@ -2,6 +2,8 @@
 test_run_dir/*
 .bloop
 .metals
+*.dasm
+*.pte
 
 # Spitchel build artifacts
 generated/
