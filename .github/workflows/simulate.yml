@@ -48,11 +48,11 @@ jobs:
           activate-environment: true
           cache: true
       - name: Generate Network
-        run: \
-          cd sw/host/apps/hello_torch && \
-          python model_dispatch.py && \
-          echo "alignas(16) " > model_data.h && \
-          xxd -i model.pte >> model_data.h && \
+        run: |
+          cd sw/host/apps/hello_torch
+          python model_dispatch.py
+          echo "alignas(16) " > model_data.h
+          xxd -i model.pte >> model_data.h
           cd ../../../
       - name: Configure Build
         run: cmake -B build/host -S sw/host -G Ninja -DBUILD_TORCH_EXAMPLES=ON
