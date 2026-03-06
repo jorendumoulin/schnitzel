@@ -41,6 +41,8 @@ jobs:
   build-executorch:
     name: Build Executorch App
     runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
       - uses: actions/checkout@v5
         with:
