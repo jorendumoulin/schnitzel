@@ -2,7 +2,6 @@ package datapath
 
 import chisel3._
 import chisel3.util.MuxLookup
-import circt.stage.ChiselStage
 import chisel3.util.Decoupled
 
 class AluPE(dataWidth: Int = 32) extends Module {

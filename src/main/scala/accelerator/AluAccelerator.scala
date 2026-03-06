@@ -5,7 +5,7 @@ import core.DecoupledBusIO
 import streamer.{Streamer, AffineAguConfig, StreamerDir}
 import csr.CsrIO
 import csr.CsrInterface
-import datapath.AluArray
+import datapath.AluBlackBoxArrayWrapper
 
 // DMA instantiates streamer <-> datapath <-> streamer
 //
@@ -38,7 +38,7 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
   dontTouch(csrVals)
 
-  val aluArray = Module(new AluArray(parallelUnroll, dataWidth))
+  val aluArray = Module(new AluBlackBoxArrayWrapper(parallelUnroll, dataWidth))
   val truncated_sel = csrVals.select.asTypeOf(UInt(2.W))
   aluArray.io.sel := truncated_sel
 
