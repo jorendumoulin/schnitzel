@@ -31,7 +31,7 @@ jobs:
       - name: Generate Verilog
         run: just generate-verilog
       - name: Configure All Build Systems
-        run: just configure
+        run: just configure fast
       - name: Build Everything
         run: just build
       - uses: actions/upload-artifact@v4
