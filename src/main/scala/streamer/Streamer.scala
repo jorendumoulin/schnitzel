@@ -33,7 +33,6 @@ class Streamer(
   val agu = Module(new AffineAgu(nTemporalDims, spatialDimSizes, queueDepth));
   agu.io.start := io.start
   agu.io.config := io.config
-  io.done := agu.io.done
 
   // Split full-width read/write ports into data port widths:
   val readVec = Wire(Vec(numPorts, UInt(dataWidth.W)))
@@ -46,11 +45,17 @@ class Streamer(
     reqQueue.io.enq.bits := writeVec(i)
 
     // Generate requests by combining input data with agu:
-    io.tcdmReqs(i).req.valid := reqQueue.io.deq.valid && agu.io.addrs(i).valid
-    reqQueue.io.deq.ready := io.tcdmReqs(i).req.ready && agu.io.addrs(i).valid
-    agu.io.addrs(i).ready := io.tcdmReqs(i).req.ready && reqQueue.io.deq.valid
-    when(io.dir === StreamerDir.write) { io.tcdmReqs(i).req.bits.wdata := reqQueue.io.deq.bits }
-      .otherwise { io.tcdmReqs(i).req.bits.wdata := DontCare }
+    when(io.dir === StreamerDir.write) {
+      io.tcdmReqs(i).req.bits.wdata := reqQueue.io.deq.bits
+      io.tcdmReqs(i).req.valid := reqQueue.io.deq.valid && agu.io.addrs(i).valid
+      reqQueue.io.deq.ready := io.tcdmReqs(i).req.ready && agu.io.addrs(i).valid
+      agu.io.addrs(i).ready := io.tcdmReqs(i).req.ready && reqQueue.io.deq.valid
+    }.otherwise {
+      io.tcdmReqs(i).req.bits.wdata := DontCare
+      io.tcdmReqs(i).req.valid := agu.io.addrs(i).valid
+      reqQueue.io.deq.ready := false.B
+      agu.io.addrs(i).ready := io.tcdmReqs(i).req.ready
+    }
     io.tcdmReqs(i).req.bits.addr := agu.io.addrs(i).bits
     io.tcdmReqs(i).req.bits.wen := io.dir === StreamerDir.write;
     io.tcdmReqs(i).req.bits.ben := 1.U.asTypeOf((io.tcdmReqs(i).req.bits.ben))
@@ -67,7 +72,7 @@ class Streamer(
     // Decouple tcdm rsps and data rsps through queues:
     val rspQueue = Module(new Queue(streamerDataType, queueDepth))
     readVec(i) := rspQueue.io.deq.bits
-    rspQueue.io.enq.valid := io.tcdmReqs(i).rsp.valid
+    rspQueue.io.enq.valid := io.tcdmReqs(i).rsp.valid && io.dir === StreamerDir.read
     io.tcdmReqs(i).rsp.ready := rspQueue.io.enq.ready
     rspQueue.io.enq.bits := io.tcdmReqs(i).rsp.bits.data
 
@@ -79,4 +84,7 @@ class Streamer(
   io.read.valid := allRspValid
   rspQueues.foreach(_.io.deq.ready := io.read.ready && allRspValid)
 
+  // Only signal done when agu is done and all queues are empty
+  val allRspEmty = rspQueues.map(_.io.count === 0.U).reduce(_ && _)
+  io.done := agu.io.done && allRspEmty
 }
