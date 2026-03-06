@@ -12,6 +12,7 @@ jobs:
   build:
     name: Build Simulator
     runs-on: ubuntu-latest
+    container: ghcr.io/jorendumoulin/schnitzel:latest
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
