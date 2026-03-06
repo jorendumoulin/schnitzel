@@ -5,6 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Add pixi packages explicitly
+if(DEFINED ENV{CONDA_PREFIX})
+  list(APPEND CMAKE_PREFIX_PATH $ENV{CONDA_PREFIX})
+endif()
+
 find_package(verilator REQUIRED)
 
 add_executable(sim
@@ -29,10 +34,10 @@ set(RTL_SOURCES
 )
 
 foreach(f ${FILELIST})
-    string(STRIP "${f}" f_stripped)
-    if(NOT f_stripped STREQUAL "")
-        list(APPEND RTL_SOURCES ${GENERATED_DIR}/${f_stripped})
-    endif()
+  string(STRIP "${f}" f_stripped)
+  if(NOT f_stripped STREQUAL "")
+    list(APPEND RTL_SOURCES ${GENERATED_DIR}/${f_stripped})
+  endif()
 endforeach()
 
 verilate(sim
