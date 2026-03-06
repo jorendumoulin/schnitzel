@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'util/Dockerfile'
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -36,7 +38,7 @@ jobs:
           file: util/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/sim-env:latest
-            ghcr.io/${{ github.repository }}/sim-env:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
