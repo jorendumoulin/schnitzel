@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Add pixi packages explicitly
 if(DEFINED ENV{CONDA_PREFIX})
   list(APPEND CMAKE_PREFIX_PATH $ENV{CONDA_PREFIX})
+  message(STATUS "Pixi/Conda environment detected: $ENV{CONDA_PREFIX}")
 endif()
 
 find_package(verilator REQUIRED)
