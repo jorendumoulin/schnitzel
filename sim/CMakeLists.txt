@@ -5,12 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Add pixi packages explicitly
-if(DEFINED ENV{CONDA_PREFIX})
-  list(APPEND CMAKE_PREFIX_PATH $ENV{CONDA_PREFIX})
-  message(STATUS "Pixi/Conda environment detected: $ENV{CONDA_PREFIX}")
-endif()
-
+find_package(elfio REQUIRED)
+find_package(argparse REQUIRED)
 find_package(verilator REQUIRED)
 
 add_executable(sim
@@ -22,6 +18,7 @@ add_executable(sim
     src/dynamic_memory.cpp
 )
 target_include_directories(sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(sim PRIVATE argparse::argparse elfio::elfio)
 
 set(GENERATED_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../generated)
 set(RTL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rtl)
