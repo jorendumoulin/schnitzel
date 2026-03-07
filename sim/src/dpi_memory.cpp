@@ -16,6 +16,11 @@ extern "C" {
 
 void dpi_mem_read_512(uint32_t addr, uint32_t *data) {
   g_dpi_memory.read_chunk(addr, 64, data);
+  // printf("dpi reads the following data at addr %p:\n", addr);
+  // for (int i = 0; i < 64; i++) {
+  //   printf("%x", data[i]);
+  // }
+  // printf("\n");
 }
 
 void dpi_mem_write_512(uint32_t addr, uint32_t *data, uint32_t *ben) {

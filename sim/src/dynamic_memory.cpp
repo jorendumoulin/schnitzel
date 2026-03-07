@@ -36,8 +36,8 @@ void DynamicMemory::write_chunk(size_t addr, size_t len, const void *src) {
     size_t page_index = current_addr / page_size;
     size_t offset_in_page = current_addr % page_size;
     // if (len == 8) {
-    //   printf("writing to addr %p page %d with offset %d data %02x\n",
-    //          current_addr, page_index, offset_in_page, src_bytes[i]);
+    // printf("writing to addr %p page %d with offset %d data %02x\n",
+    //        current_addr, page_index, offset_in_page, src_bytes[i]);
     // }
     // Get or create the page
     auto &page = get_or_create_page(current_addr);

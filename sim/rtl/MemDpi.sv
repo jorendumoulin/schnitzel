@@ -50,14 +50,19 @@ module MemDpi #(
           
         end else begin
           // READ Logic
-          if (DATA_WIDTH == 512) begin
-            dpi_mem_read_512(req_addr, rsp_data_q);
-          end else begin
-            dpi_mem_read_64(req_addr, rsp_data_q);
+          // Use a temporary variable for DPI output to avoid issues with
+          // older Verilator versions (< 5.044) not correctly propagating
+          // DPI output arguments that target flip-flop registers directly.
+          begin
+            logic [DATA_WIDTH-1:0] tmp_data;
+            if (DATA_WIDTH == 512) begin
+              dpi_mem_read_512(req_addr, tmp_data);
+            end else begin
+              dpi_mem_read_64(req_addr, tmp_data);
+            end
+            rsp_data_q <= tmp_data;
+            // $display("[%0t] [MemDpi] READ  Addr: 0x%h, Data: 0x%h", $time, req_addr, tmp_data);
           end
-          
-          // Print the data immediately after the DPI call updates rsp_data_q
-          // $display("[%0t] [MemDpi] READ  Addr: 0x%h, Data: 0x%h", $time, req_addr, rsp_data_q);
         end
       end else if (rsp_ready) begin
         rsp_valid_q <= 1'b0;
