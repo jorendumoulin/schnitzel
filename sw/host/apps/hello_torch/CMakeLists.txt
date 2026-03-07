@@ -3,10 +3,11 @@ set(EXECUTORCH_BUILD_CPUINFO OFF CACHE BOOL "Disable cpuinfo (requires pthreads)
 set(EXECUTORCH_BUILD_PTHREADPOOL OFF CACHE BOOL "Disable pthreadpool (requires pthreads)" FORCE)
 set(EXECUTORCH_PAL_DEFAULT posix CACHE STRING "")
 set(EXECUTORCH_DTYPE_SELECTIVE_BUILD OFF CACHE BOOL "")
-set(EXECUTORCH_ENABLE_LOGGING ON CACHE BOOL "")
-set(EXECUTORCH_INCLUDE_ALL_OPS ON CACHE BOOL "")
-set(EXECUTORCH_LOG_LEVEL Debug CACHE STRING "" FORCE)
-# set(EXECUTORCH_SELECT_OPS_LIST "aten::_to_copy.out,aten::add.out")
+set(EXECUTORCH_ENABLE_LOGGING OFF CACHE BOOL "")
+# set(EXECUTORCH_INCLUDE_ALL_OPS ON CACHE BOOL "")
+set(EXECUTORCH_LOG_LEVEL INFO CACHE STRING "" FORCE)
+set(EXECUTORCH_OPTIMIZE_SIZE ON CACHE BOOL "")
+set(EXECUTORCH_SELECT_OPS_MODEL "${CMAKE_CURRENT_SOURCE_DIR}/model.pte" CACHE STRING "Model for selective kernel build")
 set(EXECUTORCH_BUILD_EXECUTOR_RUNNER OFF CACHE BOOL "")
 
 # Use gcc for compiling executorch subprojects:
@@ -79,8 +80,6 @@ target_link_libraries(
     PRIVATE
         host_runtime
         executorch
-        # executorch_selected_kernels
+        executorch_selected_kernels
         custom_ops_lib
-        portable_ops_lib
-        portable_kernels
 )
