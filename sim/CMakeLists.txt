@@ -44,6 +44,8 @@ verilate(sim
     PREFIX VTopWrapper
     TRACE_VCD
     THREADS ${CMAKE_HOST_SYSTEM_PROCESSOR_COUNT}
+    OPT_FAST "-O3 -march=native"
+    OPT_SLOW "-O0"
     VERILATOR_ARGS
         -Wno-UNOPTFLAT -Wno-MULTIDRIVEN -Wno-LATCH
         -Wno-BLKANDNBLK -Wno-SELRANGE -Wno-SYMRSVDWORD
