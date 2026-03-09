@@ -68,7 +68,10 @@ jobs:
       - name: Configure Build
         run: |
           echo "python on path: $(which python3)"
-          cmake -B build/host -S sw/host -G Ninja -DBUILD_TORCH_EXAMPLES=ON -DPYTHON_EXECUTABLE=$(which python3)
+          cmake -B build/host -S sw/host -G Ninja \
+            -DBUILD_TORCH_EXAMPLES=ON \
+            -DPYTHON_EXECUTABLE=$(which python3) \
+            -DEXECUTORCH_ENABLE_PROGRAM_VERIFICATION=OFF
       - name: Build App
         run: cmake --build build/host --target hello_torch.elf
       - uses: actions/upload-artifact@v4
