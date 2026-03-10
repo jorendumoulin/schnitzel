@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.util.Queue
 import core.DecoupledBusIO
 import chisel3.util.Decoupled
+import dataclass.data
 
 object StreamerDir extends ChiselEnum { val read, write = Value }
 
@@ -41,7 +42,7 @@ class Streamer(
 
   val reqQueues = (0 until numPorts).map { i =>
     // Decouple data reqs and tcdm reqs through queues:
-    val reqQueue = Module(new Queue(streamerDataType, queueDepth))
+    val reqQueue = Module(new Queue(UInt(dataWidth.W), queueDepth))
     reqQueue.io.enq.bits := writeVec(i)
 
     // Generate requests by combining input data with agu:
@@ -58,7 +59,7 @@ class Streamer(
     }
     io.tcdmReqs(i).req.bits.addr := agu.io.addrs(i).bits
     io.tcdmReqs(i).req.bits.wen := io.dir === StreamerDir.write;
-    io.tcdmReqs(i).req.bits.ben := 1.U.asTypeOf((io.tcdmReqs(i).req.bits.ben))
+    io.tcdmReqs(i).req.bits.ben := VecInit(Seq.fill(numPorts)(true.B)).asUInt
 
     reqQueue
   }
@@ -70,7 +71,7 @@ class Streamer(
 
   val rspQueues = (0 until numPorts).map { i =>
     // Decouple tcdm rsps and data rsps through queues:
-    val rspQueue = Module(new Queue(streamerDataType, queueDepth))
+    val rspQueue = Module(new Queue(UInt(dataWidth.W), queueDepth))
     readVec(i) := rspQueue.io.deq.bits
     rspQueue.io.enq.valid := io.tcdmReqs(i).rsp.valid && io.dir === StreamerDir.read
     io.tcdmReqs(i).rsp.ready := rspQueue.io.enq.ready

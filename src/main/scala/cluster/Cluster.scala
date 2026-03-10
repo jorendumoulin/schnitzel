@@ -18,8 +18,11 @@ import csr.CsrIO
 
 class Cluster extends Module {
 
+  val wideAxiDataWidth = 512
+  val tcdmDataWidth = CoreConfig.dataWidth
+
   val io = IO(new Bundle {
-    val axi = new AXIBundle(AXIConfig(idWidth = 6, dataWidth = 512))
+    val axi = new AXIBundle(AXIConfig(idWidth = 6, dataWidth = wideAxiDataWidth))
     val csr = new CsrIO()
   })
 
@@ -33,7 +36,7 @@ class Cluster extends Module {
 
   // Convert data interface to AXI
   val mem_to_axi_0 = Module(
-    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = 512), 1)
+    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = wideAxiDataWidth), 1)
   )
   memMux_0.io.outs(0) <> mem_to_axi_0.io.bus
 
@@ -41,7 +44,9 @@ class Cluster extends Module {
   csrDemux_0.io.in <> core_0.io.csr
 
   // Attach dma to first core:
-  val dma = Module(new Dma(addrWidth = 32, dataWidth = 64, AXIConfig(dataWidth = 512), 3))
+  val dma = Module(
+    new Dma(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, AXIConfig(dataWidth = wideAxiDataWidth), 3)
+  )
   dma.io.csr <> csrDemux_0.io.outs(2)
 
   // Second core:
@@ -53,7 +58,7 @@ class Cluster extends Module {
 
   // Convert data interface to AXI
   val mem_to_axi_1 = Module(
-    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = 512), 2)
+    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = wideAxiDataWidth), 2)
   )
   memMux_1.io.outs(0) <> mem_to_axi_1.io.bus
 
@@ -61,7 +66,7 @@ class Cluster extends Module {
   csrDemux_1.io.in <> core_1.io.csr
 
   // Attach accelerator to second core:
-  val aluAccelerator = Module(new AluAccelerator(addrWidth = 32, dataWidth = 64))
+  val aluAccelerator = Module(new AluAccelerator(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth))
   aluAccelerator.io.csr <> csrDemux_1.io.outs(2)
 
 // Global synchronization CSR (0x800) - coupled and sent externally
@@ -86,7 +91,7 @@ class Cluster extends Module {
   val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM.masked(1024, Vec(4, UInt(8.W)), 0, 0, 1)));
   val tcdm_ports = VecInit(tcdm_sram.map(sram => sram.readwritePorts(0)));
 
-  val interconnect = Module(new Interconnect(22, numBanks, CoreConfig.addrWidth, CoreConfig.dataWidth));
+  val interconnect = Module(new Interconnect(30, numBanks, CoreConfig.addrWidth, tcdmDataWidth));
 
   interconnect.io.ins <> VecInit(Seq(memMux_0.io.outs(1), memMux_1.io.outs(1))) ++ dma.io.data ++ accPorts
 
@@ -103,7 +108,7 @@ class Cluster extends Module {
   }
 
   // AXI Crossbar
-  val axiMux = Module(AXIMux(AXIConfig(dataWidth = 512, idWidth = 4), 4))
+  val axiMux = Module(AXIMux(AXIConfig(dataWidth = wideAxiDataWidth, idWidth = 4), 4))
   axiMux.io.ins <> VecInit(icache.io.axi, mem_to_axi_0.io.axi, mem_to_axi_1.io.axi, dma.io.axi)
   axiMux.io.out <> io.axi
 
