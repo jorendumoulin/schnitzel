@@ -30,4 +30,10 @@ void *memset(void *s, int c, size_t n) {
     __v;                                                                       \
   })
 
+#ifdef VERBOSE
+#define verbose_printf(...) printf(__VA_ARGS__)
+#else
+#define verbose_printf(...) ((void)0)
+#endif
+
 #endif
