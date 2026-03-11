@@ -1,7 +1,7 @@
 [project]
-name = "snax-mlir"
+name = "schnitzel"
 description = "Driving SNAX with MLIR"
-version = "0.2.2"
+version = "0.1.0"
 requires-python = "== 3.12.*"
 
 
