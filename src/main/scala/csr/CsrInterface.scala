@@ -9,19 +9,22 @@ import core.BusReq
 class CsrInterface(numRegisters: Int, baseAddr: Int) extends Module {
 
   val io = IO(new Bundle {
+
     /** CSR interface, RISC-V facing */
     val csr = Flipped(new CsrIO)
+
     /** Value registers, accelerator-facing */
-    val vals = Output(Vec(numRegisters, UInt(32.W))) 
+    val vals = Output(Vec(numRegisters, UInt(32.W)))
+
     /** Signal to start accelerator, single-pulse */
     val start = Output(Bool())
+
     /** High when accelerator is done */
     val done = Input(Bool())
   })
 
   // Send start signal / set barrier
   val isSyncAddr = io.csr.req.bits.addr === (baseAddr + numRegisters).U
-  //val isWriteOp = io.csr.req.bits.op === CsrOp.WRITE
 
   // If the accelerator is done, and the CSR request is valid for the special register
   when(io.done && io.csr.req.valid && isSyncAddr) {
@@ -29,18 +32,14 @@ class CsrInterface(numRegisters: Int, baseAddr: Int) extends Module {
     io.csr.req.ready := true.B;
     // start the accelerator if the written data is exactly 0x01
     io.start := io.csr.req.bits.wdata === 1.U;
-  //} .elsewhen(io.done && io.csr.req.valid && isSyncAddr) {
-  //  // Don't stall the CPU
-  //  io.csr.req.ready := true.B;
-  //  // Don't signal a start
-  //  io.start := false.B; 
-  // If the accelerator is not done, and the CSR request is valid for the special register
-  }.otherwise { 
+  }.otherwise {
+    // If the accelerator is not done, and the CSR request is valid for the special register
     // Don't signal a start
-    io.start := false.B; 
+    io.start := false.B;
     // stall the CPU
-    io.csr.req.ready := false.B; }
-  // We currently don't care about the values inside the registers themselves
+    io.csr.req.ready := false.B;
+  }
+  // We currently don't care about the values returned from the registers
   io.csr.rsp.rdata := DontCare
 
   // Shadow registers mechanism
