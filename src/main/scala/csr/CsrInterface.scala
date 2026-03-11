@@ -4,35 +4,59 @@ package csr
 
 import chisel3._
 import core.DecoupledBusIO
-import chisel3.util.log2Up
-import chisel3.util.RRArbiter
 import core.BusReq
 
 class CsrInterface(numRegisters: Int, baseAddr: Int) extends Module {
 
   val io = IO(new Bundle {
+
+    /** CSR interface, RISC-V facing */
     val csr = Flipped(new CsrIO)
-    val vals = Vec(numRegisters, UInt(32.W))
+
+    /** Value registers, accelerator-facing */
+    val vals = Output(Vec(numRegisters, UInt(32.W)))
+
+    /** Signal to start accelerator, single-pulse */
     val start = Output(Bool())
+
+    /** High when accelerator is done */
     val done = Input(Bool())
   })
 
   // Send start signal / set barrier
-  when(io.csr.req.valid && io.csr.req.bits.addr === (baseAddr + numRegisters).U && io.done) {
+  val isSyncAddr = io.csr.req.bits.addr === (baseAddr + numRegisters).U
+
+  // If the accelerator is done, and the CSR request is valid for the special register
+  when(io.done && io.csr.req.valid && isSyncAddr) {
+    // Don't stall the CPU
     io.csr.req.ready := true.B;
+    // start the accelerator if the written data is exactly 0x01
     io.start := io.csr.req.bits.wdata === 1.U;
-  }.otherwise { io.start := false.B; io.csr.req.ready := false.B; }
+  }.otherwise {
+    // If the accelerator is not done, and the CSR request is valid for the special register
+    // Don't signal a start
+    io.start := false.B;
+    // stall the CPU
+    io.csr.req.ready := false.B;
+  }
+  // We currently don't care about the values returned from the registers
   io.csr.rsp.rdata := DontCare
 
   // Shadow registers mechanism
   for (i <- 0 until numRegisters) {
+    // Instantiate a double register set
     val shadowReg, valueReg = RegInit(0.U(32.W))
+    // All value register's outputs are connected to IO
+    io.vals(i) := valueReg
+    // If an address is written in this range, and the request is valid
     when(io.csr.req.valid && io.csr.req.bits.addr === (baseAddr + i).U) {
+      // Set ready request to true
       io.csr.req.ready := true.B;
+      // Store the value in the ShadowRegister
       shadowReg := io.csr.req.bits.wdata
     }
+    // Upon io.start, commit all shadowregisters to the valueregisters
     when(io.start) { valueReg := shadowReg }
-    io.vals(i) := valueReg
   }
 
 }

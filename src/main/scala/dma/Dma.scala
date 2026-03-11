@@ -11,6 +11,7 @@ import axi.DecoupledIOToAXI
 import csr.CsrIO
 import csr.CsrInterface
 import streamer.StreamerDir
+import chisel3.simulator.PeekPokeAPI.TestableData
 
 object DmaDir extends ChiselEnum { val readAxi, writeAxi = Value; }
 
@@ -23,8 +24,8 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
   // opposite ordering of signals as they are presented here:
   // additionally, all signals here should be 32 bits.
   class CsrVals extends Bundle {
-    val streamerConfig = new AffineAguConfig(4, Seq(2, 2, 2))
-    val axiStreamerConfig = new AffineAguConfig(4, Seq())
+    val streamerConfig = new AffineAguConfig(4, Seq(2, 2, 2, 2)) // fetches 16 elements
+    val axiStreamerConfig = new AffineAguConfig(4, Seq()) // Writes 16x32b (512b) elements in one go ~ wide AXI
     val dir = UInt(32.W)
   }
 
@@ -34,14 +35,14 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
     val csr = Flipped(new CsrIO)
   })
 
-  val csrItf = Module(new CsrInterface(12 + 9 + 1, 0x900))
+  val csrItf = Module(new CsrInterface(13 + 9 + 1, 0x900))
   csrItf.io.csr <> io.csr
   val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
   dontTouch(csrVals)
   val dir = csrVals.dir(0).asTypeOf(DmaDir())
 
   // Use streamer for tcdm requests
-  val streamer = Module(new Streamer(4, Seq(2, 2, 2), 3, addrWidth, dataWidth));
+  val streamer = Module(new Streamer(4, Seq(2, 2, 2, 2), 3, addrWidth, dataWidth));
   streamer.io.tcdmReqs <> io.data
   streamer.io.config := csrVals.streamerConfig
   streamer.io.start := csrItf.io.start
@@ -51,10 +52,11 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
   axiAgu.io.config := csrVals.axiStreamerConfig;
   axiAgu.io.start := csrItf.io.start;
 
-  val memToAxi = Module(new DecoupledIOToAXI(addrWidth, dataWidth, axiConfig, id));
+  val memToAxi = Module(new DecoupledIOToAXI(addrWidth, axiConfig.dataWidth, axiConfig, id));
   io.axi <> memToAxi.io.axi
   // streamer -> axi
-  memToAxi.io.bus.req.bits.ben := 1.U.asTypeOf(memToAxi.io.bus.req.bits.ben)
+  //
+  memToAxi.io.bus.req.bits.ben := VecInit(Seq.fill(axiConfig.strbWidth)(true.B)).asUInt
   memToAxi.io.bus.req.bits.addr := axiAgu.io.addrs(0).bits
   memToAxi.io.bus.req.bits.wen := dir === DmaDir.writeAxi
   when(dir === DmaDir.writeAxi) { // writeAxi, readTcdm

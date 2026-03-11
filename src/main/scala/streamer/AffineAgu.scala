@@ -103,7 +103,7 @@ class AffineAgu(
   queues.zip(addresses).foreach { case (queue, address) => queue.io.enq.bits := address }
   queues.zip(io.addrs).foreach { case (queue, output) => queue.io.deq <> output }
   // Push new address to address queues if all queues can accept new data:
-  val queues_ready = queues.map(_.io.enq.ready).reduce(_ | _)
+  val queues_ready = queues.map(_.io.enq.ready).reduce(_ && _)
   val enqueue = queues_ready && state === State.busy
   queues.foreach(_.io.enq.valid := enqueue)
 

@@ -9,7 +9,7 @@ set(CMAKE_C_COMPILER /usr/bin/clang)
 set(CMAKE_CXX_COMPILER /usr/bin/clang++)
 
 set(DEFAULT_COMPILE_FLAGS
-  "-O2 --target=riscv32-unkown-elf -march=rv32imc -mabi=ilp32"
+  "-O2 --target=riscv32-unkown-elf -march=rv32imc -mabi=ilp32 -fno-builtin-printf"
 )
 
 set(CMAKE_ASM_FLAGS ${DEFAULT_COMPILE_FLAGS})

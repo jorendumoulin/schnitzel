@@ -19,4 +19,21 @@ void *memset(void *s, int c, size_t n) {
   return s;
 }
 
+// --- Helper Macros ---
+#define write_csr(reg, val)                                                    \
+  ({ __asm__ volatile("csrw %0, %1" ::"i"(reg), "rK"(val)); })
+
+#define read_csr(reg)                                                          \
+  ({                                                                           \
+    unsigned long __v;                                                         \
+    __asm__ volatile("csrr %0, %1" : "=r"(__v) : "i"(reg));                    \
+    __v;                                                                       \
+  })
+
+#ifdef VERBOSE
+#define verbose_printf(...) printf(__VA_ARGS__)
+#else
+#define verbose_printf(...) ((void)0)
+#endif
+
 #endif

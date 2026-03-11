@@ -1,0 +1,4 @@
+// RUN: ./build/sim/sim ./build/device/apps/dma_test.elf  | filecheck %s
+
+// CHECK: (hart 1) TEST PASSED!
+

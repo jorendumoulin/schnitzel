@@ -1,122 +1,115 @@
 #include <runtime.h>
+#include <stdalign.h>
+
+// Assuming your TCDM and AXI base addresses
+#define TCDM_ADDR 0x10000000
+#define TEST_SIZE 16
+
+// Global test data (Linker puts this in AXI/L3)
+// Needs to be 512-bit aligned (64-bytes) to be picked up correctly over AXI
+alignas(64) int axi_src_data[TEST_SIZE] = {
+    0xDEAD, 0xBEEF, 0xCAFE, 0xBABE, 0x1234, 0x5678, 0xAAAA, 0x5555,
+    0xDEAD, 0xBEEF, 0xCAFE, 0xBABE, 0x1234, 0x5678, 0xAAAA, 0x5555};
+
+alignas(64) int axi_dest_data[TEST_SIZE];
+
+inline int check_results(int *test_data, int *reference_data,
+                         size_t test_size) {
+  unsigned int fail_count = 0;
+  for (int i = 0; i < TEST_SIZE; i++) {
+    if (test_data[i] != reference_data[i]) {
+      verbose_printf(
+          "  ERROR: Mismatch at index %d! Expected 0x%08x, Got 0x % 08x\n ", i,
+          reference_data[i], test_data[i]);
+      fail_count++;
+    } else {
+      verbose_printf("  [%d] OK: 0x%08x \n", i, test_data[i]);
+    }
+  }
+  return fail_count;
+}
 
 int main() {
-
-  int hart = hartid();
-
-  if (hart == 0) {
-    unsigned long csr;
-    unsigned long value;
-
-    // Configure Streamer:
-    csr = 0x900;
-    value = 0x10000000;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    // 4 Temporal strides:
-    csr = 0x901;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x902;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x903;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x904;
-    value = 0x200;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    // 4 Temporal bounds:
-    csr = 0x905;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x906;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x907;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x908;
-    value = 0x8;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    // 3 Spatial strides:
-    csr = 0x909;
-    value = 0x20;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x90a;
-    value = 0x10;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x90b;
-    value = 0x8;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    // Configure Streamer:
-    csr = 0x90c;
-    value = 0x20000;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    // 4 Temporal strides:
-    csr = 0x90d;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x90e;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x90f;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x910;
-    value = 0x200;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    // 4 Temporal bounds:
-    csr = 0x911;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x912;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x913;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    csr = 0x914;
-    value = 0x8;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    // Set direction:
-    csr = 0x915;
-    value = 0x0;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    // Set start:
-    csr = 0x916;
-    value = 0x1;
-    __asm__ volatile("csrw %0, %1" ::"i"(csr), "rK"(value));
-
-    // Await start:
-    csr = 0x916;
-    __asm__ volatile("csrr %0, %1" : "=r"(value) : "i"(csr));
+  verbose_printf("TCDM address %p : \n", TCDM_ADDR);
+  int hart = hart_id();
+  static int fail_count = 0; // Static so it persists across syncs
+  if (hart == 1) {
+    verbose_printf("Starting DMA Loopback Test: AXI -> TCDM -> AXI_NEW\n");
+    verbose_printf("Initial AXI Source Values:\n");
+    for (int i = 0; i < TEST_SIZE; i++) {
+      verbose_printf("  [%d] %p : 0x%08x\n", i, &axi_src_data[i],
+                     axi_src_data[i]);
+    }
   }
-
   cluster_sync();
 
-  // Exit with code 0
+  // --- PHASE 3: AXI -> TCDM ---
+  if (hart == 2) {
+
+    // Configure Streamer (TCDM Side):
+    write_csr(0x900, TCDM_ADDR);
+    // 4 Temporal strides:
+    write_csr(0x901, 0x0);
+    write_csr(0x902, 0x0);
+    write_csr(0x903, 0x0);
+    write_csr(0x904, 0x200);
+    // 4 Temporal bounds:
+    write_csr(0x905, 0x0);
+    write_csr(0x906, 0x0);
+    write_csr(0x907, 0x0);
+    write_csr(0x908, 0x1);
+    // 4 Spatial strides:
+    write_csr(0x909, 0x20);
+    write_csr(0x90a, 0x10);
+    write_csr(0x90b, 0x8);
+    write_csr(0x90c, 0x4);
+    // Configure Streamer (AXI/L3 Side):
+    write_csr(0x90d, (unsigned long)axi_src_data);
+    // 4 Temporal strides:
+    write_csr(0x90e, 0x0);
+    write_csr(0x90f, 0x0);
+    write_csr(0x910, 0x0);
+    write_csr(0x911, 0x200);
+    // 4 Temporal bounds:
+    write_csr(0x912, 0x0);
+    write_csr(0x913, 0x0);
+    write_csr(0x914, 0x0);
+    write_csr(0x915, 0x1);
+    // Set direction:
+    write_csr(0x916, 0x0);
+    // Set start:
+    write_csr(0x917, 0x1);
+    // Await start:
+    read_csr(0x917);
+    verbose_printf("DMA done\n");
+  }
+  cluster_sync();
+  if (hart == 1) {
+    int *tcdm_dest_data = (int *)TCDM_ADDR;
+    fail_count += check_results(tcdm_dest_data, axi_src_data, TEST_SIZE);
+  }
+  cluster_sync();
+  if (hart == 2) {
+    // All settings remain the same, except for direction and destination
+    // address in TCDM
+    write_csr(0x90d, (unsigned long)axi_dest_data); // Dest: New AXI Location
+    write_csr(0x916, 0x1);                          // Direction: TCDM -> AXI
+    write_csr(0x917, 0x1);                          // Start
+    read_csr(0x917);
+    verbose_printf("DMA Double-Transfer Complete.\n");
+  }
+  cluster_sync();
+  if (hart == 1) {
+    verbose_printf("Validating Final Results at %p...\n", axi_dest_data);
+    fail_count += check_results(axi_dest_data, axi_src_data, TEST_SIZE);
+    if (fail_count == 0) {
+      printf("TEST PASSED!\n");
+    } else {
+      printf("TEST FAILED with %d errors.\n", fail_count);
+    }
+    htif_exit(fail_count);
+  }
+  // Wait for hart 2 to finish with the core count
+  cluster_sync();
   htif_exit(0);
-  return 0;
 }
