@@ -13,6 +13,22 @@ alignas(64) int axi_src_data[TEST_SIZE] = {
 
 alignas(64) int axi_dest_data[TEST_SIZE];
 
+inline int check_results(int *test_data, int *reference_data,
+                         size_t test_size) {
+  unsigned int fail_count = 0;
+  for (int i = 0; i < TEST_SIZE; i++) {
+    if (test_data[i] != reference_data[i]) {
+      verbose_printf(
+          "  ERROR: Mismatch at index %d! Expected 0x%08x, Got 0x % 08x\n ", i,
+          reference_data[i], test_data[i]);
+      fail_count++;
+    } else {
+      verbose_printf("  [%d] OK: 0x%08x \n", i, test_data[i]);
+    }
+  }
+  return fail_count;
+}
+
 int main() {
   verbose_printf("TCDM address %p : \n", TCDM_ADDR);
   int hart = hart_id();
@@ -66,12 +82,11 @@ int main() {
     // Await start:
     read_csr(0x917);
     verbose_printf("DMA done\n");
-    verbose_printf("TCDM values:\n");
+  }
+  cluster_sync();
+  if (hart == 1) {
     int *tcdm_dest_data = (int *)TCDM_ADDR;
-    for (int i = 0; i < TEST_SIZE; i++) {
-      verbose_printf("  [%d] %p : 0x%08x\n", i, &tcdm_dest_data[i],
-                     tcdm_dest_data[i]);
-    }
+    fail_count += check_results(tcdm_dest_data, axi_src_data, TEST_SIZE);
   }
   cluster_sync();
   if (hart == 2) {
@@ -86,27 +101,15 @@ int main() {
   cluster_sync();
   if (hart == 1) {
     verbose_printf("Validating Final Results at %p...\n", axi_dest_data);
-
-    for (int i = 0; i < TEST_SIZE; i++) {
-      if (axi_dest_data[i] != axi_src_data[i]) {
-        verbose_printf(
-            "  ERROR: Mismatch at index %d! Expected 0x%08x, Got 0x % 08x\n ",
-            i, axi_src_data[i], axi_dest_data[i]);
-        fail_count++;
-      } else {
-        verbose_printf("  [%d] OK: 0x%08x\n", i, axi_dest_data[i]);
-      }
-    }
-
+    fail_count += check_results(axi_dest_data, axi_src_data, TEST_SIZE);
     if (fail_count == 0) {
       printf("TEST PASSED!\n");
     } else {
       printf("TEST FAILED with %d errors.\n", fail_count);
     }
-  }
-  cluster_sync();
-  if (hart == 1) {
     htif_exit(fail_count);
   }
+  // Wait for hart 2 to finish with the core count
+  cluster_sync();
   htif_exit(0);
 }

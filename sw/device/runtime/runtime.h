@@ -29,7 +29,7 @@ void *memset(void *s, int c, size_t n) {
     __asm__ volatile("csrr %0, %1" : "=r"(__v) : "i"(reg));                    \
     __v;                                                                       \
   })
-
+#define VERBOSE
 #ifdef VERBOSE
 #define verbose_printf(...) printf(__VA_ARGS__)
 #else
