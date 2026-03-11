@@ -1,12 +1,105 @@
 [project]
-name = "schnitzel"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.12"
-dependencies = []
+name = "snax-mlir"
+description = "Driving SNAX with MLIR"
+version = "0.2.2"
+requires-python = "== 3.12.*"
 
-[tool.uv.workspace]
-members = [
-    "submodules/picolibc",
+
+dependencies = [
+  "xdsl @ git+https://github.com/xdslproject/xdsl.git@af4e063ee948b8f62fd8476d2f25d0b018bc274c",
+  "minimalloc @ git+https://github.com/jorendumoulin/minimalloc.git@917a2ddf8ea0f48c7c77145d57c21d7c5dd20ef2",
+  "numpy",
+  "dacite>=1.9.2,<2",
 ]
+
+[project.optional-dependencies]
+
+# All optional dependencies for plotting and parsing
+dev = ["pre-commit", "filecheck==1.0.3", "lit", "pytest"]
+
+# All optional dependencies for graphical plotting
+viz = ["pandas", "matplotlib"]
+
+# Dependencies for neural network compilation
+nn = ["tensorflow-cpu==2.19.0"]
+
+[project.scripts]
+snax-opt = "snaxc.tools.snax_opt_main:main"
+snaxc = "snaxc.tools.snaxc_main:main"
+phsc = "snaxc.tools.phsc_main:main"
+
+[tool.ruff]
+target-version = "py310"
+extend-include = ["*.pyi"]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "PT", "TID251"]
+ignore = [
+  "E741",  # https://beta.ruff.rs/docs/rules/ambiguous-variable-name/
+  "PT006", # https://beta.ruff.rs/docs/rules/pytest-parametrize-names-wrong-type/
+  "PT011", # https://beta.ruff.rs/docs/rules/pytest-raises-too-broad/
+  "PT012", # https://beta.ruff.rs/docs/rules/pytest-raises-with-multiple-statements/
+]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 120
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"xdsl.dialects.utils.fast_math".msg = "Use xdsl.dialects.utils instead"
+"xdsl.dialects.utils.format".msg = "Use xdsl.dialects.utils instead"
+"xdsl.ir.affine.affine_expr".msg = "Use xdsl.ir.affine instead"
+"xdsl.ir.affine.affine_map".msg = "Use xdsl.ir.affine instead"
+"xdsl.ir.affine.affine_set".msg = "Use xdsl.ir.affine instead"
+"xdsl.ir.core".msg = "Use xdsl.ir instead."
+"xdsl.irdl.attributes".msg = "Use xdsl.irdl instead"
+"xdsl.irdl.common".msg = "Use xdsl.irdl instead"
+"xdsl.irdl.constraints".msg = "Use xdsl.irdl instead"
+"xdsl.irdl.operations".msg = "Use xdsl.irdl instead"
+"xdsl.parser.affine_parser".msg = "Use xdsl.parser instead."
+"xdsl.parser.attribute_parser".msg = "Use xdsl.parser instead."
+"xdsl.parser.base_parser".msg = "Use xdsl.parser instead."
+"xdsl.parser.core".msg = "Use xdsl.parser instead."
+"xdsl.parser.generic_parser".msg = "Use xdsl.parser instead."
+
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F403"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.pyright]
+reportImportCycles = false
+reportMissingModuleSource = false
+enableTypeIgnoreComments = false
+enableExperimentalFeatures = true
+typeCheckingMode = "strict"
+"include" = ["snaxc", "tests"]
+
+
+[tool.pixi.workspace]
+channels = ["conda-forge", "bioconda", "kuleuven-micas", "KEKE046"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+snax-mlir = { path = ".", editable = true }
+
+[tool.pixi.environments]
+default = { features = ["dev", "nn", "viz", "phs"] }
+
+[tool.pixi.tasks]
+
+[tool.pixi.feature.phs.dependencies]
+circt = { version = "==1.122.0", channel = "KEKE046" }
+openjdk = "==17.0.17"
+mill = "==0.11.8"
+
+[tool.pixi.dependencies]
+mlir = "==21.1.1"
+clang = "==21.1.1"
+lld = "==21.1.1"
+snax-cluster-prebuilt = "==0.2.19"
+snakemake-minimal = "*"
+pyright = ">=1.1.407,<2"
+vcd-to-csv = { version = ">=0.1.0,<0.2", channel = "kuleuven-micas" }

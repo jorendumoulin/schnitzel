@@ -1,0 +1,91 @@
+from util.snake.configs import get_snax_gemmx_config
+
+config = get_snax_gemmx_config()
+
+
+module snax_rules:
+    snakefile:
+        "../../util/snake/snax.smk"
+    config:
+        config
+
+
+use rule * from snax_rules exclude snax_opt_mlir as snax_*
+
+
+rule generate_gemm:
+    output:
+        "gemm.mlir",
+    script:
+        "gemm.py"
+
+
+rule generate_gemm_broadcast:
+    output:
+        "gemm_broadcast.mlir",
+    script:
+        "gemm_broadcast.py"
+
+
+rule generate_gemm_init:
+    output:
+        "gemm_init.mlir",
+    script:
+        "gemm_init.py"
+
+
+rule generate_gemm_init_broadcast:
+    output:
+        "gemm_init_broadcast.mlir",
+    script:
+        "gemm_init_broadcast.py"
+
+
+rule generate_gemm_rescale:
+    output:
+        "gemm_rescale.mlir",
+    script:
+        "gemm_rescale.py"
+
+
+rule generate_gemm_rescale_channels:
+    output:
+        "gemm_rescale_channels.mlir",
+    script:
+        "gemm_rescale_channels.py"
+
+
+rule compile_snax:
+    """
+    Apply various transformations snax-opt on mlir files.
+    Options controlled with `snaxoptflags` defined in config.
+    """
+    input:
+        "{file}.mlir",
+    output:
+        temp("{file}.ll.mlir"),
+    shell:
+        "{config[snaxc]} -c {config[snaxc-config]} -o {output} {input}"
+
+
+# Rules
+rule all:
+    input:
+        "gemm_traces.json",
+        "gemm_broadcast_traces.json",
+        "gemm_init_traces.json",
+        "gemm_init_broadcast_traces.json",
+        "gemm_rescale_traces.json",
+        "gemm_rescale_channels_traces.json",
+
+
+rule link_snax_binary:
+    input:
+        lambda wildcards: [
+            f"{wildcards.file}.o",
+            "main_i8.o" if "rescale" in wildcards.file else "main_i32.o",
+        ],
+    output:
+        "{file}.x",
+    shell:
+        "{config[ld]} {config[ldflags]} {input} -o {output}"

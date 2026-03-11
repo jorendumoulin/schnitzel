@@ -1,0 +1,95 @@
+from util.get_model import get_model
+from util.snake.configs import get_snax_gemmx_config
+
+config = get_snax_gemmx_config()
+
+
+module snax_rules:
+    snakefile:
+        "../../util/snake/snax.smk"
+    config:
+        config
+
+
+use rule * from snax_rules exclude snax_opt_mlir, compile_c as snax_*
+
+
+nets = ["anomaly_int8"]
+targets = ["anomaly_int8_static"]
+
+
+rule compile_c:
+    """
+    Generic rule to compile c files with default compilation options.
+    """
+    input:
+        "main_{file}.c",
+        "data_{file}.h",
+    output:
+        temp("main_{file}.o"),
+    shell:
+        "{config[cc]} {config[cflags]} -c {input[0]} -o {output}"
+
+
+rule compile_snax:
+    """
+    Apply various transformations snax-opt on mlir files.
+    Options controlled with `snaxoptflags` defined in config.
+    """
+    input:
+        "{file}.mlir",
+    output:
+        temp("{file}.ll.mlir"),
+    shell:
+        "{config[snaxc]} -c {config[snaxc-config]} -o {output} {input}"
+
+
+rule all:
+    input:
+        expand("{target}_perfetto_traces.json", target=targets),
+
+
+rule get_mlperf_tiny_model:
+    output:
+        "{network}.mlir",
+    wildcard_constraints:
+        network="|".join(nets),
+    shell:
+        "wget -O {output[0]} https://github.com/kuleuven-micas/mlir-networks/releases/latest/download/mlperf_tiny_{output[0]}"
+
+
+rule get_mlperf_tiny_data:
+    output:
+        "{network}_sample_data.json",
+    wildcard_constraints:
+        network="|".join(nets),
+    shell:
+        "wget -O {output[0]} https://github.com/kuleuven-micas/mlir-networks/releases/latest/download/mlperf_tiny_{output[0]}"
+
+
+rule generate_data_anomaly_int8:
+    input:
+        "anomaly_int8_sample_data.json",
+    output:
+        "data_anomaly_int8_static.h",
+    shell:
+        "python gendata.py {input} --batch_size 8 --output {output}"
+
+
+rule create_static_anomaly_int8:
+    output:
+        "anomaly_int8_static.mlir",
+    input:
+        "anomaly_int8.mlir",
+    shell:
+        "{config[snax-opt]} -p frontend-static-inline{{value=8}},convert-tosa-to-kernel --allow-unregistered-dialect -o {output} {input}"
+
+
+rule link_snax_binary:
+    input:
+        "{file}.o",
+        "main_{file}.o",
+    output:
+        "{file}.x",
+    shell:
+        "{config[ld]} {config[ldflags]} {input} -o {output}"

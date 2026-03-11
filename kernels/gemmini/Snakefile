@@ -1,0 +1,105 @@
+from util.snake.paths import get_default_paths
+
+
+config.update(get_default_paths())
+config["snaxoptflags"] = ",".join(
+    [
+        "test-transform-dialect-erase-schedule",
+        "preprocess",
+        "insert-accfg-op{accelerator=gemmini}",
+        "convert-linalg-to-accfg",
+        "convert-accfg-to-csr",
+    ]
+)
+
+# Rocket-specific RV flags
+config["cflags"] = [
+    "-c",
+    "-O3",
+    "-Wno-override-module",
+    "--target=riscv64-unknown-elf",
+    "-mcpu=generic-rv64",
+    "-march=rv64gc",
+]
+
+config["mliroptflags"] = [
+    "--pass-pipeline='builtin.module(transform-interpreter{debug-bind-trailing-args=linalg.quantized_matmul}, linalg-generalize-named-ops)' --mlir-print-local-scope --mlir-print-op-generic"
+]
+
+config["lowertollvmpasses"] = [
+    "--convert-vector-to-scf",
+    "--convert-linalg-to-loops",
+    "--lower-affine",
+    "--convert-scf-to-cf",
+    "--canonicalize",
+    "--cse",
+    "--convert-vector-to-llvm=reassociate-fp-reductions",
+    "--convert-math-to-llvm",
+    "--expand-strided-metadata",
+    "--lower-affine",
+    "--finalize-memref-to-llvm",
+    "--convert-func-to-llvm",
+    "--convert-arith-to-llvm",
+    "--convert-cf-to-llvm",
+    "--convert-index-to-llvm",
+    "--convert-ub-to-llvm",
+    "--reconcile-unrealized-casts",
+]
+
+
+rule all:
+    input:
+        "tiled_matmul.o",
+
+
+sed_str = "'s/iterator_types =/library_call=\"gemmini\", iterator_types =/gm;t'"
+
+
+rule prepare_mlir:
+    input:
+        "tiled_matmul.transform.mlir",
+    output:
+        "tiled_matmul.mlir",
+    shell:
+        "{config[mlir-opt]} {config[mliroptflags]} {input} | "
+        "sed -E {sed_str} > {output}"
+
+
+rule snax_compile_mlir:
+    input:
+        "{file}.mlir",
+    output:
+        "{file}.snax-opt.mlir",
+    shell:
+        "{config[snax-opt]} -p {config[snaxoptflags]} -o {output} {input}"
+
+
+# Use default pass to lower to Rocket (64-bit index type)
+rule postprocess_mlir:
+    input:
+        "{file}.snax-opt.mlir",
+    output:
+        "{file}.ll.mlir",
+    shell:
+        "{config[mlir-opt]} {config[lowertollvmpasses]} -o {output} {input}"
+
+
+rule translate_mlir:
+    """
+    Translate MLIR LLVM dialect to actual LLVM.
+    """
+    input:
+        "{file}.ll.mlir",
+    output:
+        temp("{file}.ll"),
+    shell:
+        "{config[mlir-translate]} --mlir-to-llvmir -o {output} {input}"
+
+
+rule compile_llvm_module:
+    input:
+        "{file}.ll",
+    output:
+        "{file}.o",
+    shell:
+        "{config[cc]} -x ir {input} {config[cflags]} -o {output}"
