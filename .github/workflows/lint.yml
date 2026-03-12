@@ -8,20 +8,17 @@ on:
 jobs:
   pyright:
     name: Pyright
-    build:
-      runs-on: ubuntu-latest
-      env:
-        PYRIGHT_VERSION: 1.0
-      steps:
-        - uses: actions/checkout@v5
-        - uses: prefix-dev/setup-pixi@v0.9.4
-          with:
-            activate-environment: true
-            environments: rtl
-            cache: true
-            cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-        - name: check pyright
-          run: pixi run pyright
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          activate-environment: true
+          environments: rtl
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+      - name: check pyright
+        run: pixi run pyright
   precommit:
     name: Code Formatting
     runs-on: ubuntu-latest
