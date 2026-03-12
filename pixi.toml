@@ -21,6 +21,8 @@ pytest = "<9"
 
 [pypi-dependencies]
 schnitzel = { path = ".", editable = true }
+xdsl = { git = "https://github.com/xdslproject/xdsl.git", rev = "af4e063ee948b8f62fd8476d2f25d0b018bc274c" }
+minimalloc = { git = "https://github.com/jorendumoulin/minimalloc.git", rev = "917a2ddf8ea0f48c7c77145d57c21d7c5dd20ef2" }
 filecheck = ">=1.0.3, <2"
 pyyaml = ">=6.0.3, <7"
 
