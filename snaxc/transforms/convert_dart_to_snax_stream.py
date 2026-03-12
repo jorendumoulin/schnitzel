@@ -1,6 +1,9 @@
 import warnings
 from dataclasses import dataclass
+from typing import cast
 
+import numpy as np
+from numpy.typing import NDArray
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.passes import ModulePass
@@ -50,7 +53,7 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
             # all temporal dimensions are relevant for access patterns:
             relevant: list[bool] = [True] * (pattern.num_dims - template.num_dims)
             # relevant spatial strides have a component in the template matrix
-            relevant += template[operand].pattern.A.any(axis=0).tolist()
+            relevant += cast(NDArray[np.bool], template[operand].pattern.A.any(axis=0).tolist())
 
             access_iter = iter(
                 (int(pattern.A[0, i]), op.bounds.data[i].value.data)

@@ -1,7 +1,9 @@
 from collections.abc import Callable, Iterator, Sequence
 from math import ceil
+from typing import cast
 
 import numpy as np
+from numpy.typing import NDArray
 
 from snaxc.ir.dart.access_pattern import Schedule, Template
 
@@ -158,6 +160,7 @@ def is_memory_flexible_enough(template: Template, schedule: Schedule, element_si
     for s, size in zip(schedule, element_sizes):
         # is there temporary fine-grained access for this dimension?
         temporal = (s.pattern.A[:, 0 : -template.num_dims] % ceil(TCDM_BANK_WIDTH / size)).any(axis=1)
+        temporal = cast(NDArray[np.bool], temporal)
         # is the dimension spatially unrolled?
         spatial = (s.pattern.A[:, -template.num_dims :] == 1).any(axis=1)
         if (False, True) not in zip(temporal, spatial):
