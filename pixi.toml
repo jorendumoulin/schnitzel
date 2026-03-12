@@ -23,7 +23,7 @@ just = ">=1.46.0,<2"
 lit = ">=22.1.0,<23"
 pre-commit = ">=4.5.1,<5"
 pytest = "<9"
-
+mlir = "==21.1.1"
 
 [pypi-dependencies]
 schnitzel = { path = ".", editable = true }
@@ -37,9 +37,9 @@ pyyaml = ">=6.0.3, <7"
 [feature.compiler.dependencies]
 cmake = ">=4.2.3,<5"
 ccache = ">=4.12.2,<5"
-clang = ">=21.1.8,<22"
+clang = ">=21,<22"
 ninja = ">=1.13.2,<2"
-lld = ">=21.1.8,<22"
+lld = ">=21,<22"
 verilator = "==5.044"
 openjdk = ">=21,<22"
 
@@ -52,37 +52,13 @@ executorch = ">=1.1.0, <2"
 torch = { version = "==2.10.0", index = "https://download.pytorch.org/whl/cpu" }
 torchgen = ">=0.0.1, <0.0.2"
 
-# TODO: merge old snax-mlir dependencies
-# [project.optional-dependencies]
-#
-# # All optional dependencies for plotting and parsing
-# dev = ["pre-commit", "filecheck==1.0.3", "lit", "pytest"]
-#
-# # All optional dependencies for graphical plotting
-# viz = ["pandas", "matplotlib"]
-#
-# # Dependencies for neural network compilation
-# nn = ["tensorflow-cpu==2.19.0"]
+[feature.phs.dependencies]
+circt = { version = "==1.122.0", channel = "KEKE046" }
 
-
-# [feature.phs.dependencies]
-# circt = { version = "==1.122.0", channel = "KEKE046" }
-# openjdk = "==17.0.17"
-# mill = "==0.11.8"
-
-# [tool.pixi.dependencies]
-# mlir = "==21.1.1"
-# clang = "==21.1.1"
-# lld = "==21.1.1"
-# snax-cluster-prebuilt = "==0.2.19"
-# snakemake-minimal = "*"
-# pyright = ">=1.1.407,<2"
-# vcd-to-csv = { version = ">=0.1.0,<0.2", channel = "kuleuven-micas" }
-
-# Dependencies only needed for executorch development:
 [environments]
 default = ["torch", "riscv-gnu-toolchain"]
 torch = ["torch", "riscv-gnu-toolchain"]
 rtl = ["compiler", "riscv-gnu-toolchain"]
 all = ["compiler", "torch", "riscv-gnu-toolchain"]
 minimal = []
+phs = ["compiler", "phs"]
