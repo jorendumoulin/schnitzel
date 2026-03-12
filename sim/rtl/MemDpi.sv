@@ -36,7 +36,7 @@ module MemDpi #(
     end else begin
       if (req_valid && req_ready) begin
         rsp_valid_q <= 1'b1;
-        
+
         if (req_wen) begin
           // WRITE Logic
           if (DATA_WIDTH == 512) begin
@@ -44,10 +44,10 @@ module MemDpi #(
           end else begin
             dpi_mem_write_64(req_addr, req_wdata, req_ben);
           end
-          
+
           rsp_data_q <= req_wdata;
           // $display("[%0t] [MemDpi] WRITE Addr: 0x%h, Data: 0x%h", $time, req_addr, req_wdata);
-          
+
         end else begin
           // READ Logic
           // Use a temporary variable for DPI output to avoid issues with

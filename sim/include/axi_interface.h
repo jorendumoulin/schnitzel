@@ -164,21 +164,21 @@ protected:
 //    * @param name Name of this AXI interface for logging
 //    */
 //   MMIOAxiInterface(const std::string &name);
-// 
+//
 //   /**
 //    * Handle AXI transactions for narrow interface
 //    * @param dut Pointer to the verilated DUT
 //    * @param memory Reference to the memory system
 //    */
 //   void handle_transactions(VTop *dut, DynamicMemory &memory) override;
-// 
+//
 //   /**
 //    * Handle AXI responses for narrow interface
 //    * @param dut Pointer to the verilated DUT
 //    * @param memory Reference to the memory system
 //    */
 //   void handle_responses(VTop *dut, DynamicMemory &memory) override;
-// 
+//
 // private:
 //   // Read transaction state
 //   bool read_req_pending = false;
@@ -188,7 +188,7 @@ protected:
 //   AxiBurstSize read_size = AxiBurstSize::B1;
 //   AxiBurstType read_burst = AxiBurstType::FIXED;
 //   size_t read_transfer_count = 0;
-// 
+//
 //   // Write transaction state
 //   bool write_addr_pending = false;
 //   bool write_data_pending = false;
@@ -202,8 +202,8 @@ protected:
 //   uint8_t write_strb = 0;
 //   bool write_last = false;
 // };
-// 
-// 
+//
+//
 
 /**
  * Narrow AXI Interface (64-bit data)

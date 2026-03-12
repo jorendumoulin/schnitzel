@@ -1,6 +1,3 @@
-import os
-from pathlib import Path
-
 # custom_ops.py
 import torch
 import torch.nn as nn
@@ -8,7 +5,6 @@ import torch.nn.functional as F
 from executorch.extension.export_util.utils import export_to_exec_prog, save_pte_program
 from torch.export import export
 from torch.library import Library, impl
-
 
 my_op_lib = Library("my_ops", "DEF")
 
@@ -22,9 +18,7 @@ def mul3_impl(a: torch.Tensor) -> torch.Tensor:
 
 
 # registering the out variant.
-my_op_lib.define(
-    "mul3.out(Tensor input, *, Tensor(a!) output) -> Tensor(a!)"
-)  # should print 'mul3.out'
+my_op_lib.define("mul3.out(Tensor input, *, Tensor(a!) output) -> Tensor(a!)")  # should print 'mul3.out'
 
 
 @impl(my_op_lib, "mul3.out", dispatch_key="CompositeExplicitAutograd")
@@ -35,7 +29,7 @@ def mul3_out_impl(a: torch.Tensor, *, out: torch.Tensor) -> torch.Tensor:
 
 class HelloWorldModel(nn.Module):
     def __init__(self, input_dim=10, hidden_dim=8, output_dim=3):
-        super(HelloWorldModel, self).__init__()
+        super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, output_dim)
 

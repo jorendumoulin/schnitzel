@@ -1,5 +1,11 @@
 [workspace]
-channels = ["conda-forge", "bioconda", "kuleuven-micas", "KEKE046", "JosseVanDelm"]
+channels = [
+  "conda-forge",
+  "bioconda",
+  "kuleuven-micas",
+  "KEKE046",
+  "JosseVanDelm",
+]
 name = "schnitzel"
 platforms = ["linux-64"]
 version = "0.1.0"
@@ -57,7 +63,6 @@ torchgen = ">=0.0.1, <0.0.2"
 #
 # # Dependencies for neural network compilation
 # nn = ["tensorflow-cpu==2.19.0"]
-
 
 
 # [feature.phs.dependencies]

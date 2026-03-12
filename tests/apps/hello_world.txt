@@ -9,4 +9,3 @@
 // CHECK-NEXT: (hart 2) Hello World! 0
 // CHECK-NEXT: (hart 2) Hello World! 1
 // CHECK-NEXT: (hart 2) Hello World! 2
-

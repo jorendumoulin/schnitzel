@@ -30,4 +30,3 @@ target_link_options(device_runtime INTERFACE
     -nostdlib
     -fuse-ld=lld
 )
-
