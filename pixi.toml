@@ -77,7 +77,7 @@ torchgen = ">=0.0.1, <0.0.2"
 # Dependencies only needed for executorch development:
 [environments]
 default = ["torch", "riscv-gnu-toolchain"]
-torch = ["torch"]
-rtl = ["compiler"]
+torch = ["torch", "riscv-gnu-toolchain"]
+rtl = ["compiler", "riscv-gnu-toolchain"]
 all = ["compiler", "torch", "riscv-gnu-toolchain"]
 minimal = []
