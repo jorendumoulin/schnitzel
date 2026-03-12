@@ -7,9 +7,12 @@
 *.pdf
 *.vcd
 *.csv
-
-.snakemake
-
+*.dasm
+*.log
+*.pte
+out/*
+generated/*
+build/*
 .env
 .venv
 .ruff_cache
