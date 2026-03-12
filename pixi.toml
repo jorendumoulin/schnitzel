@@ -12,10 +12,12 @@ libc = { family = "glibc", version = "2.34" }
 [dependencies]
 elfio = ">=3.12,<4"
 cpp-argparse = ">=3.2,<4"
-riscv-gnu-toolchain = "==2026.01.23nightly"
 python = ">=3.12,<3.13"
 just = ">=1.46.0,<2"
 lit = ">=22.1.0,<23"
+pre-commit = ">=4.5.1,<5"
+pytest = "<9"
+
 
 [pypi-dependencies]
 schnitzel = { path = ".", editable = true }
@@ -33,12 +35,28 @@ lld = ">=21.1.8,<22"
 verilator = "==5.044"
 openjdk = ">=21,<22"
 
+# Conda-packaged riscv-gnu-toolchain:
+[feature.riscv-gnu-toolchain.dependencies]
+riscv-gnu-toolchain = "==2026.01.23nightly"
+
 [feature.torch.pypi-dependencies]
 executorch = ">=1.1.0, <2"
 torch = { version = "==2.10.0", index = "https://download.pytorch.org/whl/cpu" }
 torchgen = ">=0.0.1, <0.0.2"
 
 # TODO: merge old snax-mlir dependencies
+# [project.optional-dependencies]
+#
+# # All optional dependencies for plotting and parsing
+# dev = ["pre-commit", "filecheck==1.0.3", "lit", "pytest"]
+#
+# # All optional dependencies for graphical plotting
+# viz = ["pandas", "matplotlib"]
+#
+# # Dependencies for neural network compilation
+# nn = ["tensorflow-cpu==2.19.0"]
+
+
 
 # [feature.phs.dependencies]
 # circt = { version = "==1.122.0", channel = "KEKE046" }
@@ -56,8 +74,8 @@ torchgen = ">=0.0.1, <0.0.2"
 
 # Dependencies only needed for executorch development:
 [environments]
-default = ["torch"]
+default = ["torch", "riscv-gnu-toolchain"]
 torch = ["torch"]
 rtl = ["compiler"]
-all = ["compiler", "torch"]
+all = ["compiler", "torch", "riscv-gnu-toolchain"]
 minimal = []
