@@ -3156,7 +3156,7 @@ packages:
 - pypi: ./
   name: schnitzel
   version: 0.1.0
-  sha256: c07441482e85ef4b55d0a629a5f39c2e5a2adae1fb90c8456e41f6e981a00ee5
+  sha256: 7c6ac469576b1c373ed9619be21767e76943c568ff94367e122eec60154f1739
   requires_dist:
   - numpy
   - dacite>=1.9.2,<2
