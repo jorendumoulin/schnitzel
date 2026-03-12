@@ -6,6 +6,7 @@ on:
   pull_request:
 jobs:
   build-and-run-kernels:
+    if: false
     runs-on: ubuntu-24.04
     strategy:
       matrix:

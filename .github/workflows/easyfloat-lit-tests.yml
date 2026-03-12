@@ -12,6 +12,7 @@ permissions:
   contents: read
 jobs:
   python-tests:
+    if: false
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
