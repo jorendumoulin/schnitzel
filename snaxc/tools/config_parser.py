@@ -39,6 +39,6 @@ def parse_config(config: Any) -> AccContext:
             accelerator_type = config_to_type.get(type(accelerator))
             if accelerator_type is not None:
                 accelerator_instance = accelerator_type.from_config(accelerator.config)
-                context.register_accelerator(accelerator_type.name, lambda: accelerator_instance)
+                context.register_accelerator(accelerator_type.name, accelerator_instance)
 
     return context

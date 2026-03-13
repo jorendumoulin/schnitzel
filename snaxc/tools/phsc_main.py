@@ -2,7 +2,7 @@ import argparse
 import os
 import subprocess
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from io import StringIO
 
 from xdsl.dialects.builtin import ModuleOp
@@ -66,8 +66,8 @@ class PHSCMain(SNAXCMain):
         hardware_module = module.clone()
 
         # Avoid late binding trap in lambda
-        def phs_register(accelerator: SNAXPHSAccelerator) -> Callable[[], SNAXPHSAccelerator]:
-            return lambda: accelerator
+        def phs_register(accelerator: SNAXPHSAccelerator) -> SNAXPHSAccelerator:
+            return accelerator
 
         for hw_op in hardware_module.ops:
             if isinstance(hw_op, phs.PEOp):
