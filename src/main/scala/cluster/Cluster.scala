@@ -116,7 +116,10 @@ class Cluster extends Module {
 
   def getConfig: ClusterConfig = ClusterConfig(
     MemoryConfig("L1", 0x1_0000_0000L, 0x1_0000L),
-    List()
+    List(
+      config.CoreConfig(1, List(aluAccelerator.getConfig)),
+      config.CoreConfig(2, List(dma.getConfig))
+    )
   )
 
 }

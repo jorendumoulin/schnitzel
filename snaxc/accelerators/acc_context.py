@@ -17,9 +17,7 @@ class AccContext(Context):
     Context that additionally allows to register and query accelerators
     """
 
-    _registered_accelerators: dict[str, Callable[[], Accelerator]] = field(
-        default_factory=dict[str, Callable[[], Accelerator]]
-    )
+    _registered_accelerators: dict[str, Accelerator] = field(default_factory=dict[str, Accelerator])
 
     _memories: dict[str, SnaxMemory] = field(default_factory=dict[str, SnaxMemory])
 
