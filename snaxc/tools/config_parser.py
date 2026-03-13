@@ -6,21 +6,24 @@ from dacite.config import Config as DaciteConfig
 from snaxc.accelerators.acc_context import AccContext
 from snaxc.accelerators.configurable_accelerator import ConfigurableAccelerator
 from snaxc.accelerators.snax_alu import SNAXAluAccelerator
-from snaxc.accelerators.snax_gemmx import SNAXGEMMXAccelerator
 from snaxc.accelerators.snax_xdma import SNAXXDMAAccelerator
-from snaxc.tools.configs import AcceleratorWrapper, GemmxWrapper, SnaxAluWrapper, SnaxXdmaWrapper, SystemConfig
+from snaxc.tools.configs import Accelerator, AluWrapper, DmaWrapper, EmptyAcceleratorConfig, SystemConfig
 from snaxc.util.snax_memory import SnaxMemory
 
-# mapping the config wrappers to actual accelerators:
-config_to_type: dict[type[AcceleratorWrapper], type[ConfigurableAccelerator] | None] = {
-    GemmxWrapper: SNAXGEMMXAccelerator,
-    SnaxAluWrapper: SNAXAluAccelerator,
-    SnaxXdmaWrapper: SNAXXDMAAccelerator,
+# # mapping the config wrappers to actual accelerators:
+config_to_type: dict[type[Accelerator], type[ConfigurableAccelerator] | None] = {
+    AluWrapper: SNAXAluAccelerator,
+    DmaWrapper: SNAXXDMAAccelerator,
 }
 
 
 def parse_config(config: Any) -> AccContext:
-    system = from_dict(SystemConfig, config, DaciteConfig(strict=True))
+    system = from_dict(
+        SystemConfig,
+        config,
+        DaciteConfig(type_hooks={EmptyAcceleratorConfig: lambda _: EmptyAcceleratorConfig()}),
+    )
+    breakpoint()
     context = AccContext()
     context.register_memory(SnaxMemory.from_config(system.memory))
 
@@ -35,7 +38,7 @@ def parse_config(config: Any) -> AccContext:
             # cannot be dynamic as lifetime of core.gemmx is not guaranteed according to pyright
             accelerator_type = config_to_type.get(type(accelerator))
             if accelerator_type is not None:
-                accelerator_instance = accelerator_type.from_config(accelerator.accelerator)
-                context.register_accelerator(accelerator_type.name, lambda: accelerator_instance)
+                accelerator_instance = accelerator_type.from_config(accelerator.config)
+                context.register_accelerator(accelerator_type.name, accelerator_instance)
 
     return context

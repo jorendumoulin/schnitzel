@@ -12,6 +12,8 @@ import csr.CsrIO
 import csr.CsrInterface
 import streamer.StreamerDir
 import chisel3.simulator.PeekPokeAPI.TestableData
+import config.DmaConfig
+import config.DmaWrapper
 
 object DmaDir extends ChiselEnum { val readAxi, writeAxi = Value; }
 
@@ -88,5 +90,7 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
   }
 
   csrItf.io.done := axiAgu.io.done && streamer.io.done
+
+  def getConfig = DmaWrapper("dma", DmaConfig())
 
 }

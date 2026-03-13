@@ -29,7 +29,7 @@ from snaxc.accelerators.streamers.streamers import (
 )
 from snaxc.dialects import accfg, dart, kernel, snax_stream
 from snaxc.ir.dart.access_pattern import Template, TemplatePattern
-from snaxc.tools.configs import AcceleratorConfig, GemmxConfig
+from snaxc.tools.configs import AcceleratorConfig
 from snaxc.util.pack_bitlist import pack_bitlist
 
 default_streamer = StreamerConfiguration(
@@ -138,47 +138,7 @@ class SNAXGEMMXAccelerator(
 
     @classmethod
     def from_config(cls, config: AcceleratorConfig) -> Self:
-        assert isinstance(config, GemmxConfig)
-        streamer_config = StreamerConfiguration(
-            [
-                Streamer(  # A
-                    StreamerType.Reader,
-                    temporal_dims=("n",) * config.streamers[0].temporal_dims,
-                    spatial_dims=config.streamers[0].spatial_dims,
-                    opts=(TransposeExtension(), HasAddressRemap()),
-                ),
-                Streamer(  # B
-                    StreamerType.Reader,
-                    temporal_dims=("n",) * config.streamers[1].temporal_dims,
-                    spatial_dims=config.streamers[1].spatial_dims,
-                    opts=(TransposeExtension(), HasAddressRemap()),
-                ),
-                Streamer(  # D8
-                    StreamerType.Writer,
-                    temporal_dims=("r",) + ("n",) * (config.streamers[2].temporal_dims - 1),
-                    spatial_dims=config.streamers[2].spatial_dims,
-                    opts=(HasAddressRemap(),),
-                ),
-                Streamer(  # C
-                    StreamerType.Reader,
-                    temporal_dims=("r",) + ("n",) * (config.streamers[3].temporal_dims - 1),
-                    spatial_dims=config.streamers[3].spatial_dims,
-                    opts=(
-                        HasChannelMask(),
-                        HasAddressRemap(),
-                        HasBroadcast(),
-                    ),
-                ),
-                Streamer(  # D32
-                    StreamerType.Writer,
-                    temporal_dims=("r",) + ("n",) * (config.streamers[4].temporal_dims - 1),
-                    spatial_dims=config.streamers[4].spatial_dims,
-                    opts=(HasAddressRemap(),),
-                ),
-            ],
-        )
-
-        return cls(streamer_config, config.m, config.n, config.k)
+        raise NotImplementedError()
 
     def generate_acc_op(self) -> accfg.AcceleratorOp:
         """

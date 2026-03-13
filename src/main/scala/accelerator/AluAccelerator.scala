@@ -6,6 +6,8 @@ import streamer.{Streamer, AffineAguConfig, StreamerDir}
 import csr.CsrIO
 import csr.CsrInterface
 import datapath.AluArray
+import config.AluConfig
+import config.AluWrapper
 
 // DMA instantiates streamer <-> datapath <-> streamer
 //
@@ -74,4 +76,8 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   cStreamer.io.read := DontCare
   cStreamer.io.dir := StreamerDir.write
   csrItf.io.done := cStreamer.io.done
+
+  // In AluAccelerator.scala
+  def getConfig = AluWrapper("alu", AluConfig())
+  // def getConfig: AcceleratorWrapper = AluWrapper: AcceleratorWrapper
 }

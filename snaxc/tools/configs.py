@@ -1,85 +1,38 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Literal
 
 
-@dataclass
-class StreamerConfig:
-    temporal_dims: int
-    spatial_dims: list[int]
+class AcceleratorConfig(ABC): ...
 
 
-@dataclass
-class StreamersConfig(list[StreamerConfig]): ...
-
-
-class AcceleratorConfig: ...
+class EmptyAcceleratorConfig(AcceleratorConfig): ...
 
 
 class AcceleratorWrapper(ABC):
-    @property
-    def accelerator(self) -> AcceleratorConfig:
-        raise NotImplementedError("This method should be implemented by subclasses.")
+    @abstractmethod
+    def get_config(self) -> AcceleratorConfig: ...
 
 
 @dataclass
-class DataMoverConfig(AcceleratorConfig): ...
+class AluWrapper(AcceleratorWrapper):
+    type: Literal["alu"]
+    config: EmptyAcceleratorConfig
+
+    def get_config(self):
+        return self.config
 
 
 @dataclass
-class DataMoverWrapper(AcceleratorWrapper):
-    data_mover: None
+class DmaWrapper:
+    type: Literal["dma"]
+    config: EmptyAcceleratorConfig
 
-    @property
-    def accelerator(self) -> AcceleratorConfig:
-        return DataMoverConfig()
-
-
-@dataclass
-class SnaxAluConfig(AcceleratorConfig): ...
+    def get_config(self):
+        return self.config
 
 
-@dataclass
-class SnaxAluWrapper(AcceleratorWrapper):
-    snax_alu: None
-
-    @property
-    def accelerator(self) -> AcceleratorConfig:
-        return SnaxAluConfig()
-
-
-@dataclass
-class SnaxXdmaConfig(AcceleratorConfig): ...
-
-
-@dataclass
-class SnaxXdmaWrapper(AcceleratorWrapper):
-    snax_xdma: None
-
-    @property
-    def accelerator(self) -> AcceleratorConfig:
-        return SnaxXdmaConfig()
-
-
-@dataclass
-class GemmxConfig(AcceleratorConfig):
-    m: int
-    n: int
-    k: int
-    streamers: list[StreamerConfig]
-
-
-@dataclass
-class GemmxWrapper(AcceleratorWrapper):
-    gemmx: GemmxConfig
-
-    @property
-    def accelerator(self) -> AcceleratorConfig:
-        return self.gemmx
-
-
-@dataclass
-class CoreConfig:
-    accelerators: list[DataMoverWrapper | SnaxAluWrapper | GemmxWrapper | SnaxXdmaWrapper]
+Accelerator = AluWrapper | DmaWrapper
 
 
 @dataclass
@@ -87,6 +40,12 @@ class SnaxMemoryConfig:
     name: str
     start: int
     size: int
+
+
+@dataclass
+class CoreConfig:
+    hart_id: int
+    accelerators: list[AluWrapper | DmaWrapper]
 
 
 @dataclass

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
 from xdsl.context import Context
@@ -17,9 +17,7 @@ class AccContext(Context):
     Context that additionally allows to register and query accelerators
     """
 
-    _registered_accelerators: dict[str, Callable[[], Accelerator]] = field(
-        default_factory=dict[str, Callable[[], Accelerator]]
-    )
+    _registered_accelerators: dict[str, Accelerator] = field(default_factory=dict[str, Accelerator])
 
     _memories: dict[str, SnaxMemory] = field(default_factory=dict[str, SnaxMemory])
 
@@ -35,15 +33,10 @@ class AccContext(Context):
             self._memories.copy(),
         )
 
-    def register_accelerator(self, name: str, accelerator_factory: Callable[[], Accelerator]) -> None:
-        """
-        Register an accelerator without loading it.
-        The accelerator is only loaded in the context
-        if the name is requested from the AccContext
-        """
+    def register_accelerator(self, name: str, accelerator: Accelerator) -> None:
         if name in self._registered_accelerators:
             raise ValueError(f"'{name}' accelerator is already registered")
-        self._registered_accelerators[name] = accelerator_factory
+        self._registered_accelerators[name] = accelerator
 
     def get_optional_accelerator(self, name: str) -> Accelerator | None:
         """
@@ -51,7 +44,7 @@ class AccContext(Context):
         If the accelerator is not registered, raise an exception.
         """
         if name in self._registered_accelerators:
-            return self._registered_accelerators[name]()
+            return self._registered_accelerators[name]
         return None
 
     def get_acc(self, name: str) -> Accelerator:
@@ -64,7 +57,7 @@ class AccContext(Context):
         return accelerator
 
     def get_all_accelerators(self) -> Sequence[Accelerator]:
-        return [registered_accelerator() for registered_accelerator in self._registered_accelerators.values()]
+        return [registered_accelerator for registered_accelerator in self._registered_accelerators.values()]
 
     def get_acc_op_from_module(self, name: str, module: ModuleOp) -> tuple[AcceleratorOp, Accelerator]:
         """

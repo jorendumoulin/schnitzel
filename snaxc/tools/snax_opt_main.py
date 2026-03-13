@@ -57,7 +57,7 @@ class SNAXOptMain(xDSLOptMain):
 
     def register_all_accelerators(self):
         for accelerator_name, accelerator_factory in get_all_accelerators().items():
-            self.ctx.register_accelerator(accelerator_name, accelerator_factory)
+            self.ctx.register_accelerator(accelerator_name, accelerator_factory())
 
     def register_all_memories(self):
         self.ctx.register_memory(L1)
