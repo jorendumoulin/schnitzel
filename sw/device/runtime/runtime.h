@@ -20,6 +20,8 @@ void *memset(void *s, int c, size_t n) {
 }
 
 // --- Helper Macros ---
+#define TCDM __attribute__((section(".tcdm"), aligned(64)))
+
 #define write_csr(reg, val)                                                    \
   ({ __asm__ volatile("csrw %0, %1" ::"i"(reg), "rK"(val)); })
 

@@ -31,6 +31,12 @@ SECTIONS
   .tohost : ALIGN(8) {} > HTIF
   .fromhost : ALIGN(8) {} > HTIF
 
+  .tcdm (NOLOAD) : {
+    . = ALIGN(64);  /* Force the start of the section to be 64-byte aligned */
+    *(.tcdm*)
+    . = ALIGN(64);  /* Ensure the next section starts cleanly too */
+  } > TCDM
+
   /* Stack top symbol */
   _stack_top = ORIGIN(TCDM) + LENGTH(TCDM);
 }

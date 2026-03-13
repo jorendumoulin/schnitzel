@@ -2,7 +2,6 @@
 #include <stdalign.h>
 
 // Assuming your TCDM and AXI base addresses
-#define TCDM_ADDR 0x10000000
 #define TEST_SIZE 16
 
 // Global test data (Linker puts this in AXI/L3)
@@ -12,6 +11,7 @@ alignas(64) int axi_src_data[TEST_SIZE] = {
     0xDEAD, 0xBEEF, 0xCAFE, 0xBABE, 0x1234, 0x5678, 0xAAAA, 0x5555};
 
 alignas(64) int axi_dest_data[TEST_SIZE];
+TCDM int tcdm_dest_data[TEST_SIZE];
 
 inline int check_results(int *test_data, int *reference_data,
                          size_t test_size) {
@@ -30,7 +30,7 @@ inline int check_results(int *test_data, int *reference_data,
 }
 
 int main() {
-  verbose_printf("TCDM address %p : \n", TCDM_ADDR);
+  verbose_printf("TCDM address %p : \n", &tcdm_dest_data);
   int hart = hart_id();
   static int fail_count = 0; // Static so it persists across syncs
   if (hart == 1) {
@@ -47,7 +47,7 @@ int main() {
   if (hart == 2) {
 
     // Configure Streamer (TCDM Side):
-    write_csr(0x900, TCDM_ADDR);
+    write_csr(0x900, (unsigned long)tcdm_dest_data);
     // 4 Temporal strides:
     write_csr(0x901, 0x0);
     write_csr(0x902, 0x0);
@@ -85,7 +85,6 @@ int main() {
   }
   cluster_sync();
   if (hart == 1) {
-    int *tcdm_dest_data = (int *)TCDM_ADDR;
     fail_count += check_results(tcdm_dest_data, axi_src_data, TEST_SIZE);
   }
   cluster_sync();
