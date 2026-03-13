@@ -1,4 +1,6 @@
 # snax stuff
+.bloop
+.metals
 *logs*
 *results*
 *output*
@@ -10,6 +12,7 @@
 *.dasm
 *.log
 *.pte
+out
 out/*
 generated/*
 build/*
