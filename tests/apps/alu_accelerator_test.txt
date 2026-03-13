@@ -1,0 +1,3 @@
+// RUN: ./build/sim/sim ./build/device/apps/alu_accelerator_test.elf  --vltargs="+ibex_tracer_enable=0" | filecheck %s
+
+// CHECK: (hart 1) TEST PASSED!
