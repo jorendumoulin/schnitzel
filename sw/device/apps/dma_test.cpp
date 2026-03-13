@@ -1,8 +1,6 @@
 #include <runtime.h>
-#include <stdalign.h>
 
-// Assuming your TCDM and AXI base addresses
-#define TEST_SIZE 16
+constexpr int TEST_SIZE = 16;
 
 // Global test data (Linker puts this in AXI/L3)
 // Needs to be 512-bit aligned (64-bytes) to be picked up correctly over AXI
@@ -19,11 +17,11 @@ inline int check_results(int *test_data, int *reference_data,
   for (int i = 0; i < TEST_SIZE; i++) {
     if (test_data[i] != reference_data[i]) {
       verbose_printf(
-          "  ERROR: Mismatch at index %d! Expected 0x%08x, Got 0x % 08x\n ", i,
+          "  ERROR: Mismatch at index %d! Expected 0x%08x, Got 0x%08x\n", i,
           reference_data[i], test_data[i]);
       fail_count++;
     } else {
-      verbose_printf("  [%d] OK: 0x%08x \n", i, test_data[i]);
+      verbose_printf("  [%d] OK: 0x%08x\n", i, test_data[i]);
     }
   }
   return fail_count;
@@ -43,7 +41,7 @@ int main() {
   }
   cluster_sync();
 
-  // --- PHASE 3: AXI -> TCDM ---
+  // --- PHASE 1: AXI -> TCDM ---
   if (hart == 2) {
 
     // Configure Streamer (TCDM Side):
@@ -88,9 +86,11 @@ int main() {
     fail_count += check_results(tcdm_dest_data, axi_src_data, TEST_SIZE);
   }
   cluster_sync();
+
+  // --- PHASE 2: TCDM -> AXI ---
   if (hart == 2) {
     // All settings remain the same, except for direction and destination
-    // address in TCDM
+    // address in AXI
     write_csr(0x90d, (unsigned long)axi_dest_data); // Dest: New AXI Location
     write_csr(0x916, 0x1);                          // Direction: TCDM -> AXI
     write_csr(0x917, 0x1);                          // Start
