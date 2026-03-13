@@ -1,4 +1,4 @@
-// RUN: ./build/sim/sim ./build/device/apps/hello_world.elf ./build/host/apps/hello_world.elf | filecheck %s
+// RUN: ./build/sim/sim ./build/device/apps/hello_world.elf ./build/host/apps/hello_world.elf --vltargs="+ibex_tracer_enable=0" | filecheck %s
 
 // CHECK:      (hart 0) Hello World! 0
 // CHECK-NEXT: (hart 0) Hello World! 1

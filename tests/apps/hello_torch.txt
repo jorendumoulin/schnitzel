@@ -1,4 +1,4 @@
-// RUN: ./build/sim/sim ./build/device/apps/hang.elf ./build/host/apps/hello_torch/hello_torch.elf | filecheck %s
+// RUN: ./build/sim/sim ./build/device/apps/hang.elf ./build/host/apps/hello_torch/hello_torch.elf --vltargs="+ibex_tracer_enable=0" | filecheck %s
 
 // CHECK:      (hart 0) Custom kernel computing bleep bloop
 // CHECK-NEXT: (hart 0) Success!
