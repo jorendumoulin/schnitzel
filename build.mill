@@ -26,6 +26,7 @@ object `schnitzel` extends SbtModule { m =>
   )
   override def ivyDeps = Agg(
     ivy"org.chipsalliance::chisel:$chiselVersion",
+    ivy"com.lihaoyi::upickle:4.4.3",
   )
   override def scalacPluginIvyDeps = Agg(
     ivy"org.chipsalliance:::chisel-plugin:$chiselVersion",

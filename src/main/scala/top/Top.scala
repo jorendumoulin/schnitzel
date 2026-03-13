@@ -8,6 +8,7 @@ import axi.{AXIBundle, AXIConfig, AXIDemux}
 import cluster.Cluster
 import core.CVA6
 import axi.AxiToMem
+import config.{SystemConfig, MemoryConfig}
 
 class Top extends Module {
 
@@ -32,4 +33,8 @@ class Top extends Module {
   barrier.io.csr <> cluster.io.csr
   barrier.io.axi <> managerDemux.io.outs(0)
 
+  def getConfig: SystemConfig = SystemConfig(
+    MemoryConfig("L3", 0x2_0000_0000L, 0x2_0000_0000L),
+    List(cluster.getConfig)
+  )
 }

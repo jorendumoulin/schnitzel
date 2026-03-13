@@ -15,6 +15,8 @@ import chisel3.util.Decoupled
 import icache.InstructionCache
 import accelerator.AluAccelerator
 import csr.CsrIO
+import config.ClusterConfig
+import config.MemoryConfig
 
 class Cluster extends Module {
 
@@ -111,5 +113,10 @@ class Cluster extends Module {
   val axiMux = Module(AXIMux(AXIConfig(dataWidth = wideAxiDataWidth, idWidth = 4), 4))
   axiMux.io.ins <> VecInit(icache.io.axi, mem_to_axi_0.io.axi, mem_to_axi_1.io.axi, dma.io.axi)
   axiMux.io.out <> io.axi
+
+  def getConfig: ClusterConfig = ClusterConfig(
+    MemoryConfig("L1", 0x1_0000_0000L, 0x1_0000L),
+    List()
+  )
 
 }
