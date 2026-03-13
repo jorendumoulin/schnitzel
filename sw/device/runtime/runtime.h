@@ -1,5 +1,6 @@
 #ifndef RUNTIME_H
 #define RUNTIME_H
+#define VERBOSE
 
 #include <stddef.h>
 

@@ -14,5 +14,9 @@ add_executable(alu_accelerator_test.elf alu_accelerator_test.c)
 target_include_directories(alu_accelerator_test.elf PRIVATE ${RUNTIME_PATH})
 target_link_libraries(alu_accelerator_test.elf PRIVATE device_runtime)
 
+add_executable(simple_copy.elf simple_copy.cpp)
+target_include_directories(simple_copy.elf PRIVATE ${RUNTIME_PATH} ${ROOT}/sw/common/mlir)
+target_link_libraries(simple_copy.elf PRIVATE device_runtime)
+
 add_executable(hang.elf hang.c)
 target_link_libraries(hang.elf PRIVATE device_runtime)
