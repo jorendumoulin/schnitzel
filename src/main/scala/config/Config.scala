@@ -7,27 +7,26 @@ case class MemoryConfig(name: String, start: Long, size: Long)
 object MemoryConfig { implicit val rw: RW[MemoryConfig] = macroRW }
 
 // --- Accelerator Config Hierarchy ---
-
-// Config is just a map of params
-case class AluConfig()
-object AluConfig { implicit val rw: RW[AluConfig] = macroRW }
-
-case class DmaConfig()
-object DmaConfig { implicit val rw: RW[DmaConfig] = macroRW }
-
 // Wrapper with type + config fields
 sealed trait Accelerator {}
 
-case class AluWrapper(`type`: String, config: AluConfig) extends Accelerator
-object AluWrapper { implicit val rw: RW[AluWrapper] = macroRW }
+// Config is just a map of params
+case class AluConfig(`type`: String, width: Int) extends Accelerator
+object AluConfig { implicit val rw: RW[AluConfig] = macroRW }
 
-case class DmaWrapper(`type`: String, config: DmaConfig) extends Accelerator
-object DmaWrapper { implicit val rw: RW[DmaWrapper] = macroRW }
+case class DmaConfig(`type`: String) extends Accelerator
+object DmaConfig { implicit val rw: RW[DmaConfig] = macroRW }
+
+// case class AluWrapper(`type`: String, config: AluConfig) extends Accelerator
+// object AluWrapper { implicit val rw: RW[AluWrapper] = macroRW }
+
+// case class DmaWrapper(`type`: String, config: DmaConfig) extends Accelerator
+// object DmaWrapper { implicit val rw: RW[DmaWrapper] = macroRW }
 
 object Accelerator {
   implicit val rw: RW[Accelerator] = RW.merge(
-    macroRW[AluWrapper],
-    macroRW[DmaWrapper]
+    macroRW[AluConfig],
+    macroRW[DmaConfig]
   )
 }
 
