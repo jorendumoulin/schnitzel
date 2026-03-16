@@ -1,4 +1,4 @@
-from snaxc.accelerators.streamers.streamers import (
+from snaxc.hw.streamers.streamers import (
     HasAddressRemap,
     HasBroadcast,
     HasByteMask,

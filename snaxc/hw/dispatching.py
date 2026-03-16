@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 from xdsl.ir import Attribute, Operation
 
-from snaxc.accelerators.accelerator import Accelerator
 from snaxc.dialects.kernel import KernelOp
+from snaxc.hw.accelerator import Accelerator
 
 
 @dataclass

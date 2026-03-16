@@ -17,9 +17,9 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 
-from snaxc.accelerators import AccContext
-from snaxc.accelerators.snax import SNAXStreamer
 from snaxc.dialects import dart
+from snaxc.hw import AccContext
+from snaxc.hw.snax import SNAXStreamer
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
 from snaxc.ir.dart.scheduler import (
     is_memory_flexible_enough,

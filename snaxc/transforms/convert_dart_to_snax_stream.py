@@ -14,10 +14,10 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 
-from snaxc.accelerators import AccContext
-from snaxc.accelerators.snax import SNAXStreamer
-from snaxc.accelerators.streamers.streamers import HasBroadcast
 from snaxc.dialects import dart, snax_stream
+from snaxc.hw import AccContext
+from snaxc.hw.snax import SNAXStreamer
+from snaxc.hw.streamers.streamers import HasBroadcast
 from snaxc.ir.dart.affine_transform import AffineTransform
 
 TCDM_BANK_WIDTH = 8

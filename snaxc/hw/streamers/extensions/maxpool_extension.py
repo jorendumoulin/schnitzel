@@ -1,8 +1,8 @@
 from collections.abc import Sequence
 
-from snaxc.accelerators.dispatching import SupportedKernel
-from snaxc.accelerators.streamers.extensions.streamer_extension import StreamerExtension
 from snaxc.dialects import kernel
+from snaxc.hw.dispatching import SupportedKernel
+from snaxc.hw.streamers.extensions.streamer_extension import StreamerExtension
 
 
 class MaxPoolExtension(StreamerExtension):

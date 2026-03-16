@@ -11,9 +11,9 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 
-from snaxc.accelerators import AccContext
-from snaxc.accelerators.snax_phs import SNAXPHSAccelerator
 from snaxc.dialects.accfg import AcceleratorOp
+from snaxc.hw import AccContext
+from snaxc.hw.snax_phs import SNAXPHSAccelerator
 from snaxc.phs.decode import MappingNotFoundError, decode_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs
 

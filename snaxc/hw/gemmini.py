@@ -4,8 +4,8 @@ from xdsl.dialects import arith, linalg, memref
 from xdsl.dialects.builtin import IndexType, i64
 from xdsl.ir import Operation, SSAValue
 
-from snaxc.accelerators.rocc import RoCCAccelerator
 from snaxc.dialects import accfg
+from snaxc.hw.rocc import RoCCAccelerator
 from snaxc.util.pack_bitlist import pack_bitlist
 
 

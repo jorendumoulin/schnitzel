@@ -12,9 +12,9 @@ from xdsl.pattern_rewriter import (
 )
 from xdsl.rewriter import InsertPoint
 
-from snaxc.accelerators import AccContext
 from snaxc.dialects import accfg
 from snaxc.dialects.snax_stream import StreamingRegionOp
+from snaxc.hw import AccContext
 from snaxc.inference.helpers import (
     calc_if_state_delta,
     find_all_acc_names_in_region,

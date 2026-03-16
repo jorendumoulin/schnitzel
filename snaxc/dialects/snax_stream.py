@@ -25,8 +25,8 @@ from xdsl.irdl import (
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
 
-from snaxc.accelerators import find_accelerator_op
-from snaxc.accelerators.streamers.streamers import StreamerConfiguration
+# from snaxc.hw import find_accelerator_op
+# from snaxc.hw.streamers.streamers import StreamerConfiguration
 
 
 @irdl_attr_definition

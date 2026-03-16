@@ -14,9 +14,9 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 
-from snaxc.accelerators import AccContext
-from snaxc.accelerators.accelerator import Accelerator
 from snaxc.dialects import accfg
+from snaxc.hw import AccContext
+from snaxc.hw.accelerator import Accelerator
 
 
 @dataclass

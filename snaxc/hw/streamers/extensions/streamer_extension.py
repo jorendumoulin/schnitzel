@@ -4,14 +4,14 @@ from collections.abc import Sequence
 from xdsl.ir import Operation, ParametrizedAttribute, SSAValue
 from xdsl.ir.affine import AffineMap
 
-from snaxc.accelerators.dispatching import SupportedKernel
-from snaxc.accelerators.streamers.streamers import (
+from snaxc.dialects import dart, kernel
+from snaxc.dialects.kernel import KernelOp
+from snaxc.hw.dispatching import SupportedKernel
+from snaxc.hw.streamers.streamers import (
     Streamer,
     StreamerConfiguration,
     StreamerOpts,
 )
-from snaxc.dialects import dart, kernel
-from snaxc.dialects.kernel import KernelOp
 from snaxc.ir.dart.access_pattern import Template, TemplatePattern
 
 
