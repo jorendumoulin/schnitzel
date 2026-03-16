@@ -26,6 +26,7 @@ from snaxc.transforms.convert_dart_to_snax_stream import ConvertDartToSnaxStream
 from snaxc.transforms.convert_linalg_to_accfg import ConvertLinalgToAccPass
 from snaxc.transforms.convert_linalg_to_kernel import ConvertLinalgToKernel
 from snaxc.transforms.convert_memref_to_arith import ConvertMemrefToArithPass
+from snaxc.transforms.copy_to_dma import CopyToDmaPass
 from snaxc.transforms.dart.convert_linalg_to_dart import ConvertLinalgToDart
 from snaxc.transforms.dart.dart_fuse_operations import DartFuseOperationsPass
 from snaxc.transforms.dart.dart_layout_resolution import DartLayoutResolutionPass
@@ -47,7 +48,6 @@ from snaxc.transforms.set_memory_layout import SetMemoryLayout
 from snaxc.transforms.set_memory_space import SetMemorySpace
 from snaxc.transforms.snax_allocate import SnaxAllocatePass
 from snaxc.transforms.snax_bufferize import SnaxBufferize
-from snaxc.transforms.snax_copy_to_dma import SNAXCopyToDMA
 from snaxc.transforms.snax_to_func import SNAXToFunc
 from snaxc.transforms.test.debug_to_func import DebugToFuncPass
 from snaxc.transforms.test.insert_debugs import InsertDebugPass
@@ -79,13 +79,10 @@ class SNAXCMain(CommandLineTool):
 
     def load_config(self):
         # read config file
-        if self.args.config is not None:
-            with open(self.args.config) as f:
-                config = yaml.safe_load(f)
-            system = parse_config(config)
-            self.ctx = AccContext()
-        else:
-            self.ctx = AccContext(allow_unregistered=True)
+        with open(self.args.config) as f:
+            config = yaml.safe_load(f)
+        system = parse_config(config)
+        self.ctx = AccContext(system=system)
 
     def run(self):
         # read file
@@ -234,7 +231,7 @@ class SNAXCMain(CommandLineTool):
         pass_pipeline.append(DartLayoutResolutionPass())
         pass_pipeline.append(ConvertDartToSnaxStream())
         pass_pipeline.append(ConvertLinalgToAccPass())
-        pass_pipeline.append(SNAXCopyToDMA(test_ignore_transform=self.args.test_ignore_transform))
+        pass_pipeline.append(CopyToDmaPass())
         pass_pipeline.append(SNAXToFunc())
         pass_pipeline.append(ConvertMemrefToArithPass())
         if self.args.debug:
