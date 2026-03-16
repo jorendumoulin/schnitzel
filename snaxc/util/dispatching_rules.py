@@ -3,7 +3,6 @@ from xdsl.ir import Operation
 
 from snaxc.dialects import dart
 from snaxc.hw.acc_context import AccContext
-from snaxc.hw.snax_xdma import SNAXXDMAAccelerator
 from snaxc.hw.streamers.extensions import XDMA_EXT_SET
 
 

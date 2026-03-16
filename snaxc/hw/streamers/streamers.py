@@ -1,28 +1,9 @@
 from abc import ABC
-from collections.abc import Iterable, Sequence
-from typing import Literal
+from collections.abc import Sequence
+from dataclasses import dataclass
+from math import prod
 
-from typing_extensions import deprecated
 from xdsl.utils.str_enum import StrEnum
-
-
-class StreamerType(StrEnum):
-    # Streamer with read capabilities
-    Reader = "r"
-    # Streamer with write capabilities
-    Writer = "w"
-
-
-class StreamerSystemType(StrEnum):
-    """
-    Enum that specifies the type of system for which the streamer is configured.
-    either a regular system or a system with xDMA support.
-    """
-
-    # Streamer for regular system
-    Regular = "reg"
-    # Streamer for xDMA
-    DmaExt = "xdma"
 
 
 class StreamerOpts(ABC):
@@ -97,84 +78,42 @@ class StreamerFlag(StrEnum):
         return self is not StreamerFlag.Normal
 
 
+@dataclass
 class Streamer:
     """
-    A representation of a single SNAX Streamer
+    A software representation of a single streamer
     """
 
-    type: StreamerType
-    temporal_dims: tuple[StreamerFlag, ...]
+    access_width: int
+    """The number of bytes of a single element access of this streamer"""
+
+    temporal_dims: int
     spatial_dims: tuple[int, ...]
 
-    opts: list[StreamerOpts]
-
-    def __init__(
-        self,
-        type: StreamerType,
-        temporal_dims: Sequence[StreamerFlag | Literal["n", "i", "r"]],
-        spatial_dims: Sequence[int],
-        opts: Iterable[StreamerOpts] = [],
-    ) -> None:
-        self.type = type
-        temporal_dims = [f if isinstance(f, StreamerFlag) else StreamerFlag(f) for f in temporal_dims]
-        self.temporal_dims = tuple(temporal_dims)
-        self.spatial_dims = tuple(spatial_dims)
-        self.opts = list(opts)
+    @property
+    def temporal_dim(self) -> int:
+        """Number of temporal dimensions"""
+        return self.temporal_dim
 
     @property
-    def temporal_dim(self):
-        return len(self.temporal_dims)
-
-    @property
-    def spatial_dim(self):
+    def spatial_dim(self) -> int:
+        """Number of spatial dimensions"""
         return len(self.spatial_dims)
 
+    @property
+    def spatial_width(self) -> int:
+        """The number of ports this streamer has"""
+        return prod(self.spatial_dims)
 
+    @property
+    def full_width(self) -> int:
+        return self.access_width * prod(self.spatial_dims)
+
+
+@dataclass
 class StreamerConfiguration:
     """
-    A representation for a SNAX Streamer Configuration.
-    The configuration consists of one of more Streamer objects,
-    one for each operand of the accelerator.
+    A software representation of a set of streamers
     """
 
     streamers: Sequence[Streamer]
-    streamers_system_type: StreamerSystemType
-
-    def __init__(
-        self,
-        streamers: Sequence[Streamer],
-        streamer_system_type: StreamerSystemType = StreamerSystemType.Regular,
-    ) -> None:
-        assert len(streamers)
-        self.streamers = streamers
-        self.streamers_system_type = streamer_system_type
-
-    def size(self) -> int:
-        """
-        Return the number of streamers in the configuration
-        """
-        return len(self.streamers)
-
-    def system_type(self) -> StreamerSystemType:
-        """
-        Return the system type of the streamers
-        """
-        return self.streamers_system_type
-
-    @deprecated("Please do not use this function, it is only valid in trivial cases")
-    def temporal_dim(self) -> int:
-        """
-        Return the temporal dimension of the streamers
-        For now, assume all temporal dimensions are equal,
-        so just take the first
-        """
-        return self.streamers[0].temporal_dim
-
-    @deprecated("Please do not use this function, it is only valid in trivial cases")
-    def spatial_dim(self) -> int:
-        """
-        Return the spatial dimension of the streamers
-        For now, assume all spatial dimensions are equal,
-        so just take the first
-        """
-        return self.streamers[0].spatial_dim

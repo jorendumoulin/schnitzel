@@ -35,9 +35,7 @@ from snaxc.hw.streamers.extensions import STREAMER_OPT_MAP
 from snaxc.hw.streamers.streamers import (
     Streamer,
     StreamerConfiguration,
-    StreamerFlag,
     StreamerOpts,
-    StreamerType,
 )
 from snaxc.util.memref_descriptor import LLVMMemrefDescriptor
 

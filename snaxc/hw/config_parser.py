@@ -14,5 +14,4 @@ def parse_config(config: Any) -> System:
         config,
         DaciteConfig(type_hooks={Accelerator: lambda accelerator: get_all_accelerators()[accelerator["type"]]()()}),
     )
-    breakpoint()
     return system
