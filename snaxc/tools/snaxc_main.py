@@ -16,7 +16,6 @@ from xdsl.transforms.mlir_opt import MLIROptPass
 from snaxc.dialects import get_all_snax_dialects
 from snaxc.hw.acc_context import AccContext
 from snaxc.hw.config_parser import parse_config
-from snaxc.tools.config_parser import parse_config
 from snaxc.transforms.accfg_config_overlap import AccfgConfigOverlapPass
 from snaxc.transforms.accfg_dedup import AccfgDeduplicate
 from snaxc.transforms.alloc_to_global import AllocToGlobalPass
@@ -84,9 +83,8 @@ class SNAXCMain(CommandLineTool):
         if self.args.config is not None:
             with open(self.args.config) as f:
                 config = yaml.safe_load(f)
-            context = parse_config(config)
-            context.allow_unregistered = True
-            self.ctx = context
+            system = parse_config(config)
+            self.ctx = AccContext()
         else:
             self.ctx = AccContext(allow_unregistered=True)
 
