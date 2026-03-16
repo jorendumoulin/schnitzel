@@ -22,7 +22,7 @@ from xdsl.utils.hints import isa
 
 from snaxc.dialects import snax
 from snaxc.hw.acc_context import AccContext
-from snaxc.hw.memory import Memory
+from snaxc.hw.system import Memory
 
 # from snaxc.util.snax_memory import L1, SnaxMemory
 
