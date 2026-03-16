@@ -24,7 +24,6 @@ from snaxc.hw.streamers.streamers import (
     Streamer,
     StreamerConfiguration,
     StreamerFlag,
-    StreamerSystemType,
 )
 from snaxc.ir.dart.access_pattern import Template
 

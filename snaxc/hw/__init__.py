@@ -7,17 +7,17 @@ from snaxc.hw.accelerator import Accelerator
 def get_all_accelerators() -> dict[str, Callable[[], type[Accelerator]]]:
     """Return all available accelerator types"""
 
-    def get_snax_alu():
-        from snaxc.hw.snax_alu import SNAXAluAccelerator
+    def get_alu():
+        from snaxc.hw.accelerators.alu import Alu
 
-        return SNAXAluAccelerator
+        return Alu
 
-    def get_xdma():
-        from snaxc.hw.snax_xdma import SNAXXDMAAccelerator
+    def get_dma():
+        from snaxc.hw.accelerators.dma import Dma
 
-        return SNAXXDMAAccelerator
+        return Dma
 
     return {
-        "alu": get_snax_alu,
-        "dma": get_xdma,
+        "alu": get_alu,
+        "dma": get_dma,
     }
