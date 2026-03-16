@@ -9,7 +9,6 @@ from snaxc.dialects import accfg
 class Accelerator(ABC):
     type: str
 
-    @abstractmethod
     def convert_to_acc_ops(self, op: Operation) -> Sequence[Operation]:
         """
         Lowers the operation op to a sequence of acc_ops.
@@ -23,7 +22,6 @@ class Accelerator(ABC):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def generate_acc_op(self) -> accfg.AcceleratorOp:
         """
         Return an accelerator op:
@@ -38,7 +36,6 @@ class Accelerator(ABC):
         raise NotImplementedError()
 
     @staticmethod
-    @abstractmethod
     def lower_acc_await(acc_op: accfg.AcceleratorOp) -> Sequence[Operation]:
         """
         Based on the accfg.accelerator op, return the necessary sequence of
@@ -47,7 +44,6 @@ class Accelerator(ABC):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def lower_acc_launch(self, launch_op: accfg.LaunchOp, acc_op: accfg.AcceleratorOp) -> Sequence[Operation]:
         """
         Based on the accfg.accelerator op, return the necessary sequence of
@@ -57,7 +53,6 @@ class Accelerator(ABC):
         raise NotImplementedError()
 
     @staticmethod
-    @abstractmethod
     def lower_acc_setup(setup_op: accfg.SetupOp, acc_op: accfg.AcceleratorOp) -> Sequence[Operation]:
         """
         Based on the accfg.accelerator op and the accfg.SetupOp,

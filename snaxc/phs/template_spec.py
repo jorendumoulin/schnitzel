@@ -3,7 +3,7 @@ from collections.abc import Iterable
 
 from xdsl.ir.affine import AffineMap
 
-from snaxc.hw.streamers.streamers import Streamer, StreamerConfiguration, StreamerFlag, StreamerType
+from snaxc.hw.streamers.streamers import Streamer, StreamerConfiguration, StreamerFlag
 from snaxc.ir.dart.access_pattern import Template, TemplatePattern
 
 
