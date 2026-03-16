@@ -34,7 +34,6 @@ from snaxc.transforms.dispatch_kernels import DispatchKernels
 from snaxc.transforms.dispatch_regions import DispatchRegions
 from snaxc.transforms.frontend.frontend_transform import FrontendTransformPass
 from snaxc.transforms.frontend.preprocess_mlir import PreprocessPass
-from snaxc.transforms.insert_accfg_op import InsertAccOp
 from snaxc.transforms.insert_sync_barrier import InsertSyncBarrier
 from snaxc.transforms.memref_to_snax import MemrefToSNAX
 from snaxc.transforms.phs.dispatch_linalg_phs import DispatchLinalgPHS
@@ -200,10 +199,6 @@ class SNAXCMain(CommandLineTool):
         # Frontend passes:
         if not self.args.no_frontend:
             pass_pipeline.append(PreprocessPass())
-
-        # Insert accfg operations based on accelerators registered in the AccContext:
-        for accelerator in self.ctx.registered_accelerator_names:
-            pass_pipeline.append(InsertAccOp(accelerator))
 
         # Standard lowering pipeline:
         if not phs:

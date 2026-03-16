@@ -7,7 +7,7 @@ from snaxc.dialects import accfg
 
 
 class Accelerator(ABC):
-    type: str
+    name: str
 
     def convert_to_acc_ops(self, op: Operation) -> Sequence[Operation]:
         """

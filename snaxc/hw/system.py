@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Iterable
 
 from xdsl.dialects.builtin import StringAttr
 
@@ -38,3 +39,13 @@ class Cluster:
 class System:
     memory: Memory
     clusters: list[Cluster]
+
+    def iter_mems(self) -> Iterable[Memory]:
+        yield self.memory
+        for cluster in self.clusters:
+            yield cluster.memory
+
+    def iter_accelerators(self) -> Iterable[Accelerator]:
+        for cluster in self.clusters:
+            for core in cluster.cores:
+                yield from core.accelerators
