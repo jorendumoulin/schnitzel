@@ -16,7 +16,7 @@ from xdsl.pattern_rewriter import (
 
 from snaxc.dialects import accfg
 from snaxc.hw import AccContext
-from snaxc.hw.accelerator import Accelerator
+from snaxc.hw.system import Accelerator
 
 
 @dataclass

@@ -25,8 +25,7 @@ from xdsl.irdl import (
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
 
-# from snaxc.hw import find_accelerator_op
-# from snaxc.hw.streamers.streamers import StreamerConfiguration
+from snaxc.hw.streamers.streamers import StreamerConfiguration
 
 
 @irdl_attr_definition
@@ -139,6 +138,7 @@ class StreamingRegionOp(IRDLOperation):
     # streaming stride pattern
     # there should be one stride pattern for every input/output
     stride_patterns = prop_def(ArrayAttr[StridePattern])
+    dynamic_operands = var_operand_def(IndexType)
 
     accelerator = prop_def(StringAttr)
     """
@@ -156,6 +156,7 @@ class StreamingRegionOp(IRDLOperation):
         inputs: Sequence[SSAValue | Operation],
         outputs: Sequence[SSAValue | Operation],
         stride_patterns: ArrayAttr[StridePattern] | Sequence[StridePattern],
+        dynamic_operands: Sequence[SSAValue | Operation],
         accelerator: StringAttr | str,
         body: Region,
     ) -> None:
@@ -164,33 +165,35 @@ class StreamingRegionOp(IRDLOperation):
         if isinstance(accelerator, str):
             accelerator = StringAttr(accelerator)
         super().__init__(
-            operands=[inputs, outputs],
+            operands=[inputs, outputs, dynamic_operands],
             regions=[body],
             properties={"stride_patterns": stride_patterns, "accelerator": accelerator},
         )
 
     def verify_(self):
-        acc_op = find_accelerator_op(self, self.accelerator.data)
-        if not acc_op:
-            raise VerifyException("AcceleratorOp not found!")
-
-        streamer_interface = acc_op.get_attr_or_prop("streamer_config")
-
-        # FIXME: restructure streamer config files to improve importing structure
-        # this verification should not be a part of this op, but moved to one of the lowerings.
-        if not streamer_interface:
-            raise VerifyException("Specified accelerator does not contain a StreamerConfigurationAttr")
-        streamer_config = cast(StreamerConfiguration, streamer_interface.data)  # pyright: ignore
-
-        if len(self.stride_patterns) != streamer_config.size():
-            raise VerifyException("Number of streamers does not equal number of stride patterns")
-
-        for stride_pattern, streamer in zip(self.stride_patterns, streamer_config.streamers):
-            if len(stride_pattern.temporal_strides) > streamer.temporal_dim:
-                raise VerifyException("Temporal stride pattern exceeds streamer dimensionality")
-
-            if len(stride_pattern.spatial_strides) > streamer.spatial_dim:
-                raise VerifyException("Spatial stride pattern exceeds streamer dimensionality")
+        # TODO: rewrite with new patterns
+        pass
+        # acc_op = find_accelerator_op(self, self.accelerator.data)
+        # if not acc_op:
+        #     raise VerifyException("AcceleratorOp not found!")
+        #
+        # streamer_interface = acc_op.get_attr_or_prop("streamer_config")
+        #
+        # # FIXME: restructure streamer config files to improve importing structure
+        # # this verification should not be a part of this op, but moved to one of the lowerings.
+        # if not streamer_interface:
+        #     raise VerifyException("Specified accelerator does not contain a StreamerConfigurationAttr")
+        # streamer_config = cast(StreamerConfiguration, streamer_interface.data)  # pyright: ignore
+        #
+        # if len(self.stride_patterns) != streamer_config.size():
+        #     raise VerifyException("Number of streamers does not equal number of stride patterns")
+        #
+        # for stride_pattern, streamer in zip(self.stride_patterns, streamer_config.streamers):
+        #     if len(stride_pattern.temporal_strides) > streamer.temporal_dim:
+        #         raise VerifyException("Temporal stride pattern exceeds streamer dimensionality")
+        #
+        #     if len(stride_pattern.spatial_strides) > streamer.spatial_dim:
+        #         raise VerifyException("Spatial stride pattern exceeds streamer dimensionality")
 
 
 SnaxStream = Dialect("snax_stream", [StreamingRegionOp], [StridePattern])
