@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from snaxc.hw.accelerator import Accelerator
+from snaxc.hw.system import Accelerator
 from snaxc.hw.streamers.streamers import (
     Streamer,
     StreamerConfiguration,
@@ -16,7 +16,7 @@ class Dma(Accelerator):
     name = "dma"
     streamers = StreamerConfiguration(
         [
-            Streamer(64, 3, (1,)),
-            Streamer(4, 3, (2, 2, 2)),
+            Streamer(4, 3, (2, 2, 2, 2)),
+            Streamer(64, 3, tuple()),
         ]
     )

@@ -1,7 +1,7 @@
 from collections.abc import Callable
 
 from snaxc.hw.acc_context import *
-from snaxc.hw.accelerator import Accelerator
+from snaxc.hw.system import Accelerator
 
 
 def get_all_accelerators() -> dict[str, Callable[[], type[Accelerator]]]:
