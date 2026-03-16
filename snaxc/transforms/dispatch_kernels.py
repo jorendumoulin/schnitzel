@@ -11,11 +11,11 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 
-from snaxc.accelerators import AccContext
-from snaxc.accelerators.dispatching import DispatchTemplate
-from snaxc.accelerators.snax import SNAXStreamer
 from snaxc.dialects.accfg import AcceleratorOp
 from snaxc.dialects.kernel import KernelOp
+from snaxc.hw import AccContext
+from snaxc.hw.dispatching import DispatchTemplate
+from snaxc.hw.snax import SNAXStreamer
 
 
 class DispatchTemplatePattern(RewritePattern):

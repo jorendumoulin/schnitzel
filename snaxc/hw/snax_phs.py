@@ -5,12 +5,12 @@ from xdsl.dialects.builtin import StringAttr
 from xdsl.ir import Operation, SSAValue
 from xdsl.pattern_rewriter import PatternRewriter
 
-from snaxc.accelerators.snax import (
+from snaxc.dialects import accfg, dart, phs, snax_stream
+from snaxc.hw.snax import (
     SNAXAccelerator,
     SNAXPollingBarrier3,
     SNAXStreamer,
 )
-from snaxc.dialects import accfg, dart, phs, snax_stream
 from snaxc.ir.dart.access_pattern import Template
 from snaxc.phs.decode import decode_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs

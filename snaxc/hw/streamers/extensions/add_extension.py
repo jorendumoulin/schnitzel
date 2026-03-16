@@ -4,11 +4,11 @@ from xdsl.dialects.builtin import i32
 from xdsl.ir import Operation, ParametrizedAttribute, SSAValue
 from xdsl.ir.affine import AffineMap
 
-from snaxc.accelerators.dispatching import SupportedKernel
-from snaxc.accelerators.streamers.extensions.streamer_extension import StreamerExtension
-from snaxc.accelerators.streamers.streamers import Streamer, StreamerConfiguration
 from snaxc.dialects import dart, kernel
 from snaxc.dialects.snax_stream import StridePattern
+from snaxc.hw.dispatching import SupportedKernel
+from snaxc.hw.streamers.extensions.streamer_extension import StreamerExtension
+from snaxc.hw.streamers.streamers import Streamer, StreamerConfiguration
 from snaxc.ir.dart.access_pattern import Template, TemplatePattern
 
 

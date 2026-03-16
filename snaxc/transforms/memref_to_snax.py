@@ -19,7 +19,8 @@ from xdsl.pattern_rewriter import (
 
 from snaxc.dialects import snax
 from snaxc.dialects.tsl import TiledStridedLayoutAttr
-from snaxc.util.snax_memory import L1
+
+# from snaxc.util.snax_memory import L1
 
 
 class AllocOpRewrite(RewritePattern):

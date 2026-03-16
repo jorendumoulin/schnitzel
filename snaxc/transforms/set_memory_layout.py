@@ -16,11 +16,11 @@ from xdsl.pattern_rewriter import (
 from xdsl.rewriter import InsertPoint
 from xdsl.utils.hints import isa
 
-from snaxc.accelerators.acc_context import AccContext
-from snaxc.accelerators.snax import SNAXStreamer
 from snaxc.dialects import dart
 from snaxc.dialects.snax import LayoutCast
 from snaxc.dialects.tsl import TiledStridedLayoutAttr
+from snaxc.hw.acc_context import AccContext
+from snaxc.hw.snax import SNAXStreamer
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
 from snaxc.ir.tsl import Stride, TiledStride, TiledStridedLayout
 

@@ -12,7 +12,8 @@ from xdsl.pattern_rewriter import (
 from xdsl.utils.hints import isa
 
 from snaxc.dialects import dart
-from snaxc.util.snax_memory import L1, L3
+
+# from snaxc.util.snax_memory import L1, L3
 
 
 class InitFuncMemorySpace(RewritePattern):

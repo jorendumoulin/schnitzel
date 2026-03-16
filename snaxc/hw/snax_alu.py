@@ -7,19 +7,19 @@ from xdsl.ir.affine import AffineMap
 from xdsl.utils.hints import isa
 
 import snaxc.dialects.kernel as kernel
-from snaxc.accelerators.configurable_accelerator import ConfigurableAccelerator
-from snaxc.accelerators.dispatching import DispatchTemplate, SupportedKernel
-from snaxc.accelerators.snax import (
+from snaxc.dialects import accfg, dart, snax_stream
+from snaxc.hw.configurable_accelerator import ConfigurableAccelerator
+from snaxc.hw.dispatching import DispatchTemplate, SupportedKernel
+from snaxc.hw.snax import (
     SNAXAccelerator,
     SNAXPollingBarrier3,
     SNAXStreamer,
 )
-from snaxc.accelerators.streamers.streamers import (
+from snaxc.hw.streamers.streamers import (
     Streamer,
     StreamerConfiguration,
     StreamerType,
 )
-from snaxc.dialects import accfg, dart, snax_stream
 from snaxc.ir.dart.access_pattern import Template, TemplatePattern
 
 default_streamer = StreamerConfiguration(

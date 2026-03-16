@@ -4,19 +4,21 @@ from xdsl.dialects import arith, builtin
 from xdsl.dialects.builtin import IntAttr, i32
 from xdsl.ir import Operation, OpResult, SSAValue
 
-from snaxc.accelerators.configurable_accelerator import ConfigurableAccelerator
-from snaxc.accelerators.dispatching import DispatchTemplate
-from snaxc.accelerators.snax import (
+from snaxc.dialects import accfg, dart, snax_stream
+from snaxc.dialects.kernel import KernelOp
+from snaxc.hw.configurable_accelerator import ConfigurableAccelerator
+from snaxc.hw.dispatching import DispatchTemplate
+from snaxc.hw.snax import (
     SNAXAccelerator,
     SNAXPollingBarrier3,
     SNAXStreamer,
 )
-from snaxc.accelerators.streamers import (
+from snaxc.hw.streamers import (
     HasBroadcast,
     HasByteMask,
     HasChannelMask,
 )
-from snaxc.accelerators.streamers.extensions import (
+from snaxc.hw.streamers.extensions import (
     AddExtension,
     MaxPoolExtension,
     MemSetExtension,
@@ -25,16 +27,14 @@ from snaxc.accelerators.streamers.extensions import (
     StreamerExtension,
     TransposeExtension,
 )
-from snaxc.accelerators.streamers.extensions.add_extension import AddLongExtension
-from snaxc.accelerators.streamers.streamers import (
+from snaxc.hw.streamers.extensions.add_extension import AddLongExtension
+from snaxc.hw.streamers.streamers import (
     Streamer,
     StreamerConfiguration,
     StreamerFlag,
     StreamerSystemType,
     StreamerType,
 )
-from snaxc.dialects import accfg, dart, snax_stream
-from snaxc.dialects.kernel import KernelOp
 
 default_streamer = StreamerConfiguration(
     [

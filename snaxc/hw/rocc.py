@@ -5,8 +5,8 @@ from xdsl.dialects import arith, llvm
 from xdsl.dialects.builtin import IntegerAttr, i64
 from xdsl.ir import Operation, SSAValue
 
-from snaxc.accelerators.accelerator import Accelerator
 from snaxc.dialects import accfg
+from snaxc.hw.accelerator import Accelerator
 from snaxc.inference.trace_acc_state import infer_state_of
 
 

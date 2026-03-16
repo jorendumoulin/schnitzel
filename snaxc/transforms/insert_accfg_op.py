@@ -5,7 +5,7 @@ from xdsl.dialects import builtin
 from xdsl.passes import ModulePass
 from xdsl.traits import SymbolTable
 
-from snaxc.accelerators import AccContext
+from snaxc.hw import AccContext
 
 
 @dataclass(frozen=True)
