@@ -7,11 +7,7 @@ from snaxc.dialects import accfg
 
 
 class Accelerator(ABC):
-    """
-    Interface to lower to and from accfg dialect.
-    """
-
-    name: str
+    type: str
 
     @abstractmethod
     def convert_to_acc_ops(self, op: Operation) -> Sequence[Operation]:

@@ -5,8 +5,8 @@ from xdsl.ir import Operation
 from xdsl.passes import ModulePass
 from xdsl.rewriter import InsertPoint, Rewriter
 
-from snaxc.accelerators.acc_context import AccContext
 from snaxc.dialects import snax
+from snaxc.hw.acc_context import AccContext
 from snaxc.util.dispatching_rules import dispatch_to_compute, dispatch_to_dm
 
 

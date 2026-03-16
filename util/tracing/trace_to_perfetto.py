@@ -7,8 +7,8 @@ from concurrent.futures import ProcessPoolExecutor
 
 import yaml
 
-from snaxc.accelerators import get_all_accelerators
-from snaxc.accelerators.snax import SNAXAccelerator
+from snaxc.hw import get_all_accelerators
+from snaxc.hw.snax import SNAXAccelerator
 from snaxc.tools.config_parser import parse_config
 from util.tracing.annotation import (
     BarrierEventGenerator,

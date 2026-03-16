@@ -13,8 +13,9 @@ from xdsl.transforms.canonicalize import CanonicalizePass
 from xdsl.transforms.experimental.function_constant_pinning import FunctionConstantPinningPass
 from xdsl.transforms.mlir_opt import MLIROptPass
 
-from snaxc.accelerators.acc_context import AccContext
 from snaxc.dialects import get_all_snax_dialects
+from snaxc.hw.acc_context import AccContext
+from snaxc.hw.config_parser import parse_config
 from snaxc.tools.config_parser import parse_config
 from snaxc.transforms.accfg_config_overlap import AccfgConfigOverlapPass
 from snaxc.transforms.accfg_dedup import AccfgDeduplicate
