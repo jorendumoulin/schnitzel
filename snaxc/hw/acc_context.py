@@ -7,8 +7,7 @@ from xdsl.parser import ModuleOp
 from xdsl.traits import SymbolTable
 
 from snaxc.dialects.accfg import AcceleratorOp
-from snaxc.hw.accelerator import Accelerator
-from snaxc.hw.system import Memory, System
+from snaxc.hw.system import Memory, System, Accelerator
 
 
 @dataclass

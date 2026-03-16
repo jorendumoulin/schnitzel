@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from snaxc.hw.accelerator import Accelerator
+from snaxc.hw.system import Accelerator
 from snaxc.hw.streamers.streamers import Streamer, StreamerConfiguration
 
 

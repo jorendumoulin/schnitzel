@@ -91,11 +91,6 @@ class Streamer:
     spatial_dims: tuple[int, ...]
 
     @property
-    def temporal_dim(self) -> int:
-        """Number of temporal dimensions"""
-        return self.temporal_dim
-
-    @property
     def spatial_dim(self) -> int:
         """Number of spatial dimensions"""
         return len(self.spatial_dims)
@@ -107,7 +102,13 @@ class Streamer:
 
     @property
     def full_width(self) -> int:
+        """The number of bytes accessed across all ports in a single cycle"""
         return self.access_width * prod(self.spatial_dims)
+
+    @property
+    def byte_offsets(self) -> Sequence[int]:
+        """The spatial byte offset for contiguous access across all spatial dims"""
+        return tuple(self.access_width * prod(self.spatial_dims[i + 1 :]) for i in range(self.spatial_dim))
 
 
 @dataclass
