@@ -16,7 +16,10 @@ class Dma(Accelerator):
     name = "dma"
     streamers = StreamerConfiguration(
         [
-            Streamer(4, 3, (2, 2, 2, 2)),
-            Streamer(64, 3, tuple()),
+            Streamer(4, 3, (2, 2, 2, 2), "tcdm"),
+            Streamer(64, 3, tuple(), "axi"),
         ]
     )
+
+    def launch_param(self) -> str:
+        return "start"
