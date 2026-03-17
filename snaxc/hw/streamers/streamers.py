@@ -2,6 +2,7 @@ from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from math import prod
+from typing import Iterable
 
 from xdsl.utils.str_enum import StrEnum
 
@@ -89,6 +90,19 @@ class Streamer:
 
     temporal_dims: int
     spatial_dims: tuple[int, ...]
+    name_base: str
+
+    def ub_params(self) -> Iterable[str]:
+        for i in range(self.temporal_dims):
+            yield f"{self.name_base}_ub_{i}"
+
+    def ts_params(self) -> Iterable[str]:
+        for i in range(self.temporal_dims):
+            yield f"{self.name_base}_ts_{i}"
+
+    def ss_params(self) -> Iterable[str]:
+        for i in range(self.spatial_dim):
+            yield f"{self.name_base}_ss_{i}"
 
     @property
     def spatial_dim(self) -> int:

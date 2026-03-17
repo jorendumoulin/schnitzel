@@ -1,11 +1,9 @@
+from abc import ABC
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Iterable, Optional
 
 from xdsl.dialects.builtin import StringAttr
-
-from abc import ABC
-from collections.abc import Sequence
-
 from xdsl.ir import Operation
 
 from snaxc.dialects import accfg
@@ -153,3 +151,9 @@ class System:
         for cluster in self.clusters:
             for core in cluster.cores:
                 yield from core.accelerators
+
+    def find_accelerator(self, attr: StringAttr) -> Accelerator:
+        for accelerator in self.iter_accelerators():
+            if accelerator.name == attr.data:
+                return accelerator
+        raise RuntimeError(f"Could not find accelerator {str(attr)}")
