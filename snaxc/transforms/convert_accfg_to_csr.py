@@ -1,9 +1,10 @@
-from abc import ABC
 from dataclasses import dataclass
-from functools import cache
+from collections.abc import Sequence
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
+from xdsl.dialects.arith import ConstantOp, IndexCastOp
+from xdsl.dialects.llvm import InlineAsmOp
 from xdsl.ir import Operation
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -13,86 +14,73 @@ from xdsl.pattern_rewriter import (
     RewritePattern,
     op_type_rewrite_pattern,
 )
+from xdsl.rewriter import InsertPoint
 
 from snaxc.dialects import accfg
 from snaxc.hw import AccContext
-from snaxc.hw.system import Accelerator
+from snaxc.hw.accelerators.dma import Dma
+from snaxc.hw.system import System
 
 
 @dataclass
-class LowerAccfgBasePattern(RewritePattern, ABC):
+class LowerAccfgSetupLaunchToCsr(RewritePattern):
     """
-    Base class for the accfg dialect lowerings.
-
-    Wraps some common logic to get handles to accelerator ops inside the module.
+    Convert launch / setup ops to a series of CSR sets that set each field to the given value.
     """
 
-    module: builtin.ModuleOp
-    ctx: AccContext
-
-    @cache
-    def get_acc(self, accelerator_str: str) -> tuple[accfg.AcceleratorOp, Accelerator]:
-        return self.ctx.get_acc_op_from_module(accelerator_str, self.module)
-
-    def __hash__(self):
-        return id(self)
-
-
-class LowerAccfgSetupToCsr(LowerAccfgBasePattern):
-    """
-    Convert setup ops to a series of CSR sets that set each field to the given value.
-
-    Looks up the csr addresses of the value fields by getting the `accfg.accelerator`
-    operation from the module op.
-    """
+    system: System
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: accfg.SetupOp, rewriter: PatternRewriter, /):
-        acc_op, acc_info = self.get_acc(op.get_acc_name())
-        # grab a dict that translates field names to CSR addresses:
-        # emit the llvm assembly code to set csr values:
-        rewriter.replace_op(
-            op,
-            acc_info.lower_acc_setup(op, acc_op),
-            [None],
-            safe_erase=False,
-        )
+    def match_and_rewrite(self, op: accfg.SetupOp | accfg.LaunchOp, rewriter: PatternRewriter) -> None:
+        accelerator = self.system.find_accelerator(op.accelerator)
+        assert isinstance(accelerator, Dma)
+        field_to_csr = accelerator.param_values()
+        ops: Sequence[Operation] = []
+        for field, val in op.iter_params():
+            if isinstance(val.type, builtin.IndexType):
+                val_to_i32 = IndexCastOp(val, builtin.i32)
+                ops.append(val_to_i32)
+                val = val_to_i32.result
+            addr = field_to_csr[field]
+            ops.extend(
+                [
+                    addr_val := ConstantOp.from_int_and_width(addr, 32),
+                    InlineAsmOp(
+                        "csrw $0, $1",
+                        "I, rK",
+                        [addr_val, val],
+                        has_side_effects=True,
+                    ),
+                ]
+            )
+        rewriter.insert_op(ops, InsertPoint.before(op))
+        rewriter.erase_op(op)
 
 
-class LowerAccfgLaunchToCsr(LowerAccfgBasePattern):
-    """
-    Convert launch ops to a single `csr_set $launch_addr, 1`
-    """
-
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: accfg.LaunchOp, rewriter: PatternRewriter, /):
-        assert isinstance(op.state.type, accfg.StateType)
-        acc_op, acc_info = self.get_acc(op.get_acc_name())
-        # acc_op, acc_info = self.get_acc(op.state.type.accelerator.data)
-        # insert an op that sets the launch CSR to 1
-        rewriter.replace_op(
-            op,
-            acc_info.lower_acc_launch(op, acc_op),
-            [op.state],
-            safe_erase=False,
-        )
-
-
-class LowerAccfgAwaitToCsr(LowerAccfgBasePattern):
+@dataclass
+class LowerAccfgAwaitToCsr(RewritePattern):
     """
     Lower await ops to a set of assembly that lowers to a buffer.
     """
 
+    system: System
+
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: accfg.AwaitOp, rewriter: PatternRewriter, /):
-        acc_op, acc_info = self.get_acc(op.get_acc_name())
-
-        # emit a snax_hwpe-style barrier
-        rewriter.replace_op(
-            op,
-            acc_info.lower_acc_await(acc_op),
-            safe_erase=False,
+        assert isinstance(op.token.owner, accfg.LaunchOp)
+        accelerator = self.system.find_accelerator(op.token.owner.accelerator)
+        assert isinstance(accelerator, Dma)
+        field_to_csr = accelerator.param_values()
+        c0 = ConstantOp.from_int_and_width(0, 32)
+        addr_op = ConstantOp.from_int_and_width(field_to_csr[accelerator.launch_param()], 32)
+        accelerator.launch_param()
+        write_op = InlineAsmOp(
+            "csrw $0, $1",
+            "I, K",
+            [addr_op.result, c0.result],
+            has_side_effects=True,
         )
+        rewriter.replace_matched_op((c0, addr_op, write_op), safe_erase=False)
 
 
 class DeleteAllStates(RewritePattern):
@@ -190,15 +178,14 @@ class ConvertAccfgToCsrPass(ModulePass):
         PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
-                    LowerAccfgSetupToCsr(op, ctx),
-                    LowerAccfgLaunchToCsr(op, ctx),
-                    LowerAccfgAwaitToCsr(op, ctx),
+                    LowerAccfgSetupLaunchToCsr(ctx.system),
+                    LowerAccfgAwaitToCsr(ctx.system),
                 ]
             ),
             walk_reverse=True,
         ).rewrite_module(op)
 
-        # then we remove all the top-level accfg.accelerator operations from the module and erase the state variables
-        PatternRewriteWalker(GreedyRewritePatternApplier([DeleteAllStates(), RemoveAcceleratorOps()])).rewrite_module(
-            op
-        )
+        # # then we remove all the top-level accfg.accelerator operations from the module and erase the state variables
+        # PatternRewriteWalker(GreedyRewritePatternApplier([DeleteAllStates(), RemoveAcceleratorOps()])).rewrite_module(
+        #     op
+        # )
