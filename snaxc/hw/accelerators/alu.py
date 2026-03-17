@@ -10,10 +10,10 @@ class Alu(Accelerator):
     Accelerator interface class for the ALU.
     """
 
-    name = "dma"
+    name = "alu"
     streamers = StreamerConfiguration(
         [
-            Streamer(4, 3, (2, 2, 2)),
-            Streamer(4, 3, (2, 2, 2)),
+            Streamer(4, 3, (2, 2, 2), "in"),
+            Streamer(4, 3, (2, 2, 2), "out"),
         ]
     )
