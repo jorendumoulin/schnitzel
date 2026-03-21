@@ -1,7 +1,7 @@
 from abc import ABC
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Optional
+from typing import Optional
 
 from xdsl.dialects.builtin import StringAttr
 from xdsl.ir import Operation
@@ -12,6 +12,11 @@ from snaxc.dialects import accfg
 class Accelerator(ABC):
     name: str
     _core: Optional["Core"] = field(default=None, init=False, repr=False)
+
+    @property
+    def core(self) -> "Core":
+        assert self._core is not None
+        return self._core
 
     def resolve_parents(self, core: "Core"):
         self._core = core
