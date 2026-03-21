@@ -35,14 +35,15 @@ class LowerAccfgSetupLaunchToCsr(RewritePattern):
         accelerator = self.system.find_accelerator(op.accelerator)
         assert isinstance(accelerator, Dma)
         field_to_csr = accelerator.param_values()
-        ops: Sequence[Operation] = []
+        ops: dict[int, list[Operation]] = {}
         for field, val in op.iter_params():
+            addr = field_to_csr[field]
+            ops[addr] = []
             if isinstance(val.type, builtin.IndexType):
                 val_to_i32 = IndexCastOp(val, builtin.i32)
-                ops.append(val_to_i32)
+                ops[addr].append(val_to_i32)
                 val = val_to_i32.result
-            addr = field_to_csr[field]
-            ops.extend(
+            ops[addr].extend(
                 [
                     addr_val := ConstantOp.from_int_and_width(addr, 32),
                     InlineAsmOp(
@@ -53,7 +54,11 @@ class LowerAccfgSetupLaunchToCsr(RewritePattern):
                     ),
                 ]
             )
-        rewriter.insert_op(ops, InsertPoint.before(op))
+        # order ops by csr addr
+        sorted_ops: list[Operation] = []
+        for key in sorted(ops):
+            sorted_ops.extend(ops[key])
+        rewriter.insert_op(sorted_ops, InsertPoint.before(op))
         rewriter.erase_op(op)
 
 
