@@ -10,6 +10,7 @@ from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 from xdsl.tools.command_line_tool import CommandLineTool
 from xdsl.transforms.canonicalize import CanonicalizePass
+from xdsl.transforms.common_subexpression_elimination import CommonSubexpressionElimination
 from xdsl.transforms.experimental.function_constant_pinning import FunctionConstantPinningPass
 from xdsl.transforms.mlir_opt import MLIROptPass
 
@@ -228,7 +229,6 @@ class SNAXCMain(CommandLineTool):
         pass_pipeline.append(CanonicalizePass())
         pass_pipeline.append(SnaxAllocatePass(self.args.alloc_mode))
         pass_pipeline.append(InsertSyncBarrier())
-        pass_pipeline.append(DispatchRegions())
         pass_pipeline.append(DartLayoutResolutionPass())
         pass_pipeline.append(ConvertDartToSnaxStream())
         pass_pipeline.append(ConvertLinalgToAccPass())
@@ -239,6 +239,10 @@ class SNAXCMain(CommandLineTool):
         if self.args.debug:
             pass_pipeline.append(DebugToFuncPass())
         pass_pipeline.append(ClearMemorySpace())
+        pass_pipeline.append(AccfgDeduplicate())
+        pass_pipeline.append(DispatchRegions())
+        pass_pipeline.append(CommonSubexpressionElimination())
+        pass_pipeline.append(CanonicalizePass())
         pass_pipeline.append(FunctionConstantPinningPass())
         pass_pipeline.append(
             MLIROptPass(
@@ -250,6 +254,7 @@ class SNAXCMain(CommandLineTool):
                 )
             )
         )
+        pass_pipeline.append(CanonicalizePass())
         pass_pipeline.append(AccfgDeduplicate())
         pass_pipeline.append(AccfgConfigOverlapPass())
         pass_pipeline.append(ConvertAccfgToCsrPass())

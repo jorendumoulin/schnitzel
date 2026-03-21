@@ -6,6 +6,11 @@ from xdsl.passes import ModulePass
 def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
     """Return the list of all available passes."""
 
+    def get_cse():
+        from xdsl.transforms.common_subexpression_elimination import CommonSubexpressionElimination
+
+        return CommonSubexpressionElimination
+
     def get_accfg_config_overlap():
         from snaxc.transforms.accfg_config_overlap import AccfgConfigOverlapPass
 
@@ -339,6 +344,7 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "convert-float-to-hardfloat": get_convert_float_to_hardfloat,
         "convert-hardfloat-to-hw": get_convert_hardfloat_to_hw,
         "hardfloat-reconcile-recodes": get_hardfloat_reconcile_recodes,
+        "cse": get_cse,
         "convert-dart-to-snax-stream": get_convert_dart_to_snax_stream,
         "convert-kernel-to-linalg": get_convert_kernel_to_linalg,
         "convert-linalg-to-accfg": get_convert_linalg_to_accfg,
