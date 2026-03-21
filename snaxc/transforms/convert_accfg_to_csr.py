@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from xdsl.context import Context
 from xdsl.dialects import builtin

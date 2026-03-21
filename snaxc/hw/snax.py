@@ -11,7 +11,6 @@ from snaxc.dialects import accfg, snax_stream
 from snaxc.dialects.dart import AccessPatternOp, StreamingRegionOpBase
 from snaxc.dialects.snax import StreamerConfigurationAttr
 from snaxc.dialects.snax_stream import StreamingRegionOp
-from snaxc.hw.system import Accelerator
 from snaxc.hw.streamers.extensions.streamer_extension import StreamerExtension
 from snaxc.hw.streamers.extensions.transpose_extension import (
     TransposeExtension,
@@ -25,6 +24,7 @@ from snaxc.hw.streamers.streamers import (
     StreamerConfiguration,
     StreamerFlag,
 )
+from snaxc.hw.system import Accelerator
 from snaxc.ir.dart.access_pattern import Template
 
 c0_attr = builtin.IntegerAttr(0, builtin.IndexType())
