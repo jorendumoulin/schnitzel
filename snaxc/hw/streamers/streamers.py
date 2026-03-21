@@ -91,6 +91,9 @@ class Streamer:
     spatial_dims: tuple[int, ...]
     name_base: str
 
+    def addr_params(self) -> str:
+        return f"{self.name_base}_addr"
+
     def ub_params(self) -> Iterable[str]:
         for i in range(self.temporal_dims):
             yield f"{self.name_base}_ub_{i}"
