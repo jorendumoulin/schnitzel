@@ -27,6 +27,7 @@ from snaxc.transforms.convert_dart_to_snax_stream import ConvertDartToSnaxStream
 from snaxc.transforms.convert_linalg_to_accfg import ConvertLinalgToAccPass
 from snaxc.transforms.convert_linalg_to_kernel import ConvertLinalgToKernel
 from snaxc.transforms.convert_memref_to_arith import ConvertMemrefToArithPass
+from snaxc.transforms.convert_snax_to_llvm import ConvertSnaxToLlvmPass
 from snaxc.transforms.convert_stream_to_accfg import ConvertStreamToAccfgPass
 from snaxc.transforms.copy_to_dma import CopyToDmaPass
 from snaxc.transforms.dart.convert_linalg_to_dart import ConvertLinalgToDart
@@ -243,7 +244,6 @@ class SNAXCMain(CommandLineTool):
         pass_pipeline.append(DispatchRegions())
         pass_pipeline.append(CommonSubexpressionElimination())
         pass_pipeline.append(CanonicalizePass())
-        pass_pipeline.append(FunctionConstantPinningPass())
         pass_pipeline.append(
             MLIROptPass(
                 arguments=(
@@ -258,6 +258,7 @@ class SNAXCMain(CommandLineTool):
         pass_pipeline.append(AccfgDeduplicate())
         pass_pipeline.append(AccfgConfigOverlapPass())
         pass_pipeline.append(ConvertAccfgToCsrPass())
+        pass_pipeline.append(ConvertSnaxToLlvmPass())
 
         # Convert to llvm:
         if not self.args.no_backend:
