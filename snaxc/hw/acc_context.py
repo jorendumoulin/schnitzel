@@ -1,5 +1,5 @@
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Sequence
 
 from xdsl.context import Context
 from xdsl.ir import Operation
@@ -7,7 +7,7 @@ from xdsl.parser import ModuleOp
 from xdsl.traits import SymbolTable
 
 from snaxc.dialects.accfg import AcceleratorOp
-from snaxc.hw.system import Memory, System, Accelerator
+from snaxc.hw.system import Accelerator, Memory, System
 
 
 @dataclass

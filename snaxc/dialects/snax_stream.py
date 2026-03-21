@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Self, cast
+from typing import Self
 
 from xdsl.dialects.builtin import ArrayAttr, IndexType, IntAttr, StringAttr
 from xdsl.ir import (
@@ -24,8 +24,6 @@ from xdsl.irdl import (
 )
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
-
-from snaxc.hw.streamers.streamers import StreamerConfiguration
 
 
 @irdl_attr_definition
