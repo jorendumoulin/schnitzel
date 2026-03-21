@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
 from xdsl.context import Context
-from xdsl.dialects import builtin
+from snaxc.dialects.accfg import SetupOp
+from xdsl.dialects.builtin import ModuleOp, i32
 from xdsl.dialects.arith import ConstantOp, DivUIOp, MuliOp
 from xdsl.dialects.builtin import (
     DYNAMIC_INDEX,
@@ -117,6 +118,10 @@ class CopyToDmaPattern(RewritePattern):
             spatial_strides=dest_streamer.byte_offsets,
         )
 
+        # set other dma params directly with accfg:
+        dir_val = ConstantOp.from_int_and_width(1 if reverse_ops else 0, i32)
+        dir_op = SetupOp({dma.dir_param(): dir_val}, dma.name)
+
         # Now create streaming region op:
         new_op = StreamingRegionOp(
             inputs=[source_ptr_op.aligned_pointer],
@@ -124,7 +129,7 @@ class CopyToDmaPattern(RewritePattern):
             stride_patterns=(source_pattern, dest_pattern),
             dynamic_operands=[total_size_op, total_size_op],
             accelerator=dma.name,
-            body=Region(Block()),
+            body=Region(Block([dir_val, dir_op])),
         )
 
         rewriter.replace_matched_op((source_ptr_op, dest_ptr_op, new_op))
@@ -138,6 +143,6 @@ class CopyToDmaPass(ModulePass):
 
     name = "copy-to-dma"
 
-    def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
+    def apply(self, ctx: Context, op: ModuleOp) -> None:
         assert isinstance(ctx, AccContext)
         PatternRewriteWalker(CopyToDmaPattern(ctx.system)).rewrite_module(op)
