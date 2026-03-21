@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from enum import Enum
+from typing import Mapping
 
 from xdsl.dialects.builtin import (
     ArrayAttr,
@@ -268,22 +269,17 @@ class SetupOp(AccfgBaseOp):
 
     def __init__(
         self,
-        vals: Iterable[SSAValue | Operation],
-        param_names: Iterable[str] | Iterable[StringAttr],
+        params: Mapping[str, SSAValue | Operation],
         accelerator: str | StringAttr,
         in_state: SSAValue | Operation | None = None,
     ):
         if not isinstance(accelerator, StringAttr):
             accelerator = StringAttr(accelerator)
 
-        param_names_tuple: tuple[StringAttr, ...] = tuple(
-            StringAttr(name) if isinstance(name, str) else name for name in param_names
-        )
-
         super().__init__(
-            operands=[list(vals), in_state],
+            operands=[list(params.values()), in_state],
             properties={
-                "param_names": ArrayAttr(param_names_tuple),
+                "param_names": ArrayAttr([StringAttr(val) for val in params.keys()]),
                 "accelerator": accelerator,
             },
             result_types=[StateType(accelerator)],
@@ -362,8 +358,7 @@ class SetupOp(AccfgBaseOp):
         parser.parse_punctuation(":")
         res_typ = parser.parse_type()
         setup_op = cls(
-            [val for _, val in args],
-            [name for name, _ in args],
+            {name: val for name, val in args},
             accelerator,
             in_state,
         )
