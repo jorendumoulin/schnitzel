@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from enum import Enum
 
 from xdsl.dialects.builtin import (
@@ -36,7 +36,7 @@ from xdsl.irdl import (
 )
 from xdsl.parser import AttrParser, Parser
 from xdsl.printer import Printer
-from xdsl.traits import SymbolOpInterface
+from xdsl.traits import Pure, SymbolOpInterface
 
 
 class EffectsEnum(Enum):
@@ -175,10 +175,6 @@ class LaunchOp(AccfgBaseOp):
         if self.token.type.accelerator != self.accelerator:
             raise VerifyException("The token's accelerator does not match the launch accelerator!")
 
-        # that the token is used
-        if self.token.uses.get_length() != 1 or not isinstance(next(iter(self.token.uses)).operation, AwaitOp):
-            raise VerifyException("Launch token must be used by exactly one await op")
-
         # that len(values) == len(param_names)
         if len(self.values) != len(self.param_names):
             raise ValueError("Must have received same number of values as parameter names")
@@ -186,6 +182,23 @@ class LaunchOp(AccfgBaseOp):
 
     def get_acc_name(self) -> str:
         return self.accelerator.data
+
+
+@irdl_op_definition
+class NoOp(IRDLOperation):
+    """
+    Nop operation to yield accfg tokens / states on cores
+    that are not connected to the accelerator.
+    """
+
+    name = "accfg.nop"
+
+    result = result_def(TokenType | StateType)
+
+    traits = traits_def(Pure())
+
+    def __init__(self, result_types: Sequence[Attribute]):
+        super().__init__(result_types=result_types)
 
 
 @irdl_op_definition
@@ -200,6 +213,12 @@ class AwaitOp(AccfgBaseOp):
 
     def __init__(self, token: SSAValue | Operation):
         super().__init__(operands=[token])
+
+    @property
+    def accelerator(self) -> StringAttr:
+        # TODO: why do i need to asserrt this?
+        assert isinstance(self.token.type, TokenType)
+        return self.token.type.accelerator
 
     def get_acc_name(self) -> str:
         assert isinstance(self.token.type, TokenType), (
@@ -456,6 +475,7 @@ ACCFG = Dialect(
         LaunchOp,
         ResetOp,
         SetupOp,
+        NoOp,
     ],
     [
         EffectsAttr,

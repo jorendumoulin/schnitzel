@@ -25,10 +25,12 @@ from xdsl.irdl import (
     operand_def,
     opt_prop_def,
     result_def,
+    traits_def,
     var_operand_def,
 )
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
+from xdsl.traits import Pure
 from xdsl.utils.exceptions import VerifyException
 
 from snaxc.hw.streamers.extensions import STREAMER_OPT_MAP
@@ -46,6 +48,20 @@ class ClusterSyncOp(IRDLOperation):
     translates directly to the C function snrt_cluster_hw_barrier()"""
 
     name = "snax.cluster_sync_op"
+
+
+@irdl_op_definition
+class HartIdOp(IRDLOperation):
+    """Retrieve the hart id of the current core"""
+
+    name = "snax.hart_id"
+
+    result = result_def(IndexType)
+
+    traits = traits_def(Pure())
+
+    def __init__(self):
+        return super().__init__(result_types=[IndexType()])
 
 
 @irdl_op_definition
@@ -236,6 +252,6 @@ class StreamerConfigurationAttr(Data[StreamerConfiguration]):
 
 Snax = Dialect(
     "snax",
-    [ClusterSyncOp, MCycleOp, LayoutCast, Alloc, ClearL1],
+    [ClusterSyncOp, MCycleOp, LayoutCast, Alloc, ClearL1, HartIdOp],
     [StreamerConfigurationAttr],
 )
