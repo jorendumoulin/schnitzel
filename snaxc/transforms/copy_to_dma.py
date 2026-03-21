@@ -64,7 +64,6 @@ class CopyToDmaPattern(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: CopyOp, rewriter: PatternRewriter):
-
         # Only handling types with a known bitwidth:
         assert isa(op.source.type, MemRefType[FixedBitwidthType])
         assert isa(op.destination.type, MemRefType[FixedBitwidthType])

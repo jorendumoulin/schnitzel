@@ -1,8 +1,7 @@
 from abc import ABC
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from math import prod
-from typing import Iterable
 
 from xdsl.utils.str_enum import StrEnum
 
