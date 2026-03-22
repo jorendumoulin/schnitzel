@@ -20,9 +20,11 @@ from xdsl.rewriter import InsertPoint
 from xdsl.traits import IsTerminator, SymbolTable
 from xdsl.utils.hints import isa
 
-from snaxc.accelerators.acc_context import AccContext
 from snaxc.dialects import snax
-from snaxc.util.snax_memory import L1, SnaxMemory
+from snaxc.hw.acc_context import AccContext
+from snaxc.hw.system import Memory
+
+# from snaxc.util.snax_memory import L1, SnaxMemory
 
 
 def create_memref_struct(
@@ -156,9 +158,9 @@ class StaticAllocs(RewritePattern):
     No allocations are ever freed, so the address space is never reused.
     """
 
-    get_memory: Callable[[str], SnaxMemory]
+    get_memory: Callable[[str], Memory]
 
-    current_addresses: dict[SnaxMemory, int] = field(default_factory=dict[SnaxMemory, int])
+    current_addresses: dict[Memory, int] = field(default_factory=dict[Memory, int])
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: snax.Alloc, rewriter: PatternRewriter):
@@ -219,7 +221,7 @@ class MiniMallocate(RewritePattern):
     Lifetime is determined by the index of the first and last op it is used in.
     """
 
-    get_memory: Callable[[str], SnaxMemory]
+    get_memory: Callable[[str], Memory]
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, func_op: func.FuncOp, rewriter: PatternRewriter):

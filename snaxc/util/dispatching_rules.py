@@ -1,10 +1,9 @@
 from xdsl.dialects import linalg, memref
 from xdsl.ir import Operation
 
-from snaxc.accelerators.acc_context import AccContext
-from snaxc.accelerators.snax_xdma import SNAXXDMAAccelerator
-from snaxc.accelerators.streamers.extensions import XDMA_EXT_SET
 from snaxc.dialects import dart
+from snaxc.hw.acc_context import AccContext
+from snaxc.hw.streamers.extensions import XDMA_EXT_SET
 
 
 def dispatch_to_dm(op: Operation, ctx: AccContext):

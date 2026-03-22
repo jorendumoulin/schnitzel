@@ -6,6 +6,11 @@ from xdsl.passes import ModulePass
 def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
     """Return the list of all available passes."""
 
+    def get_cse():
+        from xdsl.transforms.common_subexpression_elimination import CommonSubexpressionElimination
+
+        return CommonSubexpressionElimination
+
     def get_accfg_config_overlap():
         from snaxc.transforms.accfg_config_overlap import AccfgConfigOverlapPass
 
@@ -85,6 +90,11 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return ConvertMemrefToArithPass
 
+    def get_convert_stream_to_acc():
+        from snaxc.transforms.convert_stream_to_acc import ConvertStreamToAccPass
+
+        return ConvertStreamToAccPass
+
     def get_convert_pe_to_hw():
         from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
 
@@ -134,6 +144,11 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         from snaxc.transforms.convert_tosa_to_kernel import ConvertTosaToKernelPass
 
         return ConvertTosaToKernelPass
+
+    def get_convert_snax_to_llvm():
+        from snaxc.transforms.convert_snax_to_llvm import ConvertSnaxToLlvmPass
+
+        return ConvertSnaxToLlvmPass
 
     def get_dart_bufferize():
         from snaxc.transforms.dart.dart_bufferize import DartBufferize
@@ -334,12 +349,15 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "convert-float-to-hardfloat": get_convert_float_to_hardfloat,
         "convert-hardfloat-to-hw": get_convert_hardfloat_to_hw,
         "hardfloat-reconcile-recodes": get_hardfloat_reconcile_recodes,
+        "cse": get_cse,
         "convert-dart-to-snax-stream": get_convert_dart_to_snax_stream,
         "convert-kernel-to-linalg": get_convert_kernel_to_linalg,
         "convert-linalg-to-accfg": get_convert_linalg_to_accfg,
         "convert-linalg-to-dart": get_convert_linalg_to_dart,
         "convert-linalg-to-kernel": get_convert_linalg_to_kernel,
         "convert-memref-to-arith": get_convert_memref_to_arith,
+        "convert-stream-to-acc": get_convert_stream_to_acc,
+        "convert-snax-to-llvm": get_convert_snax_to_llvm,
         "convert-tosa-to-kernel": get_convert_tosa_to_kernel,
         "dart-fuse-operations": get_dart_fuse_operations,
         "dart-layout-resolution": get_dart_layout_resolution,

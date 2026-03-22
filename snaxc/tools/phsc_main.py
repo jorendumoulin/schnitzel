@@ -12,9 +12,9 @@ from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 from xdsl.transforms.mlir_opt import MLIROptPass
 
-from snaxc.accelerators.acc_context import AccContext
-from snaxc.accelerators.snax_phs import SNAXPHSAccelerator
 from snaxc.dialects import phs
+from snaxc.hw.acc_context import AccContext
+from snaxc.hw.snax_phs import SNAXPHSAccelerator
 from snaxc.phs.template_spec import TemplateSpec
 from snaxc.tools.snaxc_main import SNAXCMain
 from snaxc.transforms.hardfloat.convert_float_to_hardfloat import ConvertFloatToHardfloatPass

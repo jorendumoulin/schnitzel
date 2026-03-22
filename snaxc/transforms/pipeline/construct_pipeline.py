@@ -18,10 +18,10 @@ from xdsl.pattern_rewriter import (
 )
 from xdsl.rewriter import InsertPoint
 
-from snaxc.accelerators.acc_context import AccContext
 from snaxc.dialects.dart import StreamingRegionOpBase
 from snaxc.dialects.pipeline import IndexOp, PipelineOp, StageOp, YieldOp
 from snaxc.dialects.snax import ClusterSyncOp
+from snaxc.hw.acc_context import AccContext
 from snaxc.util.dispatching_rules import dispatch_to_compute, dispatch_to_dm
 
 

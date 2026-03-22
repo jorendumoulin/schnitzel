@@ -10,12 +10,13 @@ from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 from xdsl.tools.command_line_tool import CommandLineTool
 from xdsl.transforms.canonicalize import CanonicalizePass
+from xdsl.transforms.common_subexpression_elimination import CommonSubexpressionElimination
 from xdsl.transforms.experimental.function_constant_pinning import FunctionConstantPinningPass
 from xdsl.transforms.mlir_opt import MLIROptPass
 
-from snaxc.accelerators.acc_context import AccContext
 from snaxc.dialects import get_all_snax_dialects
-from snaxc.tools.config_parser import parse_config
+from snaxc.hw.acc_context import AccContext
+from snaxc.hw.config_parser import parse_config
 from snaxc.transforms.accfg_config_overlap import AccfgConfigOverlapPass
 from snaxc.transforms.accfg_dedup import AccfgDeduplicate
 from snaxc.transforms.alloc_to_global import AllocToGlobalPass
@@ -26,6 +27,9 @@ from snaxc.transforms.convert_dart_to_snax_stream import ConvertDartToSnaxStream
 from snaxc.transforms.convert_linalg_to_accfg import ConvertLinalgToAccPass
 from snaxc.transforms.convert_linalg_to_kernel import ConvertLinalgToKernel
 from snaxc.transforms.convert_memref_to_arith import ConvertMemrefToArithPass
+from snaxc.transforms.convert_snax_to_llvm import ConvertSnaxToLlvmPass
+from snaxc.transforms.convert_stream_to_accfg import ConvertStreamToAccfgPass
+from snaxc.transforms.copy_to_dma import CopyToDmaPass
 from snaxc.transforms.dart.convert_linalg_to_dart import ConvertLinalgToDart
 from snaxc.transforms.dart.dart_fuse_operations import DartFuseOperationsPass
 from snaxc.transforms.dart.dart_layout_resolution import DartLayoutResolutionPass
@@ -34,7 +38,6 @@ from snaxc.transforms.dispatch_kernels import DispatchKernels
 from snaxc.transforms.dispatch_regions import DispatchRegions
 from snaxc.transforms.frontend.frontend_transform import FrontendTransformPass
 from snaxc.transforms.frontend.preprocess_mlir import PreprocessPass
-from snaxc.transforms.insert_accfg_op import InsertAccOp
 from snaxc.transforms.insert_sync_barrier import InsertSyncBarrier
 from snaxc.transforms.memref_to_snax import MemrefToSNAX
 from snaxc.transforms.phs.dispatch_linalg_phs import DispatchLinalgPHS
@@ -48,7 +51,6 @@ from snaxc.transforms.set_memory_layout import SetMemoryLayout
 from snaxc.transforms.set_memory_space import SetMemorySpace
 from snaxc.transforms.snax_allocate import SnaxAllocatePass
 from snaxc.transforms.snax_bufferize import SnaxBufferize
-from snaxc.transforms.snax_copy_to_dma import SNAXCopyToDMA
 from snaxc.transforms.snax_to_func import SNAXToFunc
 from snaxc.transforms.test.debug_to_func import DebugToFuncPass
 from snaxc.transforms.test.insert_debugs import InsertDebugPass
@@ -80,14 +82,10 @@ class SNAXCMain(CommandLineTool):
 
     def load_config(self):
         # read config file
-        if self.args.config is not None:
-            with open(self.args.config) as f:
-                config = yaml.safe_load(f)
-            context = parse_config(config)
-            context.allow_unregistered = True
-            self.ctx = context
-        else:
-            self.ctx = AccContext(allow_unregistered=True)
+        with open(self.args.config) as f:
+            config = yaml.safe_load(f)
+        system = parse_config(config)
+        self.ctx = AccContext(system=system)
 
     def run(self):
         # read file
@@ -202,10 +200,6 @@ class SNAXCMain(CommandLineTool):
         if not self.args.no_frontend:
             pass_pipeline.append(PreprocessPass())
 
-        # Insert accfg operations based on accelerators registered in the AccContext:
-        for accelerator in self.ctx.registered_accelerator_names:
-            pass_pipeline.append(InsertAccOp(accelerator))
-
         # Standard lowering pipeline:
         if not phs:
             pass_pipeline.append(ConvertLinalgToKernel())
@@ -236,17 +230,20 @@ class SNAXCMain(CommandLineTool):
         pass_pipeline.append(CanonicalizePass())
         pass_pipeline.append(SnaxAllocatePass(self.args.alloc_mode))
         pass_pipeline.append(InsertSyncBarrier())
-        pass_pipeline.append(DispatchRegions())
         pass_pipeline.append(DartLayoutResolutionPass())
         pass_pipeline.append(ConvertDartToSnaxStream())
         pass_pipeline.append(ConvertLinalgToAccPass())
-        pass_pipeline.append(SNAXCopyToDMA(test_ignore_transform=self.args.test_ignore_transform))
+        pass_pipeline.append(CopyToDmaPass())
+        pass_pipeline.append(ConvertStreamToAccfgPass())
         pass_pipeline.append(SNAXToFunc())
         pass_pipeline.append(ConvertMemrefToArithPass())
         if self.args.debug:
             pass_pipeline.append(DebugToFuncPass())
         pass_pipeline.append(ClearMemorySpace())
-        pass_pipeline.append(FunctionConstantPinningPass())
+        pass_pipeline.append(AccfgDeduplicate())
+        pass_pipeline.append(DispatchRegions())
+        pass_pipeline.append(CommonSubexpressionElimination())
+        pass_pipeline.append(CanonicalizePass())
         pass_pipeline.append(
             MLIROptPass(
                 arguments=(
@@ -257,9 +254,11 @@ class SNAXCMain(CommandLineTool):
                 )
             )
         )
+        pass_pipeline.append(CanonicalizePass())
         pass_pipeline.append(AccfgDeduplicate())
         pass_pipeline.append(AccfgConfigOverlapPass())
         pass_pipeline.append(ConvertAccfgToCsrPass())
+        pass_pipeline.append(ConvertSnaxToLlvmPass())
 
         # Convert to llvm:
         if not self.args.no_backend:

@@ -41,8 +41,7 @@ class SimplifyRedundantSetupCalls(RewritePattern):
         rewriter.replace_op(
             op,
             accfg.SetupOp(
-                [val for _, val in new_params],
-                [param for param, _ in new_params],
+                {param: val for param, val in new_params},
                 op.accelerator,
                 op.in_state,
             ),
@@ -76,7 +75,7 @@ class MergeSetupOps(RewritePattern):
 
         rewriter.replace_op(
             op,
-            accfg.SetupOp(state.values(), state.keys(), op.accelerator, prev_op.in_state),
+            accfg.SetupOp(state, op.accelerator, prev_op.in_state),
         )
 
 
@@ -145,8 +144,7 @@ class PullSetupOpsOutOfLoops(RewritePattern):
 
         # create a new op
         loop_invariant_setups = accfg.SetupOp(
-            (acc_fields_to_values[key] for key in loop_invariant_options),
-            loop_invariant_options,
+            {key: acc_fields_to_values[key] for key in loop_invariant_options},
             op.accelerator,
             in_state=get_initial_value_for_scf_for_lcv(loop_op, op.in_state),
         )
