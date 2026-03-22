@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from dataclasses import dataclass
 
 from xdsl.context import Context
@@ -43,17 +42,7 @@ class LowerAccfgSetupLaunchToCsr(RewritePattern):
                 val_to_i32 = IndexCastOp(val, builtin.i32)
                 ops[addr].append(val_to_i32)
                 val = val_to_i32.result
-            ops[addr].extend(
-                [
-                    addr_val := ConstantOp.from_int_and_width(addr, 32),
-                    InlineAsmOp(
-                        "csrw $0, $1",
-                        "I, rK",
-                        [addr_val, val],
-                        has_side_effects=True,
-                    ),
-                ]
-            )
+            ops[addr].append(InlineAsmOp(f"csrw {addr:#x}, $0", "rK", [val], has_side_effects=True))
         # order ops by csr addr
         sorted_ops: list[Operation] = []
         for key in sorted(ops):
@@ -77,15 +66,10 @@ class LowerAccfgAwaitToCsr(RewritePattern):
         assert isinstance(accelerator, Dma)
         field_to_csr = accelerator.param_values()
         c0 = ConstantOp.from_int_and_width(0, 32)
-        addr_op = ConstantOp.from_int_and_width(field_to_csr[accelerator.launch_param()], 32)
+        addr = field_to_csr[accelerator.launch_param()]
         accelerator.launch_param()
-        write_op = InlineAsmOp(
-            "csrw $0, $1",
-            "I, K",
-            [addr_op.result, c0.result],
-            has_side_effects=True,
-        )
-        rewriter.replace_matched_op((c0, addr_op, write_op), safe_erase=False)
+        write_op = InlineAsmOp(f"csrw {addr:#x}, $0", "K", [c0.result], has_side_effects=True)
+        rewriter.replace_matched_op((c0, write_op), safe_erase=False)
 
 
 class DeleteAllStates(RewritePattern):
