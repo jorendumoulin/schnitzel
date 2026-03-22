@@ -1,3 +1,4 @@
+#include <dma.h>
 #include <runtime.h>
 #include <stdalign.h>
 
@@ -43,44 +44,10 @@ int main() {
   }
   cluster_sync();
 
-  // --- PHASE 3: AXI -> TCDM ---
+  // --- PHASE 1: AXI -> TCDM ---
+  // Call dma_memcpy
+  dma_memcpy(tcdm_dest_data, axi_src_data, sizeof(axi_src_data));
   if (hart == 2) {
-
-    // Configure Streamer (TCDM Side):
-    write_csr(0x900, (unsigned long)tcdm_dest_data);
-    // 4 Temporal strides:
-    write_csr(0x901, 0x0);
-    write_csr(0x902, 0x0);
-    write_csr(0x903, 0x0);
-    write_csr(0x904, 0x200);
-    // 4 Temporal bounds:
-    write_csr(0x905, 0x0);
-    write_csr(0x906, 0x0);
-    write_csr(0x907, 0x0);
-    write_csr(0x908, 0x1);
-    // 4 Spatial strides:
-    write_csr(0x909, 0x20);
-    write_csr(0x90a, 0x10);
-    write_csr(0x90b, 0x8);
-    write_csr(0x90c, 0x4);
-    // Configure Streamer (AXI/L3 Side):
-    write_csr(0x90d, (unsigned long)axi_src_data);
-    // 4 Temporal strides:
-    write_csr(0x90e, 0x0);
-    write_csr(0x90f, 0x0);
-    write_csr(0x910, 0x0);
-    write_csr(0x911, 0x200);
-    // 4 Temporal bounds:
-    write_csr(0x912, 0x0);
-    write_csr(0x913, 0x0);
-    write_csr(0x914, 0x0);
-    write_csr(0x915, 0x1);
-    // Set direction:
-    write_csr(0x916, 0x0);
-    // Set start:
-    write_csr(0x917, 0x1);
-    // Await start:
-    read_csr(0x917);
     verbose_printf("DMA done\n");
   }
   cluster_sync();
