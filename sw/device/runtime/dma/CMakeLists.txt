@@ -1,5 +1,4 @@
 add_library(dma_memcpy STATIC src/dma.cpp)
-# target_include_directories(dma_memcpy PRIVATE ./include)
-target_include_directories(dma_memcpy PRIVATE ./include)
-set_target_properties(dma_memcpy PROPERTIES LINKER_LANGUAGE C)
+target_include_directories(dma_memcpy PUBLIC include)
+set_target_properties(dma_memcpy PROPERTIES LINKER_LANGUAGE CXX)
 target_add_mlir_source(dma_memcpy src/dma_memcpy.mlir CONFIG "/home/joren/phd/schnitzel/generated/config.json")
