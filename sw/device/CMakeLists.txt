@@ -10,7 +10,7 @@ if(NOT CMAKE_TOOLCHAIN_FILE)
     CACHE FILEPATH "Ibex Toolchain file")
 endif()
 
-project(device ASM C)
+project(device ASM C CXX)
 
 include(${CMAKE_SOURCE_DIR}/../cmake/mlir_source.cmake)
 
