@@ -14,6 +14,8 @@ project(device ASM C)
 
 include(${CMAKE_SOURCE_DIR}/../cmake/mlir_source.cmake)
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common/mlir)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime)
 set(RUNTIME_PATH "${CMAKE_CURRENT_SOURCE_DIR}/runtime")
 
 add_subdirectory(runtime)
