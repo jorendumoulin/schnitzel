@@ -103,15 +103,39 @@ class AffineAgu(
     port.valid := state === State.busy
   }
 
-  // Advance wen all consumers are ready
+  // Advance when all consumers are ready
   val allReady = io.addrs.map(_.ready).reduce(_ && _)
   val advance = allReady && state === State.busy
 
-  // Remaining control logic:
+  // Address generation is done when all bounds have hit their limit
   val allDone = io.config.temporalBounds
     .zip(temporalCounters)
-    .map { case (bound, counter) => counter === (bound - 1.U) }
-    .reduce(_ | _);
+    .map { case (bound, counter) =>
+      (bound <= 1.U) || counter === (bound - 1.U)
+    }
+    .reduce(_ && _);
+
+  // High when not performing a reduction: All strides are larger than 0
+  // When performing a temporal reduction, only high for first element
+  // Not affected by dimensions with bound <= 1
+  val globalIsFirst = io.config.temporalStrides
+    .zip(io.config.temporalBounds)
+    .zip(temporalCounters)
+    .map { case ((stride, bound), count) =>
+      (bound <= 1.U) || (stride =/= 0.U) || (count === 0.U)
+    }
+    .reduce(_ && _)
+
+  // High when not performing a reduction: All strides are larger than 0
+  // When performing a temporal reduction, only high for last element
+  // Not affected by dimensions with bound <= 1
+  val globalIsLast = io.config.temporalStrides
+    .zip(io.config.temporalBounds)
+    .zip(temporalCounters)
+    .map { case ((stride, bound), count) =>
+      (bound <= 1.U) || (stride =/= 0.U) || (count === bound - 1.U)
+    }
+    .reduce(_ && _)
 
   when(advance && allDone) { state := State.idle; }
   when(advance) { incrementCounters(); }
