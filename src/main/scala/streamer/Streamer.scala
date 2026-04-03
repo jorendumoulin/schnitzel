@@ -48,16 +48,16 @@ class Streamer(
     // Generate requests by combining input data with agu:
     when(io.dir === StreamerDir.write) {
       io.tcdmReqs(i).req.bits.wdata := reqQueue.io.deq.bits
-      io.tcdmReqs(i).req.valid := reqQueue.io.deq.valid && agu.io.addrs(i).valid
-      reqQueue.io.deq.ready := io.tcdmReqs(i).req.ready && agu.io.addrs(i).valid
-      agu.io.addrs(i).ready := io.tcdmReqs(i).req.ready && reqQueue.io.deq.valid
+      io.tcdmReqs(i).req.valid := reqQueue.io.deq.valid && agu.io.addrs.valid
+      reqQueue.io.deq.ready := io.tcdmReqs(i).req.ready && agu.io.addrs.valid
+      agu.io.addrs.ready := io.tcdmReqs(i).req.ready && reqQueue.io.deq.valid
     }.otherwise {
       io.tcdmReqs(i).req.bits.wdata := DontCare
-      io.tcdmReqs(i).req.valid := agu.io.addrs(i).valid
+      io.tcdmReqs(i).req.valid := agu.io.addrs.valid
       reqQueue.io.deq.ready := false.B
-      agu.io.addrs(i).ready := io.tcdmReqs(i).req.ready
+      agu.io.addrs.ready := io.tcdmReqs(i).req.ready
     }
-    io.tcdmReqs(i).req.bits.addr := agu.io.addrs(i).bits
+    io.tcdmReqs(i).req.bits.addr := agu.io.addrs.bits.addrs(i)
     io.tcdmReqs(i).req.bits.wen := io.dir === StreamerDir.write;
     io.tcdmReqs(i).req.bits.ben := VecInit(Seq.fill(numPorts)(true.B)).asUInt
 

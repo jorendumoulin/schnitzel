@@ -58,19 +58,19 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
   // streamer -> axi
   //
   memToAxi.io.bus.req.bits.ben := VecInit(Seq.fill(axiConfig.strbWidth)(true.B)).asUInt
-  memToAxi.io.bus.req.bits.addr := axiAgu.io.addrs(0).bits
+  memToAxi.io.bus.req.bits.addr := axiAgu.io.addrs.bits.addrs(0)
   memToAxi.io.bus.req.bits.wen := dir === DmaDir.writeAxi
   when(dir === DmaDir.writeAxi) { // writeAxi, readTcdm
     memToAxi.io.bus.req.bits.wen := true.B
-    memToAxi.io.bus.req.valid := axiAgu.io.addrs(0).valid && streamer.io.read.valid
+    memToAxi.io.bus.req.valid := axiAgu.io.addrs.valid && streamer.io.read.valid
     memToAxi.io.bus.req.bits.wdata := streamer.io.read.bits
-    axiAgu.io.addrs(0).ready := memToAxi.io.bus.req.ready
+    axiAgu.io.addrs.ready := memToAxi.io.bus.req.ready
     streamer.io.read.ready := true.B;
   }.otherwise { // readAxi, writeTcdm
     memToAxi.io.bus.req.bits.wen := false.B
-    memToAxi.io.bus.req.valid := axiAgu.io.addrs(0).valid
+    memToAxi.io.bus.req.valid := axiAgu.io.addrs.valid
     memToAxi.io.bus.req.bits.wdata := DontCare
-    axiAgu.io.addrs(0).ready := memToAxi.io.bus.req.ready
+    axiAgu.io.addrs.ready := memToAxi.io.bus.req.ready
     streamer.io.read.ready := false.B;
     // streamer.io.read.ready := memToAxi.io.bus.req.fire
   }

@@ -35,6 +35,12 @@ class AffineAguConfig(val nTemporalDims: Int, val spatialDimSizes: Seq[Int], val
   }
 }
 
+class AguOutput(val addressWidth: Int, val numSpatialOutputs: Int) extends Bundle {
+  val addrs = Vec(numSpatialOutputs, UInt(addressWidth.W))
+  val isFirst = Bool()
+  val isLast = Bool()
+}
+
 /** Affine Address Generation Unit (AGU). This module generates a stream of addresses based on nested loop parameters.
   * It combines a temporal iteration (looping over time) with a spatial expansion (generating multiple parallel
   * addresses per cycle).
@@ -64,7 +70,7 @@ class AffineAgu(
     val config = Input(new AffineAguConfig(nTemporalDims, spatialDimSizes, addressWidth))
 
     /** Vector of Decoupled interfaces providing calculated addresses. */
-    val addrs = Vec(numSpatialOutputs, Decoupled(UInt(addressWidth.W)))
+    val addrs = Decoupled(new AguOutput(addressWidth, numSpatialOutputs))
 
     /** High when the AGU is idle and has finished its current iteration bounds. */
     val done = Output(Bool())
@@ -102,14 +108,8 @@ class AffineAgu(
     }
   )
 
-  io.addrs.zip(addresses).foreach { case (port, addr) =>
-    port.bits := addr
-    port.valid := state === State.busy
-  }
-
   // Advance when all consumers are ready
-  val allReady = io.addrs.map(_.ready).reduce(_ && _)
-  val advance = allReady && state === State.busy
+  val advance = io.addrs.ready && state === State.busy
 
   // Address generation is done when all bounds have hit their limit
   val allDone = io.config.temporalBounds
@@ -140,6 +140,11 @@ class AffineAgu(
       (bound <= 1.U) || (stride =/= 0.U) || (count === bound - 1.U)
     }
     .reduce(_ && _)
+
+  io.addrs.valid := state === State.busy
+  io.addrs.bits.addrs := addresses
+  io.addrs.bits.isFirst := globalIsFirst
+  io.addrs.bits.isLast := globalIsLast
 
   when(advance && allDone) { state := State.idle; }
   when(advance) { incrementCounters(); }
