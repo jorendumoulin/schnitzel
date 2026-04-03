@@ -1,7 +1,7 @@
 package streamer
 
 import chisel3._
-import chisel3.util.{Decoupled, Queue}
+import chisel3.util.{Decoupled}
 
 /** Configuration parameters for the Affine Address Generation Unit (AGU). * Defines the iteration space and memory
   * layout for both temporal (time-multiplexed) and spatial (parallel) address calculations.
@@ -98,14 +98,14 @@ class AffineAgu(
     }
   )
 
-  // Pass outputs to queues for fine-grained prefetching
-  val queues = Seq.fill(numSpatialOutputs)(Module(new Queue(UInt(32.W), queueDepth)))
-  queues.zip(addresses).foreach { case (queue, address) => queue.io.enq.bits := address }
-  queues.zip(io.addrs).foreach { case (queue, output) => queue.io.deq <> output }
-  // Push new address to address queues if all queues can accept new data:
-  val queues_ready = queues.map(_.io.enq.ready).reduce(_ && _)
-  val enqueue = queues_ready && state === State.busy
-  queues.foreach(_.io.enq.valid := enqueue)
+  io.addrs.zip(addresses).foreach { case (port, addr) =>
+    port.bits := addr
+    port.valid := state === State.busy
+  }
+
+  // Advance wen all consumers are ready
+  val allReady = io.addrs.map(_.ready).reduce(_ && _)
+  val advance = allReady && state === State.busy
 
   // Remaining control logic:
   val allDone = io.config.temporalBounds
@@ -113,8 +113,8 @@ class AffineAgu(
     .map { case (bound, counter) => counter === (bound - 1.U) }
     .reduce(_ | _);
 
-  when(enqueue && allDone) { state := State.idle; }
-  when(enqueue) { incrementCounters(); }
+  when(advance && allDone) { state := State.idle; }
+  when(advance) { incrementCounters(); }
 
   // Function to increment counters in nested loop fashion
   def incrementCounters(): Unit = {
