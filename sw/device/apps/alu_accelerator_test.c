@@ -124,18 +124,22 @@ int main() {
     write_csr(0x906, 4);                          // B temporal bound
     write_csr(0x907, 4);                          // B spatial stride
 
-    // C streamer:
+    // C streamer (2 temporal dims):
     write_csr(0x908, (unsigned long)tcdm_c_data); // C base address
-    write_csr(0x909, 16);                         // C temporal stride
-    write_csr(0x90A, 4);                          // C temporal bound
-    write_csr(0x90B, 4);                          // C spatial stride
+    write_csr(0x909, 16);                         // C temporal stride 1 (outer)
+    write_csr(0x90A, 0);                          // C temporal stride 0 (inner, unused)
+    write_csr(0x90B, 4);                          // C temporal bound 1 (outer)
+    write_csr(0x90C, 0);                          // C temporal bound 0 (inner, unused)
+    write_csr(0x90D, 4);                          // C spatial stride
 
     // ALU operation: 0 = addition
-    write_csr(0x90C, 0);
+    write_csr(0x90E, 0);
+    // Mode: 0 = normal (C = A + B)
+    write_csr(0x90F, 0);
 
     // Start and wait
-    write_csr(0x90D, 0x1);
-    read_csr(0x90D);
+    write_csr(0x910, 0x1);
+    read_csr(0x910);
     verbose_printf("ALU: Done.\n");
   }
   cluster_sync();
