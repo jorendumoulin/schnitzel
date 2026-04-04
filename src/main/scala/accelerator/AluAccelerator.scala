@@ -49,30 +49,30 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   aStreamer.io.tcdmReqs <> io.aData
   aStreamer.io.config := csrVals.aStreamerConfig
   aStreamer.io.start := csrItf.io.start
-  aStreamer.io.read.valid <> aluArray.io.A_in.valid
-  aStreamer.io.read.ready <> aluArray.io.A_in.ready
-  aStreamer.io.write := DontCare
+  aStreamer.io.readData.valid <> aluArray.io.A_in.valid
+  aStreamer.io.readData.ready <> aluArray.io.A_in.ready
+  aStreamer.io.writeData := DontCare
   aStreamer.io.dir := StreamerDir.read
-  aluArray.io.A_in.bits := aStreamer.io.read.bits.asTypeOf(Vec(parallelUnroll, UInt(dataWidth.W)))
+  aluArray.io.A_in.bits := aStreamer.io.readData.bits.asTypeOf(Vec(parallelUnroll, UInt(dataWidth.W)))
 
   val bStreamer = Module(new Streamer(1, Seq(parallelUnroll), queueDepth, addrWidth, dataWidth));
   bStreamer.io.tcdmReqs <> io.bData
   bStreamer.io.config := csrVals.bStreamerConfig
   bStreamer.io.start := csrItf.io.start
-  bStreamer.io.read.valid <> aluArray.io.B_in.valid
-  bStreamer.io.read.ready <> aluArray.io.B_in.ready
-  bStreamer.io.write := DontCare
+  bStreamer.io.readData.valid <> aluArray.io.B_in.valid
+  bStreamer.io.readData.ready <> aluArray.io.B_in.ready
+  bStreamer.io.writeData := DontCare
   bStreamer.io.dir := StreamerDir.read
-  aluArray.io.B_in.bits := bStreamer.io.read.bits.asTypeOf(Vec(parallelUnroll, UInt(dataWidth.W)))
+  aluArray.io.B_in.bits := bStreamer.io.readData.bits.asTypeOf(Vec(parallelUnroll, UInt(dataWidth.W)))
 
   val cStreamer = Module(new Streamer(1, Seq(parallelUnroll), queueDepth, addrWidth, dataWidth));
   cStreamer.io.tcdmReqs <> io.cData
   cStreamer.io.config := csrVals.cStreamerConfig
   cStreamer.io.start := csrItf.io.start
-  cStreamer.io.write.valid <> aluArray.io.C_out.valid
-  cStreamer.io.write.ready <> aluArray.io.C_out.ready
-  cStreamer.io.write.bits := aluArray.io.C_out.bits.asTypeOf(UInt((dataWidth * parallelUnroll).W))
-  cStreamer.io.read := DontCare
+  cStreamer.io.writeData.valid <> aluArray.io.C_out.valid
+  cStreamer.io.writeData.ready <> aluArray.io.C_out.ready
+  cStreamer.io.writeData.bits := aluArray.io.C_out.bits.asTypeOf(UInt((dataWidth * parallelUnroll).W))
+  cStreamer.io.readData := DontCare
   cStreamer.io.dir := StreamerDir.write
   csrItf.io.done := cStreamer.io.done
 
