@@ -151,18 +151,23 @@ class AffineAgu(
 
   // Function to increment counters in nested loop fashion
   def incrementCounters(): Unit = {
-    // Carry propagation: start with innermost dimension (index 0)
-    var carry = true.B
+    // Use Wire for carry so propagation is decided at runtime, not elaboration time
+    val carries = Wire(Vec(nTemporalDims + 1, Bool()))
+    carries(0) := true.B
     for (i <- 0 until nTemporalDims) {
-      when(carry) {
-        when(temporalCounters(i) === io.config.temporalBounds(i) - 1.U) {
+      val wraps = io.config.temporalBounds(i) <= 1.U || temporalCounters(i) === io.config.temporalBounds(i) - 1.U
+      when(carries(i)) {
+        when(io.config.temporalBounds(i) <= 1.U) {
+          // Unused dimension (bound 0 or 1): skip, carry propagates
           temporalCounters(i) := 0.U
-          // Carry continues to next dimension
+        }.elsewhen(temporalCounters(i) === io.config.temporalBounds(i) - 1.U) {
+          temporalCounters(i) := 0.U
         }.otherwise {
           temporalCounters(i) := temporalCounters(i) + 1.U
-          carry = false.B
         }
       }
+      // Carry propagates when this dimension wraps (or is unused)
+      carries(i + 1) := carries(i) && wraps
     }
   }
 
