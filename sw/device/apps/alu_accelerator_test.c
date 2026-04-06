@@ -127,10 +127,10 @@ int main() {
     // C streamer (2 temporal dims):
     write_csr(0x908, (unsigned long)tcdm_c_data); // C base address
     write_csr(0x909, 16);                         // C temporal stride 1 (outer)
-    write_csr(0x90A, 0);                          // C temporal stride 0 (inner, unused)
-    write_csr(0x90B, 4);                          // C temporal bound 1 (outer)
-    write_csr(0x90C, 0);                          // C temporal bound 0 (inner, unused)
-    write_csr(0x90D, 4);                          // C spatial stride
+    write_csr(0x90A, 0); // C temporal stride 0 (inner, unused)
+    write_csr(0x90B, 4); // C temporal bound 1 (outer)
+    write_csr(0x90C, 0); // C temporal bound 0 (inner, unused)
+    write_csr(0x90D, 4); // C spatial stride
 
     // ALU operation: 0 = addition
     write_csr(0x90E, 0);
