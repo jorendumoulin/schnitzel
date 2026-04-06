@@ -13,14 +13,14 @@ TCDM int tcdm_a_data[TEST_SIZE];
 TCDM int tcdm_c_data[TEST_SIZE];
 
 // Expected results for reduction: C[i] = sum_j A[i + 4*j] for j=0..3
-// C[0] = 0+4+8+12 = 24, C[1] = 1+5+9+13 = 28, C[2] = 2+6+10+14 = 32, C[3] = 3+7+11+15 = 36
+// C[0] = 0+4+8+12 = 24, C[1] = 1+5+9+13 = 28, C[2] = 2+6+10+14 = 32, C[3] =
+// 3+7+11+15 = 36
 int c_reduction_expected[REDUCE_SIZE] = {24, 28, 32, 36};
 
 // Expected results for in-place readWrite: C[i] = C_initial[i] + A[i]
 // C_initial[i] = 100 + i, A[i] = i => C[i] = 100 + 2*i
-int c_inplace_expected[TEST_SIZE] = {100, 102, 104, 106, 108, 110, 112,
-                                     114, 116, 118, 120, 122, 124, 126,
-                                     128, 130};
+int c_inplace_expected[TEST_SIZE] = {100, 102, 104, 106, 108, 110, 112, 114,
+                                     116, 118, 120, 122, 124, 126, 128, 130};
 
 inline int check_results(int *test_data, int *reference_data, int count) {
   unsigned int fail_count = 0;
@@ -104,14 +104,14 @@ int main() {
 
     // C streamer: 2 temporal dims, reduction on dim 0
     write_csr(0x908, (unsigned long)tcdm_c_data); // C base
-    write_csr(0x909, 0);  // C temporal stride 1 (outer, unused, bound=0)
-    write_csr(0x90A, 0);  // C temporal stride 0 (inner, reduction: stride=0)
-    write_csr(0x90B, 0);  // C temporal bound 1 (outer, unused)
-    write_csr(0x90C, 4);  // C temporal bound 0 (inner, 4 reduction iterations)
-    write_csr(0x90D, 4);  // C spatial stride: 4 bytes
+    write_csr(0x909, 0); // C temporal stride 1 (outer, unused, bound=0)
+    write_csr(0x90A, 0); // C temporal stride 0 (inner, reduction: stride=0)
+    write_csr(0x90B, 0); // C temporal bound 1 (outer, unused)
+    write_csr(0x90C, 4); // C temporal bound 0 (inner, 4 reduction iterations)
+    write_csr(0x90D, 4); // C spatial stride: 4 bytes
 
-    write_csr(0x90E, 0);  // ALU select: addition
-    write_csr(0x90F, 1);  // Mode: readWrite (reduction)
+    write_csr(0x90E, 0); // ALU select: addition
+    write_csr(0x90F, 1); // Mode: readWrite (reduction)
 
     write_csr(0x910, 0x1); // Start
     read_csr(0x910);       // Wait for completion
@@ -135,9 +135,9 @@ int main() {
 
     // A streamer: same as before
     write_csr(0x900, (unsigned long)tcdm_a_data); // A base
-    write_csr(0x901, 16); // A temporal stride
-    write_csr(0x902, 4);  // A temporal bound: 4 iterations
-    write_csr(0x903, 4);  // A spatial stride
+    write_csr(0x901, 16);                         // A temporal stride
+    write_csr(0x902, 4); // A temporal bound: 4 iterations
+    write_csr(0x903, 4); // A spatial stride
 
     // B streamer: unused
     write_csr(0x904, 0);
@@ -147,14 +147,15 @@ int main() {
 
     // C streamer: 2 temporal dims, NO reduction (all strides non-zero)
     write_csr(0x908, (unsigned long)tcdm_c_data); // C base
-    write_csr(0x909, 0);  // C temporal stride 1 (outer, unused, bound=0)
-    write_csr(0x90A, 16); // C temporal stride 0 (inner, stride=16: iterate normally)
-    write_csr(0x90B, 0);  // C temporal bound 1 (outer, unused)
-    write_csr(0x90C, 4);  // C temporal bound 0 (inner, 4 iterations)
-    write_csr(0x90D, 4);  // C spatial stride: 4 bytes
+    write_csr(0x909, 0); // C temporal stride 1 (outer, unused, bound=0)
+    write_csr(0x90A,
+              16); // C temporal stride 0 (inner, stride=16: iterate normally)
+    write_csr(0x90B, 0); // C temporal bound 1 (outer, unused)
+    write_csr(0x90C, 4); // C temporal bound 0 (inner, 4 iterations)
+    write_csr(0x90D, 4); // C spatial stride: 4 bytes
 
-    write_csr(0x90E, 0);  // ALU select: addition
-    write_csr(0x90F, 1);  // Mode: readWrite (but no reduction since stride != 0)
+    write_csr(0x90E, 0); // ALU select: addition
+    write_csr(0x90F, 1); // Mode: readWrite (but no reduction since stride != 0)
 
     write_csr(0x910, 0x1); // Start
     read_csr(0x910);       // Wait for completion
