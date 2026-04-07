@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 import subprocess
 import sys
@@ -16,7 +15,7 @@ from xdsl.transforms.mlir_opt import MLIROptPass
 from snaxc.accelerators.acc_context import AccContext
 from snaxc.accelerators.snax_phs import SNAXPHSAccelerator
 from snaxc.dialects import phs
-from snaxc.phs.hw_conversion import get_switch_bitwidth
+from snaxc.phs.export_to_schnitzel import call_phs_driver
 from snaxc.phs.template_spec import TemplateSpec
 from snaxc.tools.snaxc_main import SNAXCMain
 from snaxc.transforms.hardfloat.convert_float_to_hardfloat import ConvertFloatToHardfloatPass
@@ -139,7 +138,7 @@ class PHSCMain(SNAXCMain):
 
         # Generate schnitzel SoC verilog if requested
         if self.args.output_schnitzel_dir:
-            self._call_phs_driver(accelerators)
+            call_phs_driver(accelerators, self.args.output_hardware, self.args.output_schnitzel_dir)
 
         # If an optional explicit software file is requested, overwrite the previous module
         if self.args.software_file:
@@ -193,98 +192,6 @@ class PHSCMain(SNAXCMain):
             nargs="?",
             help="generate schnitzel SoC verilog in this directory (calls PhsDriver via mill)",
         )
-
-    def _build_schnitzel_config(self, accelerators: list[SNAXPHSAccelerator]) -> str:
-        """
-        Build PhsAcceleratorConfig JSON string from registered accelerators.
-
-        Returns a Seq[Seq[PhsAcceleratorConfig]] JSON string — per-core config.
-        All PHS accelerators go on core 1 (core 0 has DMA only).
-        """
-        configs = []
-        for acc in accelerators:
-            pe = acc.pe
-            spec = acc.template_spec
-
-            # Streamer configs
-            streamer_cfgs = []
-            for input_size in spec.get_input_sizes():
-                streamer_cfgs.append(
-                    {
-                        "streamType": "read",
-                        "nTemporalDims": len(input_size),
-                        "spatialDimSizes": list(input_size),
-                    }
-                )
-            for output_size in spec.get_output_sizes():
-                streamer_cfgs.append(
-                    {
-                        "streamType": "write",
-                        "nTemporalDims": len(output_size),
-                        "spatialDimSizes": list(output_size),
-                    }
-                )
-
-            # Switches: count true switches and get their bitwidths
-            true_switches = pe.get_true_switches()
-            switch_bitwidths = []
-            for switch_arg in pe.get_switches():
-                use = switch_arg.get_unique_use()
-                if use is not None:
-                    switch_bitwidths.append(get_switch_bitwidth(switch_arg))
-            switch_bitwidths = switch_bitwidths[:true_switches]
-
-            # Module name: PEOp sym_name + "_array" (matches firtool output convention)
-            module_name = acc.name + "_array"
-
-            # SV path: relative to schnitzel project root
-            sv_path = os.path.relpath(
-                os.path.abspath(self.args.output_hardware),
-                self._get_schnitzel_path(),
-            )
-
-            configs.append(
-                {
-                    "streamers": streamer_cfgs,
-                    "numSwitches": true_switches,
-                    "switchBitwidths": switch_bitwidths,
-                    "moduleName": module_name,
-                    "svPath": sv_path,
-                }
-            )
-
-        # Seq[Seq[PhsAcceleratorConfig]]: core 0 = empty, core 1 = all PHS accels
-        return json.dumps([[], configs])
-
-    def _get_schnitzel_path(self) -> str:
-        """Get the schnitzel project root directory."""
-        tool_dir = os.path.dirname(__file__)
-        return os.path.abspath(os.path.join(tool_dir, "..", ".."))
-
-    def _call_phs_driver(self, accelerators: list[SNAXPHSAccelerator]) -> None:
-        """Call the schnitzel PhsDriver via mill to generate SoC verilog."""
-        schnitzel_path = self._get_schnitzel_path()
-        config_json = self._build_schnitzel_config(accelerators)
-        output_dir = os.path.abspath(self.args.output_schnitzel_dir)
-
-        mill_cmd = [
-            "./mill",
-            "schnitzel.runMain",
-            "sim.PhsDriver",
-            f"--phs-config={config_json}",
-            f"--output-dir={output_dir}",
-        ]
-        print(f"Calling PhsDriver: output-dir={output_dir}")
-        try:
-            subprocess.run(
-                mill_cmd,
-                cwd=schnitzel_path,
-                check=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"Error during schnitzel hardware generation:\n{e}", file=sys.stderr)
-            raise SystemExit(e.returncode or 1)
 
     """
     The pipelines of this compiler are as follows
