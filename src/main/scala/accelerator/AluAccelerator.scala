@@ -35,7 +35,7 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
     val csr = Flipped(new CsrIO)
   })
 
-  val csrItf = Module(new CsrInterface((new CsrVals).numRegs, 0x900))
+  val csrItf = Module(new CsrInterface((new CsrVals).numRegs, 0))
   csrItf.io.csr <> io.csr
   val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
   dontTouch(csrVals)

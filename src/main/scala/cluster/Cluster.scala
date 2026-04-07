@@ -6,27 +6,39 @@ import icache.InstructionCache
 import core.{Core, DecoupledBusIO, CoreConfig}
 import axi.{AXIBundle, AXIConfig, AXIMux, DecoupledIOToAXI}
 import interconnect.Interconnect
-import chisel3.util.{SRAM, Cat, log2Ceil, log2Up}
+import chisel3.util.{SRAM, log2Up}
 import memory.MemDemux
 import csr.HWBarrier
 import dma.Dma
-import csr.{CsrDemux, CsrCombiner, CsrOp, CsrReq}
-import chisel3.util.Decoupled
-import accelerator.PhsAccelerator
+import csr.{CsrDemux, CsrCombiner}
+import accelerator.AluAccelerator
 import csr.CsrIO
-import config.{ClusterConfig, MemoryConfig, PhsAcceleratorConfig}
+import config.{ClusterConfig, MemoryConfig}
 
-/** Cluster with 2 RISC-V cores, shared TCDM, DMA, and configurable PHS accelerators.
+/** Handle to an instantiated accelerator's ports for Cluster wiring.
   *
-  * @param phsConfigs
-  *   Per-core list of PHS accelerator configs. phsConfigs(0) = core 0, phsConfigs(1) = core 1. Core 0 always has
-  *   DMA. Default matches the original ALU accelerator on core 1.
+  * @param tcdmPorts
+  *   TCDM memory ports to connect to the interconnect
+  * @param csrPort
+  *   CSR interface port
+  * @param csrRange
+  *   CSR address range (base, size) for CsrDemux routing
+  * @param accelConfig
+  *   Accelerator config for metadata export
   */
-class Cluster(
-    phsConfigs: Seq[Seq[PhsAcceleratorConfig]] = Seq(Seq(), Seq(PhsAcceleratorConfig.defaultAlu))
-) extends Module {
+class AcceleratorHandle(
+    val tcdmPorts: Seq[DecoupledBusIO],
+    val csrPort: CsrIO,
+    val csrRange: (Long, Long),
+    val accelConfig: _root_.config.Accelerator
+)
 
-  require(phsConfigs.length == 2, "Cluster has exactly 2 cores")
+/** Cluster with 2 RISC-V cores, shared TCDM, DMA, and configurable accelerators.
+  *
+  * Override [[makeAccelerators]] in subclasses to provide custom accelerators. The default creates an AluAccelerator on
+  * core 1, matching the original hardcoded behavior.
+  */
+class Cluster extends Module {
 
   val wideAxiDataWidth = 512
   val tcdmDataWidth = CoreConfig.dataWidth
@@ -35,6 +47,27 @@ class Cluster(
     val axi = new AXIBundle(AXIConfig(idWidth = 6, dataWidth = wideAxiDataWidth))
     val csr = new CsrIO()
   })
+
+  /** Override in subclasses to provide custom accelerators per core. Returns Seq[Seq[AcceleratorHandle]] indexed by
+    * core (must be length 2). Default: AluAccelerator on core 1.
+    */
+  protected def makeAccelerators(): Seq[Seq[AcceleratorHandle]] = {
+    val alu = Module(new AluAccelerator(CoreConfig.addrWidth, tcdmDataWidth))
+    Seq(
+      Seq(), // core 0: no accelerators
+      Seq(
+        new AcceleratorHandle(
+          tcdmPorts = (alu.io.aData ++ alu.io.bData ++ alu.io.cData).toSeq,
+          csrPort = alu.io.csr,
+          csrRange = (0x900L, 0x20L),
+          accelConfig = alu.getConfig
+        )
+      )
+    )
+  }
+
+  val accelerators = makeAccelerators()
+  require(accelerators.length == 2, "Cluster has exactly 2 cores")
 
   // ---- Cores ----
   val core_0 = Module(new Core(2))
@@ -60,38 +93,38 @@ class Cluster(
   val dma = Module(
     new Dma(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, AXIConfig(dataWidth = wideAxiDataWidth), 3)
   )
+  val dmaHandle = new AcceleratorHandle(
+    tcdmPorts = dma.io.data.toSeq,
+    csrPort = dma.io.csr,
+    csrRange = (0x900L, 0x20L),
+    accelConfig = dma.getConfig
+  )
 
-  // ---- PHS Accelerators ----
-  val phsAccelModules = phsConfigs.map { coreConfigs =>
-    coreConfigs.map(cfg => Module(new PhsAccelerator(CoreConfig.addrWidth, tcdmDataWidth, cfg)))
-  }
+  // ---- CSR Demux ----
+  // Each core gets: barrier(0x800) + local barrier(0x810) + device CSR ranges.
+  // Core 0 devices: DMA + accelerators. Core 1 devices: accelerators only.
+  val core0Devices = Seq(dmaHandle) ++ accelerators(0)
+  val core1Devices = accelerators(1)
 
-  // ---- CSR Demux for core 0 ----
-  // Address map: barrier(0x800) + local barrier(0x810) + PHS accels(0x920+) + DMA(catch-all)
-  // PHS accels start at 0x920 to avoid DMA's CSR range at 0x900-0x917
-  val core0PhsRanges = phsConfigs(0).indices.map(i => (0x920L + i * 0x20L, 0x20L))
-  val core0NumOuts = 2 + phsConfigs(0).length + 1
-  val core0AddrMap = Seq((0x800L, 0x10L), (0x810L, 0x10L)) ++ core0PhsRanges
-  val csrDemux_0 = Module(new CsrDemux(core0NumOuts, core0AddrMap))
+  val csrDemux_0 = Module(
+    new CsrDemux(
+      Seq((0x800L, 0x10L), (0x810L, 0x10L)) ++ core0Devices.map(_.csrRange)
+    )
+  )
   csrDemux_0.io.in <> core_0.io.csr
-  dma.io.csr <> csrDemux_0.io.outs(core0NumOuts - 1) // DMA on catch-all
-  phsAccelModules(0).zipWithIndex.foreach { case (acc, i) =>
-    acc.io.csr <> csrDemux_0.io.outs(2 + i)
+  core0Devices.zipWithIndex.foreach { case (dev, i) =>
+    dev.csrPort <> csrDemux_0.io.outs(2 + i)
   }
 
-  // ---- CSR Demux for core 1 ----
-  // Address map: barrier(0x800) + local barrier(0x810) + PHS accels(0x900+) + catch-all(tied off)
-  val core1PhsRanges = phsConfigs(1).indices.map(i => (0x900L + i * 0x20L, 0x20L))
-  val core1NumOuts = 2 + phsConfigs(1).length + 1
-  val core1AddrMap = Seq((0x800L, 0x10L), (0x810L, 0x10L)) ++ core1PhsRanges
-  val csrDemux_1 = Module(new CsrDemux(core1NumOuts, core1AddrMap))
+  val csrDemux_1 = Module(
+    new CsrDemux(
+      Seq((0x800L, 0x10L), (0x810L, 0x10L)) ++ core1Devices.map(_.csrRange)
+    )
+  )
   csrDemux_1.io.in <> core_1.io.csr
-  phsAccelModules(1).zipWithIndex.foreach { case (acc, i) =>
-    acc.io.csr <> csrDemux_1.io.outs(2 + i)
+  core1Devices.zipWithIndex.foreach { case (dev, i) =>
+    dev.csrPort <> csrDemux_1.io.outs(2 + i)
   }
-  // Tie off catch-all on core 1 (no DMA)
-  csrDemux_1.io.outs(core1NumOuts - 1).req.ready := true.B
-  csrDemux_1.io.outs(core1NumOuts - 1).rsp.rdata := 0.U
 
   // ---- Global synchronization CSR (0x800) ----
   val csrCombiner = Module(new CsrCombiner(2))
@@ -108,19 +141,15 @@ class Cluster(
   icache.io.imems <> VecInit(Seq(core_0.io.imem, core_1.io.imem))
 
   // ---- TCDM ----
-  val phsTotalPorts = phsConfigs.flatten.map(_.totalTcdmPorts).sum
-  val numInterconnectPorts = 2 + 16 + phsTotalPorts // 2 cores + DMA(16) + PHS accels
+  val allDeviceTcdmPorts = (core0Devices ++ core1Devices).flatMap(_.tcdmPorts)
+  val numInterconnectPorts = 2 + allDeviceTcdmPorts.length // 2 cores + all devices
   val numBanks = 32
   val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM.masked(1024, Vec(4, UInt(8.W)), 0, 0, 1)))
   val tcdm_ports = VecInit(tcdm_sram.map(sram => sram.readwritePorts(0)))
 
   val interconnect = Module(new Interconnect(numInterconnectPorts, numBanks, CoreConfig.addrWidth, tcdmDataWidth))
 
-  val allTcdmPorts = VecInit(Seq(memMux_0.io.outs(1), memMux_1.io.outs(1))) ++
-    dma.io.data ++
-    phsAccelModules.flatten.flatMap(_.io.tcdmPorts)
-
-  interconnect.io.ins <> allTcdmPorts
+  interconnect.io.ins <> VecInit(Seq(memMux_0.io.outs(1), memMux_1.io.outs(1))) ++ allDeviceTcdmPorts
 
   interconnect.io.outs.zip(tcdm_ports).foreach { case (out, port) =>
     port.enable := out.req.valid
@@ -143,8 +172,8 @@ class Cluster(
   def getConfig: ClusterConfig = ClusterConfig(
     MemoryConfig("L1", 0x1_0000_0000L, 0x1_0000L),
     List(
-      config.CoreConfig(1, phsAccelModules(1).map(_.getConfig).toList),
-      config.CoreConfig(2, List(dma.getConfig) ++ phsAccelModules(0).map(_.getConfig).toList)
+      config.CoreConfig(1, core1Devices.map(_.accelConfig).toList),
+      config.CoreConfig(2, core0Devices.map(_.accelConfig).toList)
     )
   )
 }

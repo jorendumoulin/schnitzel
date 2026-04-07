@@ -37,7 +37,7 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
     val csr = Flipped(new CsrIO)
   })
 
-  val csrItf = Module(new CsrInterface(13 + 9 + 1, 0x900))
+  val csrItf = Module(new CsrInterface(13 + 9 + 1, 0))
   csrItf.io.csr <> io.csr
   val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
   dontTouch(csrVals)
