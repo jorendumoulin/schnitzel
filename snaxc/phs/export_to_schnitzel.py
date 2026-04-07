@@ -40,13 +40,13 @@ def build_schnitzel_config(
         Path to the generated BlackBox SystemVerilog file, relative to the
         schnitzel project root.
     """
-    configs = []
+    configs: list[dict[str, object]] = []
     for acc in accelerators:
         pe = acc.pe
         spec = acc.template_spec
 
         # Streamer configs
-        streamer_cfgs: list[dict] = []
+        streamer_cfgs: list[dict[str, str | int | list[int]]] = []
         for input_size in spec.get_input_sizes():
             streamer_cfgs.append(
                 {
@@ -66,12 +66,11 @@ def build_schnitzel_config(
 
         # Switches: count true switches and get their bitwidths
         true_switches = pe.get_true_switches()
-        switch_bitwidths = []
-        for switch_arg in pe.get_switches():
-            use = switch_arg.get_unique_use()
-            if use is not None:
-                switch_bitwidths.append(get_switch_bitwidth(switch_arg))
-        switch_bitwidths = switch_bitwidths[:true_switches]
+        switch_bitwidths: list[int] = [
+            get_switch_bitwidth(arg)
+            for arg in pe.get_switches()
+            if arg.get_unique_use() is not None
+        ][:true_switches]
 
         # Module name: PEOp sym_name + "_array" (matches firtool output convention)
         module_name = acc.name + "_array"
