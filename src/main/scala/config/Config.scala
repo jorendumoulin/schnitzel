@@ -32,9 +32,6 @@ case class PhsAcceleratorConfig(
   def switchBitwidth(i: Int): Int =
     if (i < switchBitwidths.length) switchBitwidths(i) else 32
 
-  /** Whether this config has PHS verilog to link as a BlackBox */
-  def hasBlackBox: Boolean = svPath.nonEmpty && moduleName.nonEmpty
-
   def readStreamers: Seq[PhsStreamerConfig] = streamers.filter(_.streamType == "read")
   def writeStreamers: Seq[PhsStreamerConfig] = streamers.filter(_.streamType == "write")
 }

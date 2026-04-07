@@ -7,7 +7,6 @@ import core.DecoupledBusIO
 import streamer.{Streamer, AffineAguConfig, StreamerDir}
 import csr.CsrIO
 import csr.CsrInterface
-import datapath.AluArray
 import config.{PhsAcceleratorConfig, PhsWrapper}
 
 /** BlackBox wrapper for PHS-generated SystemVerilog datapath.
@@ -126,62 +125,39 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
   val readStreamers = streamers.zip(config.streamers).filter(_._2.streamType == "read").map(_._1)
   val writeStreamers = streamers.zip(config.streamers).filter(_._2.streamType == "write").map(_._1)
 
-  // ---- Datapath ----
-  if (config.hasBlackBox) {
-    // Use PHS-generated SystemVerilog as a BlackBox
-    val bb = Module(new PhsDatapathBlackBox(config, dataWidth))
-    val readConfigs = config.readStreamers
-    val writeConfigs = config.writeStreamers
+  // ---- Datapath (PHS-generated SystemVerilog BlackBox) ----
+  val bb = Module(new PhsDatapathBlackBox(config, dataWidth))
+  val readConfigs = config.readStreamers
+  val writeConfigs = config.writeStreamers
 
-    // Wire read streamer data -> BlackBox data inputs
-    for ((sc, rIdx) <- readConfigs.zipWithIndex) {
-      val numElements = sc.spatialDimSizes.product
-      val bits = readStreamers(rIdx).io.read.bits.asTypeOf(Vec(numElements, UInt(dataWidth.W)))
-      for (eIdx <- 0 until numElements) {
-        bb.io.elements(s"data_${rIdx}_${eIdx}") := bits(eIdx)
-      }
+  // Wire read streamer data -> BlackBox data inputs
+  for ((sc, rIdx) <- readConfigs.zipWithIndex) {
+    val numElements = sc.spatialDimSizes.product
+    val bits = readStreamers(rIdx).io.read.bits.asTypeOf(Vec(numElements, UInt(dataWidth.W)))
+    for (eIdx <- 0 until numElements) {
+      bb.io.elements(s"data_${rIdx}_${eIdx}") := bits(eIdx)
     }
+  }
 
-    // Wire switches -> BlackBox switch inputs
-    for (i <- 0 until config.numSwitches) {
-      bb.io.elements(s"switch_${i}") := switches(i)(config.switchBitwidth(i) - 1, 0)
+  // Wire switches -> BlackBox switch inputs
+  for (i <- 0 until config.numSwitches) {
+    bb.io.elements(s"switch_${i}") := switches(i)(config.switchBitwidth(i) - 1, 0)
+  }
+
+  // Wire BlackBox outputs -> write streamer data
+  for ((sc, wIdx) <- writeConfigs.zipWithIndex) {
+    val numElements = sc.spatialDimSizes.product
+    val outBits = Wire(Vec(numElements, UInt(dataWidth.W)))
+    for (eIdx <- 0 until numElements) {
+      outBits(eIdx) := bb.io.elements(s"out_${wIdx}_${eIdx}")
     }
+    writeStreamers(wIdx).io.write.bits := outBits.asTypeOf(UInt((dataWidth * numElements).W))
+    writeStreamers(wIdx).io.write.valid := readStreamers.map(_.io.read.valid).reduce(_ && _)
+  }
 
-    // Wire BlackBox outputs -> write streamer data
-    for ((sc, wIdx) <- writeConfigs.zipWithIndex) {
-      val numElements = sc.spatialDimSizes.product
-      val outBits = Wire(Vec(numElements, UInt(dataWidth.W)))
-      for (eIdx <- 0 until numElements) {
-        outBits(eIdx) := bb.io.elements(s"out_${wIdx}_${eIdx}")
-      }
-      writeStreamers(wIdx).io.write.bits := outBits.asTypeOf(UInt((dataWidth * numElements).W))
-      writeStreamers(wIdx).io.write.valid := readStreamers.map(_.io.read.valid).reduce(_ && _)
-    }
-
-    // BlackBox is purely combinational — read streamers are ready when writes are ready
-    for (rIdx <- readStreamers.indices) {
-      readStreamers(rIdx).io.read.ready := writeStreamers.map(_.io.write.ready).reduce(_ && _)
-    }
-  } else {
-    // Fallback: use built-in AluArray (backwards compatibility)
-    val parallelUnroll = config.streamers.head.spatialDimSizes.product
-    val aluArray = Module(new AluArray(parallelUnroll, dataWidth))
-    aluArray.io.sel := switches(0)(1, 0)
-
-    // Read streamer 0 -> ALU input A
-    aluArray.io.A_in.bits := readStreamers(0).io.read.bits.asTypeOf(Vec(parallelUnroll, UInt(dataWidth.W)))
-    aluArray.io.A_in.valid := readStreamers(0).io.read.valid
-    readStreamers(0).io.read.ready := aluArray.io.A_in.ready
-
-    // Read streamer 1 -> ALU input B
-    aluArray.io.B_in.bits := readStreamers(1).io.read.bits.asTypeOf(Vec(parallelUnroll, UInt(dataWidth.W)))
-    aluArray.io.B_in.valid := readStreamers(1).io.read.valid
-    readStreamers(1).io.read.ready := aluArray.io.B_in.ready
-
-    // ALU output C -> Write streamer 0
-    writeStreamers(0).io.write.bits := aluArray.io.C_out.bits.asTypeOf(UInt((dataWidth * parallelUnroll).W))
-    writeStreamers(0).io.write.valid := aluArray.io.C_out.valid
-    aluArray.io.C_out.ready := writeStreamers(0).io.write.ready
+  // BlackBox is purely combinational — read streamers are ready when writes are ready
+  for (rIdx <- readStreamers.indices) {
+    readStreamers(rIdx).io.read.ready := writeStreamers.map(_.io.write.ready).reduce(_ && _)
   }
 
   // Done when all write streamers complete
