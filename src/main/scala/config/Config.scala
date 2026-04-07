@@ -6,28 +6,63 @@ import upickle.default.{ReadWriter => RW, macroRW}
 case class MemoryConfig(name: String, start: Long, size: Long)
 object MemoryConfig { implicit val rw: RW[MemoryConfig] = macroRW }
 
-// --- Accelerator Config Hierarchy ---
+// --- PHS Accelerator Config ---
 
-// Config is just a map of params
-case class AluConfig()
-object AluConfig { implicit val rw: RW[AluConfig] = macroRW }
+case class PhsStreamerConfig(
+    streamType: String, // "read" or "write"
+    nTemporalDims: Int,
+    spatialDimSizes: Seq[Int]
+) {
+  def numTcdmPorts: Int = spatialDimSizes.product
+  def numCsrRegs: Int = 1 + nTemporalDims * 2 + spatialDimSizes.length
+}
+object PhsStreamerConfig { implicit val rw: RW[PhsStreamerConfig] = macroRW }
+
+case class PhsAcceleratorConfig(
+    streamers: Seq[PhsStreamerConfig],
+    numSwitches: Int
+) {
+  def totalTcdmPorts: Int = streamers.map(_.numTcdmPorts).sum
+  def numCsrRegs: Int = streamers.map(_.numCsrRegs).sum + numSwitches
+}
+object PhsAcceleratorConfig {
+  implicit val rw: RW[PhsAcceleratorConfig] = macroRW
+
+  /** Default config matching the existing ALU accelerator: 2 read + 1 write streamer, 1 switch */
+  val defaultAlu = PhsAcceleratorConfig(
+    streamers = Seq(
+      PhsStreamerConfig("read", 1, Seq(4)),
+      PhsStreamerConfig("read", 1, Seq(4)),
+      PhsStreamerConfig("write", 1, Seq(4))
+    ),
+    numSwitches = 1
+  )
+}
+
+// --- Accelerator Config Hierarchy ---
 
 case class DmaConfig()
 object DmaConfig { implicit val rw: RW[DmaConfig] = macroRW }
 
-// Wrapper with type + config fields
 sealed trait Accelerator {}
 
-case class AluWrapper(`type`: String, config: AluConfig) extends Accelerator
-object AluWrapper { implicit val rw: RW[AluWrapper] = macroRW }
+case class PhsWrapper(`type`: String, config: PhsAcceleratorConfig) extends Accelerator
+object PhsWrapper { implicit val rw: RW[PhsWrapper] = macroRW }
 
 case class DmaWrapper(`type`: String, config: DmaConfig) extends Accelerator
 object DmaWrapper { implicit val rw: RW[DmaWrapper] = macroRW }
 
+// Keep AluWrapper for backwards compatibility with existing configs
+case class AluConfig()
+object AluConfig { implicit val rw: RW[AluConfig] = macroRW }
+case class AluWrapper(`type`: String, config: AluConfig) extends Accelerator
+object AluWrapper { implicit val rw: RW[AluWrapper] = macroRW }
+
 object Accelerator {
   implicit val rw: RW[Accelerator] = RW.merge(
-    macroRW[AluWrapper],
-    macroRW[DmaWrapper]
+    macroRW[PhsWrapper],
+    macroRW[DmaWrapper],
+    macroRW[AluWrapper]
   )
 }
 
