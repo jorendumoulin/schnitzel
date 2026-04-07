@@ -20,10 +20,23 @@ object PhsStreamerConfig { implicit val rw: RW[PhsStreamerConfig] = macroRW }
 
 case class PhsAcceleratorConfig(
     streamers: Seq[PhsStreamerConfig],
-    numSwitches: Int
+    numSwitches: Int,
+    switchBitwidths: Seq[Int] = Seq(),
+    moduleName: String = "",
+    svPath: String = ""
 ) {
   def totalTcdmPorts: Int = streamers.map(_.numTcdmPorts).sum
   def numCsrRegs: Int = streamers.map(_.numCsrRegs).sum + numSwitches
+
+  /** Get bitwidth for switch i. Falls back to 32 (full CSR width) if not specified. */
+  def switchBitwidth(i: Int): Int =
+    if (i < switchBitwidths.length) switchBitwidths(i) else 32
+
+  /** Whether this config has PHS verilog to link as a BlackBox */
+  def hasBlackBox: Boolean = svPath.nonEmpty && moduleName.nonEmpty
+
+  def readStreamers: Seq[PhsStreamerConfig] = streamers.filter(_.streamType == "read")
+  def writeStreamers: Seq[PhsStreamerConfig] = streamers.filter(_.streamType == "write")
 }
 object PhsAcceleratorConfig {
   implicit val rw: RW[PhsAcceleratorConfig] = macroRW
@@ -35,7 +48,10 @@ object PhsAcceleratorConfig {
       PhsStreamerConfig("read", 1, Seq(4)),
       PhsStreamerConfig("write", 1, Seq(4))
     ),
-    numSwitches = 1
+    numSwitches = 1,
+    switchBitwidths = Seq(2),
+    moduleName = "acc1_array",
+    svPath = "src/main/resources/phs/acc1_array.sv"
   )
 }
 
