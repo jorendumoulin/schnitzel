@@ -23,7 +23,9 @@ add_executable(sim
 target_include_directories(sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(sim PRIVATE argparse::argparse elfio::elfio)
 
-set(GENERATED_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../generated)
+if(NOT DEFINED GENERATED_DIR)
+  set(GENERATED_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../generated)
+endif()
 set(RTL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rtl)
 
 file(READ ${GENERATED_DIR}/filelist.f FILELIST_CONTENT)
