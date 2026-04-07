@@ -17,7 +17,7 @@ object EmitVerilog extends App {
 
   println("Generating Verilog for Schnitzel Core...")
 
-  val outputDir = "generated"
+  val outputDir = sys.env.getOrElse("GENERATED_DIR", "generated")
 
   // Load PHS config from environment if set
   val phsConfigs = sys.env.get("PHS_CONFIG").map { path =>

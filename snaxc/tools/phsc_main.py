@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -15,6 +16,7 @@ from xdsl.transforms.mlir_opt import MLIROptPass
 from snaxc.accelerators.acc_context import AccContext
 from snaxc.accelerators.snax_phs import SNAXPHSAccelerator
 from snaxc.dialects import phs
+from snaxc.phs.hw_conversion import get_switch_bitwidth
 from snaxc.phs.template_spec import TemplateSpec
 from snaxc.tools.snaxc_main import SNAXCMain
 from snaxc.transforms.hardfloat.convert_float_to_hardfloat import ConvertFloatToHardfloatPass
@@ -25,6 +27,7 @@ from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
 from snaxc.transforms.phs.encode import PhsEncodePass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
+from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
 from snaxc.util.snax_memory import L1, L3
 
@@ -69,12 +72,14 @@ class PHSCMain(SNAXCMain):
         def phs_register(accelerator: SNAXPHSAccelerator) -> SNAXPHSAccelerator:
             return accelerator
 
+        accelerators: list[SNAXPHSAccelerator] = []
         for hw_op in hardware_module.ops:
             if isinstance(hw_op, phs.PEOp):
                 # Use a clone to prevent downstream changes messing up accelerator registration
                 accelerator = SNAXPHSAccelerator(hw_op.clone(), self.template_spec)
                 assert isinstance(self.ctx, AccContext)
                 self.ctx.register_accelerator(accelerator.name, phs_register(accelerator))
+                accelerators.append(accelerator)
 
         # Remaining pipelines can only be setup after accelerators have been registered
         self.setup_hardware_pipeline()
@@ -132,6 +137,10 @@ class PHSCMain(SNAXCMain):
             with open(self.args.output_hardware, "w") as outfile:
                 outfile.write(hardware_ir_string)
 
+        # Generate schnitzel SoC verilog if requested
+        if self.args.output_schnitzel_dir:
+            self._call_phs_driver(accelerators)
+
         # If an optional explicit software file is requested, overwrite the previous module
         if self.args.software_file:
             f = open(self.args.software_file)
@@ -178,6 +187,104 @@ class PHSCMain(SNAXCMain):
         arg_parser.add_argument(
             "--hardfloat-external-modules", action="store_true", help="Instantiate hardfloat modules as external"
         )
+        arg_parser.add_argument(
+            "--output-schnitzel-dir",
+            type=str,
+            nargs="?",
+            help="generate schnitzel SoC verilog in this directory (calls PhsDriver via mill)",
+        )
+
+    def _build_schnitzel_config(self, accelerators: list[SNAXPHSAccelerator]) -> str:
+        """
+        Build PhsAcceleratorConfig JSON string from registered accelerators.
+
+        Returns a Seq[Seq[PhsAcceleratorConfig]] JSON string — per-core config.
+        All PHS accelerators go on core 1 (core 0 has DMA only).
+        """
+        configs = []
+        for acc in accelerators:
+            pe = acc.pe
+            spec = acc.template_spec
+
+            # Streamer configs
+            streamer_cfgs = []
+            for input_size in spec.get_input_sizes():
+                streamer_cfgs.append(
+                    {
+                        "streamType": "read",
+                        "nTemporalDims": len(input_size),
+                        "spatialDimSizes": list(input_size),
+                    }
+                )
+            for output_size in spec.get_output_sizes():
+                streamer_cfgs.append(
+                    {
+                        "streamType": "write",
+                        "nTemporalDims": len(output_size),
+                        "spatialDimSizes": list(output_size),
+                    }
+                )
+
+            # Switches: count true switches and get their bitwidths
+            true_switches = pe.get_true_switches()
+            switch_bitwidths = []
+            for switch_arg in pe.get_switches():
+                use = switch_arg.get_unique_use()
+                if use is not None:
+                    switch_bitwidths.append(get_switch_bitwidth(switch_arg))
+            switch_bitwidths = switch_bitwidths[:true_switches]
+
+            # Module name: PEOp sym_name + "_array" (matches firtool output convention)
+            module_name = acc.name + "_array"
+
+            # SV path: relative to schnitzel project root
+            sv_path = os.path.relpath(
+                os.path.abspath(self.args.output_hardware),
+                self._get_schnitzel_path(),
+            )
+
+            configs.append(
+                {
+                    "streamers": streamer_cfgs,
+                    "numSwitches": true_switches,
+                    "switchBitwidths": switch_bitwidths,
+                    "moduleName": module_name,
+                    "svPath": sv_path,
+                }
+            )
+
+        # Seq[Seq[PhsAcceleratorConfig]]: core 0 = empty, core 1 = all PHS accels
+        return json.dumps([[], configs])
+
+    def _get_schnitzel_path(self) -> str:
+        """Get the schnitzel project root directory."""
+        tool_dir = os.path.dirname(__file__)
+        return os.path.abspath(os.path.join(tool_dir, "..", ".."))
+
+    def _call_phs_driver(self, accelerators: list[SNAXPHSAccelerator]) -> None:
+        """Call the schnitzel PhsDriver via mill to generate SoC verilog."""
+        schnitzel_path = self._get_schnitzel_path()
+        config_json = self._build_schnitzel_config(accelerators)
+        output_dir = os.path.abspath(self.args.output_schnitzel_dir)
+
+        mill_cmd = [
+            "./mill",
+            "schnitzel.runMain",
+            "sim.PhsDriver",
+            f"--phs-config={config_json}",
+            f"--output-dir={output_dir}",
+        ]
+        print(f"Calling PhsDriver: output-dir={output_dir}")
+        try:
+            subprocess.run(
+                mill_cmd,
+                cwd=schnitzel_path,
+                check=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Error during schnitzel hardware generation:\n{e}", file=sys.stderr)
+            raise SystemExit(e.returncode or 1)
 
     """
     The pipelines of this compiler are as follows
@@ -247,6 +354,7 @@ class PHSCMain(SNAXCMain):
             ConvertHardfloatToHw(easyfloat_path=easyfloat_path, external_modules=self.args.hardfloat_external_modules)
         )
         hardware_pass_pipeline.append(FinalizePhsToHWPass())
+        hardware_pass_pipeline.append(HwScalarizePublicModulesPass())
         self.hardware_pipeline = PassPipeline(tuple(hardware_pass_pipeline), self.pipeline_callback)
 
     def setup_software_pipeline(self):

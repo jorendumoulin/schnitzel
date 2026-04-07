@@ -1,168 +1,95 @@
-from util.snake.configs import get_snax_alu_config
-from util.tracing.merge_json import merge_json
+"""
+End-to-end PHS build flow for the streamer_phs_alu kernel on schnitzel.
 
-snax_cluster = "../../../snax_cluster"
-generated_folder = f"{snax_cluster}/target/snitch_cluster/generated"
+  phsc (MLIR → SV + SoC verilog) → verilator (sim binary)
+                                  → clang (test ELF)
+                                  → simulate & verify
 
-config = get_snax_alu_config()
-config["vltsim"] = f"{snax_cluster}/target/snitch_cluster/bin/snitch_cluster.vlt"
+Usage: pixi run -e phs snakemake -j$(nproc)
+"""
+import os
 
-mako_wrappers = [
-    f"{generated_folder}/snax_alu_phs/snax_alu_phs_csrman_wrapper.sv",
-    f"{generated_folder}/snax_alu_phs/snax_alu_phs_streamer_wrapper.sv",
-    f"{generated_folder}/snax_alu_phs/snax_alu_phs_wrapper.sv",
-    f"{generated_folder}/sparse_interconnect_wrapper.sv",
-]
-
-chisel_generated = [
-    f"{generated_folder}/snax_alu_phs/snax_alu_phs_reqrspman_ReqRspManager.sv",
-    f"{generated_folder}/snax_alu_phs/snax_alu_phs_Streamer.sv",
-    f"{generated_folder}/SparseInterconnect.sv",
-]
-
-snaxgen = [*mako_wrappers, *chisel_generated]
-
-
-module snax_rules:
-    snakefile:
-        "../../util/snake/snax.smk"
-    config:
-        config
-
-
-use rule aggregate_json from snax_rules as snax_*
-
-
-use rule compile_c from snax_rules as snax_*
-
-
-use rule compile_llvm_module from snax_rules as snax_*
-
-
-use rule trace_dasm from snax_rules as snax_*
-
-
-use rule translate_mlir from snax_rules as snax_*
-
-
-files = ["addition"]
-
+ROOT = os.path.abspath("../..")
+BUILD = "build"
+GENERATED = os.path.abspath(f"{BUILD}/generated")
+SIM_BUILD = f"{BUILD}/sim"
+DEVICE_BUILD = f"{BUILD}/device"
 
 rule all:
     input:
-        expand("{file}_traces.json", file=files),
-        "acc2_array.sv",
+        f"{BUILD}/test.log",
 
 
-rule run_phs:
+# --- Step 1: PHS compilation + schnitzel hardware generation ---
+# phsc compiles MLIR → BlackBox SV, then calls PhsDriver via mill
+# to generate the full SoC verilog in one step.
+
+rule phsc:
     input:
-        "addition.mlir",
-        "transform_schedule.mlir",
-        "test_software.mlir",
+        mlir="addition.mlir",
+        schedule="transform_schedule.mlir",
+        software="test_software.mlir",
     output:
-        "addition.ll.mlir",
-        "acc1_array.sv",
+        top=f"{GENERATED}/Top.sv",
+        filelist=f"{GENERATED}/filelist.f",
     shell:
-        "phsc {input[0]} {input[1]} --software-file {input[2]} -o {output[0]} --output-hardware {output[1]} --debug"
+        """
+        phsc {input.mlir} {input.schedule} \
+            --software-file {input.software} \
+            -o {BUILD}/sw.mlir \
+            --output-hardware {ROOT}/src/main/resources/phs/acc1_array.sv \
+            --output-schnitzel-dir {GENERATED}
+        """
 
 
-rule fuse_addition:
+# --- Step 2: Build simulator (Verilator) ---
+
+rule configure_sim:
     input:
-        "addition.mlir",
+        filelist=f"{GENERATED}/filelist.f",
     output:
-        "addition_fused.mlir",
+        ninja=f"{SIM_BUILD}/build.ninja",
     shell:
-        "mlir-opt --cse --linalg-generalize-named-ops --linalg-fuse-elementwise-ops {input[0]} -o {output[0]}"
+        "cmake -B {SIM_BUILD} -S {ROOT}/sim -G Ninja -DGENERATED_DIR={GENERATED}"
 
-
-rule run_phs_fused:
+rule build_sim:
     input:
-        "addition_fused.mlir",
-        "transform_schedule.mlir",
-        "test_software.mlir",
+        ninja=f"{SIM_BUILD}/build.ninja",
+        top=f"{GENERATED}/Top.sv",
     output:
-        "addition_fused.ll.mlir",
-        "acc2_array.sv",
-    shell:
-        "phsc {input[0]} {input[1]} --software-file {input[2]} -o {output[0]} --output-hardware {output[1]}"
-
-
-rule create_wrappers:
-    input:
-        f"{snax_cluster}/target/snitch_cluster/cfg/snax_alu_phs_cluster.hjson",
-    output:
-        snaxgen,
-    shell:
-        "pixi run --manifest-path={snax_cluster}/pixi.toml make -C {snax_cluster}/target/snitch_cluster/ CFG_OVERRIDE={input[0]} rtl-gen"
-
-
-rule copy_array:
-    input:
-        "acc1_array.sv",
-    output:
-        f"{generated_folder}/snax_alu_phs/acc1_array.sv",
-    shell:
-        "cp {input} {output}"
-
-
-rule create_simulation_binary:
-    input:
-        f"{snax_cluster}/target/snitch_cluster/cfg/snax_alu_phs_cluster.hjson",
-        snaxgen,
-        f"{generated_folder}/snax_alu_phs/acc1_array.sv",
-    output:
-        config["vltsim"],
+        sim=f"{SIM_BUILD}/sim",
     threads: workflow.cores
     shell:
-        "pixi run --manifest-path={snax_cluster}/pixi.toml make -C {snax_cluster}/target/snitch_cluster/ CFG_OVERRIDE={input[0]} bin/snitch_cluster.vlt -j{threads}"
+        "cmake --build {SIM_BUILD} -j{threads}"
 
 
-from gendata import create_data_files
+# --- Step 3: Build test software ---
 
-
-rule generate_data:
+rule configure_device:
     output:
-        "data.c",
-        "data.h",
-    run:
-        create_data_files()
-
-
-rule compile_simple_main:
-    input:
-        "main.c",
-        "data.o",
-    output:
-        temp("main.o"),
+        ninja=f"{DEVICE_BUILD}/build.ninja",
     shell:
-        "{config[cc]} {config[cflags]} -c {input} -o {output}"
+        "cmake -B {DEVICE_BUILD} -S {ROOT}/sw/device -G Ninja"
 
-
-rule link_snax_binary:
+rule build_device:
     input:
-        "addition.o",
-        "data.o",
-        "main.o",
+        ninja=f"{DEVICE_BUILD}/build.ninja",
     output:
-        "addition.x",
+        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
     shell:
-        "{config[ld]} {config[ldflags]} {input} -o {output}"
+        "cmake --build {DEVICE_BUILD}"
 
+
+# --- Step 4: Simulate ---
 
 rule simulate:
     input:
-        config["vltsim"],
-        "addition.x",
+        sim=f"{SIM_BUILD}/sim",
+        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
     output:
-        temp(
-            expand(
-                "addition_trace_chip_{num_chips:02d}_hart_{num_harts:05d}.dasm",
-                file=["addition"],
-                num_chips=range(config["num_chips"]),
-                num_harts=range(config["num_harts"]),
-            ),
-        ),
-    log:
-        "addition.vltlog",
+        log=f"{BUILD}/test.log",
     shell:
-        "{config[vltsim]} --prefix-trace=addition_ addition.x  2>&1 | tee {log}"
+        """
+        {input.sim} {input.elf} --vltargs="+ibex_tracer_enable=0" 2>&1 | tee {output.log}
+        grep -q "TEST PASSED" {output.log}
+        """

@@ -14,5 +14,8 @@ class PhsTop(
     phsConfigs: Seq[Seq[PhsAcceleratorConfig]] = Seq(Seq(), Seq(PhsAcceleratorConfig.defaultAlu))
 ) extends Top {
 
+  // Use "Top" as the module name so TopWrapper.sv works for both Top and PhsTop
+  override def desiredName: String = "Top"
+
   override protected def makeCluster(): Cluster = Module(new PhsCluster(phsConfigs))
 }

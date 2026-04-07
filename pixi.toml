@@ -55,6 +55,7 @@ torchgen = ">=0.0.1, <0.0.2"
 
 [feature.phs.dependencies]
 circt = { version = "==1.122.0", channel = "KEKE046" }
+snakemake = ">=9,<10"
 
 [environments]
 default = ["torch", "riscv-gnu-toolchain"]
