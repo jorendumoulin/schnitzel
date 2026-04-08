@@ -1,146 +1,89 @@
-from util.snake.configs import get_snax_alu_config
-from util.tracing.merge_json import merge_json
+"""
+End-to-end PHS build flow for the streamer_phs_aluf kernel on schnitzel.
 
-snax_cluster = "../../../snax_cluster"
-generated_folder = f"{snax_cluster}/target/snitch_cluster/generated"
+  phsc (MLIR → SV + SoC verilog) → verilator (sim binary)
+                                  → clang (test ELF)
 
-config = get_snax_alu_config()
-config["vltsim"] = f"{snax_cluster}/target/snitch_cluster/bin/snitch_cluster.vlt"
+Note: simulation is not yet wired up because the existing
+alu_accelerator_test.c uses integer data, while this kernel operates
+on f64.  The `all` target only builds hardware + software.
 
-mako_wrappers = [
-    f"{generated_folder}/snax_alu_phs/snax_alu_phs_csrman_wrapper.sv",
-    f"{generated_folder}/snax_alu_phs/snax_alu_phs_streamer_wrapper.sv",
-    f"{generated_folder}/snax_alu_phs/snax_alu_phs_wrapper.sv",
-    f"{generated_folder}/sparse_interconnect_wrapper.sv",
-]
+Usage: pixi run -e phs snakemake -j$(nproc)
+"""
 
-chisel_generated = [
-    f"{generated_folder}/snax_alu_phs/snax_alu_phs_reqrspman_ReqRspManager.sv",
-    f"{generated_folder}/snax_alu_phs/snax_alu_phs_Streamer.sv",
-    f"{generated_folder}/SparseInterconnect.sv",
-]
+import os
 
-snaxgen = [*mako_wrappers, *chisel_generated]
-
-
-module snax_rules:
-    snakefile:
-        "../../util/snake/snax.smk"
-    config:
-        config
-
-
-use rule aggregate_json from snax_rules as snax_*
-
-
-use rule compile_c from snax_rules as snax_*
-
-
-use rule compile_llvm_module from snax_rules as snax_*
-
-
-use rule trace_dasm from snax_rules as snax_*
-
-
-use rule translate_mlir from snax_rules as snax_*
-
-
-files = ["addf"]
-
-
-rule run_phs:
-    input:
-        "addf.mlir",
-        "transform_schedule.mlir",
-        "test_software.mlir",
-    output:
-        "addf.ll.mlir",
-        "acc1_array.sv",
-    shell:
-        "phsc {input[0]} {input[1]} --software-file {input[2]} -o {output[0]} --output-hardware {output[1]} --debug"
+ROOT = os.path.abspath("../..")
+BUILD = "build"
+GENERATED = os.path.abspath(f"{BUILD}/generated")
+SIM_BUILD = f"{BUILD}/sim"
+DEVICE_BUILD = f"{BUILD}/device"
 
 
 rule all:
     input:
-        expand("{file}_traces.json", file=files),
+        f"{SIM_BUILD}/sim",
+        f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
 
 
-rule create_wrappers:
+# --- Step 1: PHS compilation + schnitzel hardware generation ---
+
+
+rule phsc:
     input:
-        f"{snax_cluster}/target/snitch_cluster/cfg/snax_alu_phs_cluster.hjson",
+        mlir="addf.mlir",
+        schedule="transform_schedule.mlir",
+        software="test_software.mlir",
     output:
-        snaxgen,
+        top=f"{GENERATED}/Top.sv",
+        filelist=f"{GENERATED}/filelist.f",
     shell:
-        "pixi run --manifest-path={snax_cluster}/pixi.toml make -C {snax_cluster}/target/snitch_cluster/ CFG_OVERRIDE={input[0]} rtl-gen"
+        """
+        phsc {input.mlir} {input.schedule} \
+            --software-file {input.software} \
+            -o {BUILD}/sw.mlir \
+            --output-hardware {GENERATED}/acc1_array.sv \
+            --output-schnitzel-dir {GENERATED}
+        """
 
 
-rule copy_array:
+# --- Step 2: Build simulator (Verilator) ---
+
+
+rule configure_sim:
     input:
-        "acc1_array.sv",
+        filelist=f"{GENERATED}/filelist.f",
     output:
-        f"{generated_folder}/snax_alu_phs/acc1_array.sv",
+        ninja=f"{SIM_BUILD}/build.ninja",
     shell:
-        "cp {input} {output}"
+        "cmake -B {SIM_BUILD} -S {ROOT}/sim -G Ninja -DGENERATED_DIR={GENERATED}"
 
 
-rule create_simulation_binary:
+rule build_sim:
     input:
-        f"{snax_cluster}/target/snitch_cluster/cfg/snax_alu_phs_cluster.hjson",
-        snaxgen,
-        f"{generated_folder}/snax_alu_phs/acc1_array.sv",
+        ninja=f"{SIM_BUILD}/build.ninja",
+        top=f"{GENERATED}/Top.sv",
     output:
-        config["vltsim"],
+        sim=f"{SIM_BUILD}/sim",
     threads: workflow.cores
     shell:
-        "pixi run --manifest-path={snax_cluster}/pixi.toml make -C {snax_cluster}/target/snitch_cluster/ CFG_OVERRIDE={input[0]} bin/snitch_cluster.vlt -j{threads}"
+        "cmake --build {SIM_BUILD} -j{threads}"
 
 
-from gendata import create_data_files
+# --- Step 3: Build test software ---
 
 
-rule generate_data:
+rule configure_device:
     output:
-        "data.c",
-        "data.h",
-    run:
-        create_data_files()
-
-
-rule compile_simple_main:
-    input:
-        "main.c",
-        "data.o",
-    output:
-        temp("main.o"),
+        ninja=f"{DEVICE_BUILD}/build.ninja",
     shell:
-        "{config[cc]} {config[cflags]} -c {input} -o {output}"
+        "cmake -B {DEVICE_BUILD} -S {ROOT}/sw/device -G Ninja"
 
 
-rule link_snax_binary:
+rule build_device:
     input:
-        "addf.o",
-        "data.o",
-        "main.o",
+        ninja=f"{DEVICE_BUILD}/build.ninja",
     output:
-        "addf.x",
+        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
     shell:
-        "{config[ld]} {config[ldflags]} {input} -o {output}"
-
-
-rule simulate:
-    input:
-        config["vltsim"],
-        "addf.x",
-    output:
-        temp(
-            expand(
-                "addf_trace_chip_{num_chips:02d}_hart_{num_harts:05d}.dasm",
-                file=["addf"],
-                num_chips=range(config["num_chips"]),
-                num_harts=range(config["num_harts"]),
-            ),
-        ),
-    log:
-        "addf.vltlog",
-    shell:
-        "{config[vltsim]} --prefix-trace=addf_ addf.x  2>&1 | tee {log}"
+        "cmake --build {DEVICE_BUILD}"

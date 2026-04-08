@@ -15,6 +15,7 @@ from xdsl.transforms.mlir_opt import MLIROptPass
 from snaxc.accelerators.acc_context import AccContext
 from snaxc.accelerators.snax_phs import SNAXPHSAccelerator
 from snaxc.dialects import phs
+from snaxc.phs.export_to_schnitzel import call_phs_driver
 from snaxc.phs.template_spec import TemplateSpec
 from snaxc.tools.snaxc_main import SNAXCMain
 from snaxc.transforms.hardfloat.convert_float_to_hardfloat import ConvertFloatToHardfloatPass
@@ -25,6 +26,7 @@ from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
 from snaxc.transforms.phs.encode import PhsEncodePass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
+from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
 from snaxc.util.snax_memory import L1, L3
 
@@ -69,12 +71,14 @@ class PHSCMain(SNAXCMain):
         def phs_register(accelerator: SNAXPHSAccelerator) -> SNAXPHSAccelerator:
             return accelerator
 
+        accelerators: list[SNAXPHSAccelerator] = []
         for hw_op in hardware_module.ops:
             if isinstance(hw_op, phs.PEOp):
                 # Use a clone to prevent downstream changes messing up accelerator registration
                 accelerator = SNAXPHSAccelerator(hw_op.clone(), self.template_spec)
                 assert isinstance(self.ctx, AccContext)
                 self.ctx.register_accelerator(accelerator.name, phs_register(accelerator))
+                accelerators.append(accelerator)
 
         # Remaining pipelines can only be setup after accelerators have been registered
         self.setup_hardware_pipeline()
@@ -91,6 +95,8 @@ class PHSCMain(SNAXCMain):
         # Hardware postprocessing pipeline treats circt-opt and firtool as black box
         # Because the output after circt-opt can not be parsed by xdsl,
         # and for sure the systemverilog after firtool can not be parsed by xdsl.
+
+        os.makedirs(os.path.dirname(os.path.abspath(self.args.output_hardware)), exist_ok=True)
 
         if not self.args.no_sv_conversion:
             p1 = subprocess.Popen(
@@ -131,6 +137,10 @@ class PHSCMain(SNAXCMain):
         else:
             with open(self.args.output_hardware, "w") as outfile:
                 outfile.write(hardware_ir_string)
+
+        # Generate schnitzel SoC verilog if requested
+        if self.args.output_schnitzel_dir:
+            call_phs_driver(accelerators, self.args.output_hardware, self.args.output_schnitzel_dir)
 
         # If an optional explicit software file is requested, overwrite the previous module
         if self.args.software_file:
@@ -177,6 +187,12 @@ class PHSCMain(SNAXCMain):
         )
         arg_parser.add_argument(
             "--hardfloat-external-modules", action="store_true", help="Instantiate hardfloat modules as external"
+        )
+        arg_parser.add_argument(
+            "--output-schnitzel-dir",
+            type=str,
+            nargs="?",
+            help="generate schnitzel SoC verilog in this directory (calls PhsDriver via mill)",
         )
 
     """
@@ -247,6 +263,7 @@ class PHSCMain(SNAXCMain):
             ConvertHardfloatToHw(easyfloat_path=easyfloat_path, external_modules=self.args.hardfloat_external_modules)
         )
         hardware_pass_pipeline.append(FinalizePhsToHWPass())
+        hardware_pass_pipeline.append(HwScalarizePublicModulesPass())
         self.hardware_pipeline = PassPipeline(tuple(hardware_pass_pipeline), self.pipeline_callback)
 
     def setup_software_pipeline(self):
