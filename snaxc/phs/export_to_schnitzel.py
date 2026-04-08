@@ -67,9 +67,7 @@ def build_schnitzel_config(
         # Switches: count true switches and get their bitwidths
         true_switches = pe.get_true_switches()
         switch_bitwidths: list[int] = [
-            get_switch_bitwidth(arg)
-            for arg in pe.get_switches()
-            if arg.get_unique_use() is not None
+            get_switch_bitwidth(arg) for arg in pe.get_switches() if arg.get_unique_use() is not None
         ][:true_switches]
 
         # Module name: PEOp sym_name + "_array" (matches firtool output convention)
