@@ -3,6 +3,10 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void putchar_(char ch);
 void htif_exit(int exit_code);
 int hart_id();
@@ -12,7 +16,7 @@ void cluster_sync() { __asm__ volatile("csrr x0, 0x810"); }
 int printf(const char *format, ...);
 
 void *memset(void *s, int c, size_t n) {
-  unsigned char *p = s;
+  unsigned char *p = (unsigned char *)s;
   while (n--) {
     *p++ = (unsigned char)c;
   }
@@ -36,6 +40,10 @@ void *memset(void *s, int c, size_t n) {
 #define verbose_printf(...) printf(__VA_ARGS__)
 #else
 #define verbose_printf(...) ((void)0)
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif
