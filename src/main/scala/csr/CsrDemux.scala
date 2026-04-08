@@ -4,11 +4,13 @@ import chisel3._
 import chisel3.util.{MuxLookup, log2Ceil}
 import csr.CsrIO
 
-class CsrDemux(addrMap: Seq[(Long, Long)]) extends Module {
+class CsrDemux(numOuts: Int, addrMap: Seq[(Long, Long)]) extends Module {
 
-  require(addrMap.nonEmpty, "addrMap must have at least one entry")
-
-  val numOuts = addrMap.length
+  require(
+    addrMap.length == numOuts - 1,
+    "addrMap must have numOuts-1 entries; the last port is the default catch-all"
+  )
+  require(numOuts >= 1, "numOuts must be at least 1")
 
   val io = IO(new Bundle {
     val in = Flipped(new CsrIO);
@@ -18,7 +20,7 @@ class CsrDemux(addrMap: Seq[(Long, Long)]) extends Module {
   val idxBits = log2Ceil(numOuts)
 
   def decode(addr: UInt): UInt =
-    addrMap.zipWithIndex.foldRight(0.U(idxBits.W)) { case ((entry, i), otherwise) =>
+    addrMap.zipWithIndex.foldRight((numOuts - 1).U(idxBits.W)) { case ((entry, i), otherwise) =>
       val (base, size) = entry
       Mux(addr >= base.U && addr < (base + size).U, i.U(idxBits.W), otherwise)
     }

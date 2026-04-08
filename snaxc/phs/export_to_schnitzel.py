@@ -117,7 +117,7 @@ def call_phs_driver(
     mill_cmd = [
         "./mill",
         "schnitzel.runMain",
-        "sim.PhsDriver",
+        "phs.PhsDriver",
         f"--phs-config={config_json}",
         f"--output-dir={abs_output_dir}",
     ]

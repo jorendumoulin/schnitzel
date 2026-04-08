@@ -2,8 +2,9 @@ package top
 
 import chisel3._
 
+import core.Core
 import core.{DecoupledBusIO, CoreConfig}
-import axi.{AXIConfig, AXIDemux}
+import axi.{AXIBundle, AXIConfig, AXIDemux}
 import cluster.Cluster
 import core.CVA6
 import axi.AxiToMem
@@ -16,10 +17,7 @@ class Top extends Module {
     val narrow_mem = new DecoupledBusIO(addrWidth = 32, dataWidth = 64)
   })
 
-  /** Override in subclasses to provide a custom cluster (e.g. with PHS accelerators). */
-  protected def makeCluster(): Cluster = Module(new Cluster)
-
-  val cluster = makeCluster()
+  val cluster = Module(new Cluster())
   val toMem = Module(new AxiToMem(addrWidth = 32, dataWidth = 512, axiConfig = AXIConfig(dataWidth = 512, idWidth = 6)))
   toMem.io.axi <> cluster.io.axi
   io.mem <> toMem.io.mem
