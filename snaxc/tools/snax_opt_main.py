@@ -9,7 +9,6 @@ from xdsl.xdsl_opt_main import xDSLOptMain
 from snaxc.dialects import get_all_snax_dialects
 from snaxc.hw.acc_context import AccContext
 from snaxc.hw.config_parser import parse_config
-from snaxc.hw.system import Cluster, Core, Memory, System
 from snaxc.transforms import get_all_snax_passes
 
 # Default system config matching the schnitzel architecture
