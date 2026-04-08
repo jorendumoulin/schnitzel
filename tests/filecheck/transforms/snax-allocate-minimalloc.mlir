@@ -1,4 +1,4 @@
-// RUN: snax-opt --split-input-file %s -p snax-allocate{mode=minimalloc} | filecheck %s
+// RUN: snax-opt --split-input-file --system-config %S/../test_system_config.json %s -p snax-allocate{mode=minimalloc} | filecheck %s
 
 builtin.module {
   func.func public @test() {

@@ -11,9 +11,12 @@ from xdsl.pattern_rewriter import (
 )
 from xdsl.utils.hints import isa
 
+from xdsl.dialects.builtin import StringAttr
+
 from snaxc.dialects import dart
 
-# from snaxc.util.snax_memory import L1, L3
+L1 = StringAttr("L1")
+L3 = StringAttr("L3")
 
 
 class InitFuncMemorySpace(RewritePattern):
@@ -43,7 +46,7 @@ class InitFuncMemorySpace(RewritePattern):
                         t.element_type,
                         t.get_shape(),
                         t.layout,
-                        L3.attribute,
+                        L3,
                     )
             return t
 
@@ -81,7 +84,7 @@ class InitMemRefGlobalMemorySpace(RewritePattern):
         memspace = op.memref.type.memory_space
 
         # If memory space is already L3, don't do anything
-        if memspace == L3.attribute:
+        if memspace == L3:
             return
 
         # otherwise, create new memref type with correct memory space
@@ -89,7 +92,7 @@ class InitMemRefGlobalMemorySpace(RewritePattern):
             op.memref.type.element_type,
             op.memref.type.get_shape(),
             op.memref.type.layout,
-            L3.attribute,
+            L3,
         )
 
         # create new get_global op
@@ -105,7 +108,7 @@ class InitMemRefAllocMemorySpace(RewritePattern):
         # allocs should go in memory space L1
         memspace = op.memref.type.memory_space
 
-        if memspace == L1.attribute:
+        if memspace == L1:
             # good, nothing left to do
             return
 
@@ -118,7 +121,7 @@ class InitMemRefAllocMemorySpace(RewritePattern):
             op.memref.type.get_shape(),
             dynamic_sizes=op.dynamic_sizes,
             layout=op.memref.type.layout,
-            memory_space=L1.attribute,
+            memory_space=L1,
         )
 
         # replace op
@@ -135,7 +138,7 @@ class InitStreamAndLinalgMemorySpace(RewritePattern):
         operands_to_memory_cast = tuple(
             x
             for x in op.operands
-            if isinstance(memref_type := x.type, builtin.MemRefType) and memref_type.memory_space != L1.attribute
+            if isinstance(memref_type := x.type, builtin.MemRefType) and memref_type.memory_space != L1
         )
 
         if not operands_to_memory_cast:
@@ -148,14 +151,14 @@ class InitStreamAndLinalgMemorySpace(RewritePattern):
                 if (
                     isinstance(use.operation, memref.MemorySpaceCastOp)
                     and isinstance(use_type := use.operation.dest.type, builtin.MemRefType)
-                    and use_type.memory_space == L1.attribute
+                    and use_type.memory_space == L1
                 ):
                     cast_op = use.operation
                     break
             # If cast op not found, create and insert new one
             assert isa(optype := operand.type, builtin.MemRefType[Attribute])
             if cast_op is None:
-                cast_op = memref.MemorySpaceCastOp.from_type_and_target_space(operand, optype, L1.attribute)
+                cast_op = memref.MemorySpaceCastOp.from_type_and_target_space(operand, optype, L1)
                 rewriter.insert_op(cast_op)
 
             return cast_op
