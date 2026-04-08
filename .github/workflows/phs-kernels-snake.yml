@@ -13,6 +13,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Checkout kuleuven-easyfloat
+        uses: actions/checkout@v4
+        with:
+          repository: KULeuven-MICAS/kuleuven-easyfloat
+          path: ../kuleuven-easyfloat
+          ref: b755dcdce7a9df261feff2c654d62241034e6e4a
       - name: Checkout Selective Submodules
         run: git submodule update --init --recursive --depth 1 submodules/cva6 submodules/ibex submodules/printf
       - name: Setup Pixi
