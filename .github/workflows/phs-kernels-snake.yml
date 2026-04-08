@@ -31,6 +31,11 @@ jobs:
           environments: phs
           cache: true
           cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+      - name: Generate flattened BlackBox wrappers
+        working-directory: schnitzel
+        run: |
+          pixi run -e phs make -C src/main/resources/ibex
+          pixi run -e phs make -C src/main/resources/cva6
       - name: Build and run kernels
         run: pixi run -e phs snakemake -k -p -j $(nproc) all
         working-directory: schnitzel/kernels/${{ matrix.kernel }}
