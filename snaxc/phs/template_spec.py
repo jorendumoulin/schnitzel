@@ -3,7 +3,6 @@ from collections.abc import Iterable
 
 from xdsl.ir.affine import AffineMap
 
-from snaxc.hw.streamers.streamers import Streamer, StreamerConfiguration, StreamerFlag
 from snaxc.ir.dart.access_pattern import Template, TemplatePattern
 
 
@@ -58,24 +57,6 @@ class TemplateSpec:
     def get_iterations(self) -> Iterable[tuple[int, ...]]:
         return itertools.product(*[range(bound) for bound in self.template_bounds])
 
-    def get_streamer_config(self) -> StreamerConfiguration:
-        reader_streamers: list[Streamer] = []
-        for input_size in self.get_input_sizes():
-            reader_streamers.append(
-                Streamer(
-                    StreamerType.Reader, temporal_dims=[StreamerFlag.Normal] * len(input_size), spatial_dims=input_size
-                )
-            )
-        writer_streamers: list[Streamer] = []
-        for output_size in self.get_output_sizes():
-            writer_streamers.append(
-                Streamer(
-                    StreamerType.Reader,
-                    temporal_dims=[StreamerFlag.Normal] * len(output_size),
-                    spatial_dims=output_size,
-                )
-            )
-        return StreamerConfiguration([*reader_streamers, *writer_streamers])
 
     def get_dart_template(self) -> Template:
         template = [*self.input_maps, *self.output_maps]
