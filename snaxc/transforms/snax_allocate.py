@@ -20,11 +20,13 @@ from xdsl.rewriter import InsertPoint
 from xdsl.traits import IsTerminator, SymbolTable
 from xdsl.utils.hints import isa
 
+from xdsl.dialects.builtin import StringAttr
+
 from snaxc.dialects import snax
 from snaxc.hw.acc_context import AccContext
 from snaxc.hw.system import Memory
 
-# from snaxc.util.snax_memory import L1, SnaxMemory
+L1 = StringAttr("L1")
 
 
 def create_memref_struct(
@@ -92,7 +94,7 @@ class DynamicAllocs(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, alloc_op: snax.Alloc, rewriter: PatternRewriter):
         ## only supporting L1 allocation for now
-        if alloc_op.memory_space != L1.attribute:
+        if alloc_op.memory_space != L1:
             return
 
         ops_to_insert: list[Operation] = []
@@ -160,7 +162,7 @@ class StaticAllocs(RewritePattern):
 
     get_memory: Callable[[str], Memory]
 
-    current_addresses: dict[Memory, int] = field(default_factory=dict[Memory, int])
+    current_addresses: dict[str, int] = field(default_factory=dict)
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: snax.Alloc, rewriter: PatternRewriter):
@@ -185,10 +187,10 @@ class StaticAllocs(RewritePattern):
         assert isinstance(op.memory_space, builtin.StringAttr)
         memory = self.get_memory(op.memory_space.data)
 
-        if memory not in self.current_addresses:
-            self.current_addresses[memory] = memory.start
+        if memory.name not in self.current_addresses:
+            self.current_addresses[memory.name] = memory.start
 
-        current_address = self.current_addresses[memory]
+        current_address = self.current_addresses[memory.name]
 
         if current_address % alignment != 0:
             # align the address
@@ -196,10 +198,10 @@ class StaticAllocs(RewritePattern):
 
         next_address = current_address + size
 
-        if next_address > memory.start + memory.capacity:
+        if next_address > memory.start + memory.size:
             raise RuntimeError(f"Memory space {memory.attribute.data} is full, cannot allocate {size} bytes")
 
-        self.current_addresses[memory] = next_address
+        self.current_addresses[memory.name] = next_address
 
         pointer_cst = arith.ConstantOp.from_int_and_width(current_address, builtin.i32)
         pointer = llvm.IntToPtrOp(pointer_cst)
@@ -292,12 +294,14 @@ class MiniMallocate(RewritePattern):
 
         # Lifetime of the buffers is now determined, run the minimalloc algorithm for every memory space
         pointer_result: dict[str, int] = {}
-        memory_spaces = set(
-            self.get_memory(cast(StringAttr, buffer_ops[buffer.id].memory_space).data) for buffer in buffers
-        )
-        for memory in memory_spaces:
+        memory_spaces = {
+            self.get_memory(cast(StringAttr, buffer_ops[buffer.id].memory_space).data).name:
+            self.get_memory(cast(StringAttr, buffer_ops[buffer.id].memory_space).data)
+            for buffer in buffers
+        }
+        for memory in memory_spaces.values():
             buffers_subset = [buffer for buffer in buffers if buffer_ops[buffer.id].memory_space == memory.attribute]
-            problem = Problem(buffers_subset, memory.capacity)
+            problem = Problem(buffers_subset, memory.size)
             solution = problem.solve()
             for buffer, offset in zip(buffers_subset, solution):
                 pointer_result[buffer.id] = offset + memory.start

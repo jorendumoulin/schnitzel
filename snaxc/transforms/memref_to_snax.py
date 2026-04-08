@@ -17,10 +17,12 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 
+from xdsl.dialects.builtin import StringAttr
+
 from snaxc.dialects import snax
 from snaxc.dialects.tsl import TiledStridedLayoutAttr
 
-# from snaxc.util.snax_memory import L1
+L1 = StringAttr("L1")
 
 
 class AllocOpRewrite(RewritePattern):
@@ -39,7 +41,7 @@ class AllocOpRewrite(RewritePattern):
         memory_space = alloc_op.memref.type.memory_space
 
         # if the memory space is not L1, conversion to snax is not possible
-        if memory_space != L1.attribute:
+        if memory_space != L1:
             return
 
         # get the layout
