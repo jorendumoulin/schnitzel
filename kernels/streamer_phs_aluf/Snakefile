@@ -42,7 +42,7 @@ rule phsc:
         phsc {input.mlir} {input.schedule} \
             --software-file {input.software} \
             -o {BUILD}/sw.mlir \
-            --output-hardware {ROOT}/src/main/resources/phs/acc1_array.sv \
+            --output-hardware {GENERATED}/acc1_array.sv \
             --output-schnitzel-dir {GENERATED}
         """
 

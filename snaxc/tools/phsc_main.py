@@ -96,6 +96,8 @@ class PHSCMain(SNAXCMain):
         # Because the output after circt-opt can not be parsed by xdsl,
         # and for sure the systemverilog after firtool can not be parsed by xdsl.
 
+        os.makedirs(os.path.dirname(os.path.abspath(self.args.output_hardware)), exist_ok=True)
+
         if not self.args.no_sv_conversion:
             p1 = subprocess.Popen(
                 ["circt-opt", "--map-arith-to-comb", "--hw-flatten-modules"],
