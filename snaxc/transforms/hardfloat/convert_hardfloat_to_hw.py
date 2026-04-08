@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -150,13 +151,17 @@ class ConvertHardfloatToHw(ModulePass):
             if len(self.easyfloat_path) == 0:
                 raise RuntimeError("Must provide easyfloat path if not using external_modules=True")
             ops = ",".join([spec.symbol_name for spec in counts.keys()])
-            mill_cmd = f"mill 'EasyFloat.run' --ops {ops} --format=hw"
+            pixi_toml = os.path.join(self.easyfloat_path, "pixi.toml")
+            mill_cmd = (
+                f"unset PIXI_PROJECT_MANIFEST PIXI_ENVIRONMENT_NAME PIXI_IN_SHELL;"
+                f" source <(pixi shell-hook --manifest-path {pixi_toml})"
+                f" && mill 'EasyFloat.run' --ops {ops} --format=hw"
+            )
             try:
                 mill_process = subprocess.run(
-                    mill_cmd,
+                    ["bash", "-c", mill_cmd],
                     cwd=self.easyfloat_path,
                     capture_output=True,
-                    shell=True,
                     text=True,
                     check=True,
                 )
