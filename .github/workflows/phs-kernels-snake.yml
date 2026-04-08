@@ -6,41 +6,22 @@ on:
   pull_request:
 jobs:
   build-and-run-kernels:
-    if: false
     runs-on: ubuntu-24.04
     strategy:
       matrix:
         kernel: [streamer_phs_alu, streamer_phs_aluf]
     steps:
-      - name: Checkout snax-mlir
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          path: snax-mlir
-      - name: Checkout kuleuven-easyfloat
-        uses: actions/checkout@v4
-        with:
-          repository: KULeuven-MICAS/kuleuven-easyfloat
-          path: kuleuven-easyfloat
-          ref: b755dcdce7a9df261feff2c654d62241034e6e4a
-      - name: Checkout snax_cluster
-        uses: actions/checkout@v4
-        with:
-          ref: Josse/add-phs-wrappers
-          repository: KULeuven-MICAS/snax_cluster
-          path: snax_cluster
           submodules: recursive
-      - name: Setup Pixi (snax-mlir)
+      - name: Setup Pixi
         uses: prefix-dev/setup-pixi@v0.8.1
         with:
-          manifest-path: snax-mlir/pyproject.toml
+          manifest-path: pixi.toml
+          environments: phs
           cache: true
           cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-      - name: Setup Pixi (snax_cluster)
-        uses: prefix-dev/setup-pixi@v0.8.1
-        with:
-          manifest-path: snax_cluster/pixi.toml
-          cache: true
-          post-cleanup: false
       - name: Build and run kernels
-        run: pixi run snakemake -k -p -j $(nproc) all
-        working-directory: snax-mlir/kernels/${{ matrix.kernel }}
+        run: pixi run -e phs snakemake -k -p -j $(nproc) all
+        working-directory: kernels/${{ matrix.kernel }}
