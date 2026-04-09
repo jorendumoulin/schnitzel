@@ -281,10 +281,6 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return SnaxBufferize
 
-    def get_snax_copy_to_dma():
-        from snaxc.transforms.snax_copy_to_dma import SNAXCopyToDMA
-
-        return SNAXCopyToDMA
 
     def get_snax_lower_mcycle():
         from snaxc.transforms.snax_lower_mcycle import SNAXLowerMCycle
@@ -384,7 +380,6 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "set-memory-layout": get_set_memory_layout,
         "set-memory-space": get_set_memory_space,
         "snax-bufferize": get_snax_bufferize,
-        "snax-copy-to-dma": get_snax_copy_to_dma,
         "snax-lower-mcycle": get_snax_lower_mcycle,
         "snax-to-func": get_snax_to_func,
         "test-add-mcycle-around-launch": get_test_add_mcycle_around_launch,
