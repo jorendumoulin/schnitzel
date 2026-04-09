@@ -11,7 +11,6 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 
-from snaxc.dialects.accfg import AcceleratorOp
 from snaxc.hw import AccContext
 from snaxc.hw.snax_phs import SNAXPHSAccelerator
 from snaxc.phs.decode import MappingNotFoundError, decode_abstract_graph
@@ -62,14 +61,12 @@ class DispatchLinalgPHS(ModulePass):
     name = "dispatch-linalg-phs"
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
-        # find all accelerator ops in the IR
         assert isinstance(ctx, AccContext)
-        accelerators: list[SNAXPHSAccelerator] = []
-        for accelerator_op in op.ops:
-            if isinstance(accelerator_op, AcceleratorOp):
-                accelerator_type = ctx.get_acc(accelerator_op.get_acc_name())
-                if isinstance(accelerator_type, SNAXPHSAccelerator):
-                    accelerators.append(accelerator_type)
+        # Get PHS accelerators from the system context
+        accelerators = [
+            acc for acc in ctx.system.iter_accelerators()
+            if isinstance(acc, SNAXPHSAccelerator)
+        ]
 
         # dispatch
         PatternRewriteWalker(DispatchLinalgPhsPattern(accelerators), apply_recursively=False).rewrite_module(op)

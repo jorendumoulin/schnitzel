@@ -22,6 +22,7 @@ from snaxc.hw.streamers.streamers import (
     Streamer,
     StreamerConfiguration,
     StreamerFlag,
+    StreamerSystemType,
 )
 from snaxc.hw.system import Accelerator
 from snaxc.ir.dart.access_pattern import Template
