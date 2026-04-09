@@ -35,6 +35,12 @@ rule all:
         f"{BUILD}/test.log",
 
 
+rule alu_test:
+    """Run the hand-written ALU accelerator test (for debugging CSR values)"""
+    input:
+        f"{BUILD}/alu_test.log",
+
+
 # --- Step 1: PHS compilation + schnitzel hardware generation ---
 # phsc compiles MLIR → BlackBox SV + SoC verilog + lowered software MLIR
 
@@ -119,6 +125,31 @@ rule link:
         f"{BUILD}/test.elf",
     shell:
         "{CC} {LDFLAGS} -T{LINKER_SCRIPT} {input.sw} {input.main} {input.runtime} -o {output}"
+
+
+# --- Hand-written ALU test (for debugging) ---
+
+
+rule build_alu_test:
+    input:
+        ninja=f"{DEVICE_BUILD}/build.ninja",
+    output:
+        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
+    shell:
+        "cmake --build {DEVICE_BUILD} --target alu_accelerator_test.elf"
+
+
+rule simulate_alu_test:
+    input:
+        sim=f"{SIM_BUILD}/sim",
+        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
+    output:
+        log=f"{BUILD}/alu_test.log",
+    shell:
+        """
+        {input.sim} {input.elf} 2>&1 | tee {output.log}
+        grep -q "TEST PASSED" {output.log}
+        """
 
 
 # --- Step 5: Build simulator (Verilator) ---
