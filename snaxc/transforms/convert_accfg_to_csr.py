@@ -17,7 +17,6 @@ from xdsl.rewriter import InsertPoint
 
 from snaxc.dialects import accfg
 from snaxc.hw import AccContext
-from snaxc.hw.accelerators.dma import Dma
 from snaxc.hw.system import System
 
 
@@ -32,7 +31,6 @@ class LowerAccfgSetupLaunchToCsr(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: accfg.SetupOp | accfg.LaunchOp, rewriter: PatternRewriter) -> None:
         accelerator = self.system.find_accelerator(op.accelerator)
-        assert isinstance(accelerator, Dma)
         field_to_csr = accelerator.param_values()
         ops: dict[int, list[Operation]] = {}
         for field, val in op.iter_params():
@@ -63,13 +61,10 @@ class LowerAccfgAwaitToCsr(RewritePattern):
     def match_and_rewrite(self, op: accfg.AwaitOp, rewriter: PatternRewriter, /):
         assert isinstance(op.token.owner, accfg.LaunchOp)
         accelerator = self.system.find_accelerator(op.token.owner.accelerator)
-        assert isinstance(accelerator, Dma)
-        field_to_csr = accelerator.param_values()
+        addr = accelerator.barrier_address()
         c0 = ConstantOp.from_int_and_width(0, 32)
-        addr = field_to_csr[accelerator.launch_param()]
-        accelerator.launch_param()
-        write_op = InlineAsmOp(f"csrw {addr:#x}, $0", "K", [c0.result], has_side_effects=True)
-        rewriter.replace_matched_op((c0, write_op), safe_erase=False)
+        poll_op = InlineAsmOp(f"csrr x0, {addr:#x}", "", [], has_side_effects=True)
+        rewriter.replace_matched_op((c0, poll_op), safe_erase=False)
 
 
 class DeleteAllStates(RewritePattern):
