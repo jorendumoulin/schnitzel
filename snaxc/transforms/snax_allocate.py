@@ -6,6 +6,7 @@ from typing import cast
 from minimalloc import Buffer, Problem  # pyright: ignore[reportMissingTypeStubs]
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, llvm
+from xdsl.dialects.builtin import StringAttr
 from xdsl.dialects.memref import DeallocOp
 from xdsl.ir import Operation, OpResult, Sequence, SSAValue
 from xdsl.parser import IndexType, IntegerAttr, StringAttr
@@ -19,8 +20,6 @@ from xdsl.pattern_rewriter import (
 from xdsl.rewriter import InsertPoint
 from xdsl.traits import IsTerminator, SymbolTable
 from xdsl.utils.hints import isa
-
-from xdsl.dialects.builtin import StringAttr
 
 from snaxc.dialects import snax
 from snaxc.hw.acc_context import AccContext
@@ -295,8 +294,9 @@ class MiniMallocate(RewritePattern):
         # Lifetime of the buffers is now determined, run the minimalloc algorithm for every memory space
         pointer_result: dict[str, int] = {}
         memory_spaces = {
-            self.get_memory(cast(StringAttr, buffer_ops[buffer.id].memory_space).data).name:
-            self.get_memory(cast(StringAttr, buffer_ops[buffer.id].memory_space).data)
+            self.get_memory(cast(StringAttr, buffer_ops[buffer.id].memory_space).data).name: self.get_memory(
+                cast(StringAttr, buffer_ops[buffer.id].memory_space).data
+            )
             for buffer in buffers
         }
         for memory in memory_spaces.values():

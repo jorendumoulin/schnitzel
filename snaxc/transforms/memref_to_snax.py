@@ -6,6 +6,7 @@ from xdsl.dialects.builtin import (
     FixedBitwidthType,
     IndexType,
     NoneAttr,
+    StringAttr,
     UnrealizedConversionCastOp,
 )
 from xdsl.ir import Operation, OpResult
@@ -16,8 +17,6 @@ from xdsl.pattern_rewriter import (
     RewritePattern,
     op_type_rewrite_pattern,
 )
-
-from xdsl.dialects.builtin import StringAttr
 
 from snaxc.dialects import snax
 from snaxc.dialects.tsl import TiledStridedLayoutAttr

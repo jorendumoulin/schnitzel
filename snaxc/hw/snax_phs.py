@@ -33,11 +33,9 @@ class SNAXPHSAccelerator:
 
         # Build Phs accelerator from template
         true_switches = pe.get_true_switches()
-        switch_bitwidths = [
-            get_switch_bitwidth(arg)
-            for arg in pe.get_switches()
-            if arg.get_unique_use() is not None
-        ][:true_switches]
+        switch_bitwidths = [get_switch_bitwidth(arg) for arg in pe.get_switches() if arg.get_unique_use() is not None][
+            :true_switches
+        ]
 
         self.phs = Phs.from_template(
             name=self.name,
