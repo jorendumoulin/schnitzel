@@ -71,4 +71,8 @@ class Phs(Accelerator):
             csrs.extend(streamer.ss_params())
         for i in range(self.num_switches):
             csrs.append(f"switch_{i}")
+        csrs.append("start")
         return {param: base + idx for idx, param in enumerate(csrs)}
+
+    def barrier_address(self) -> int:
+        return self.param_values()["start"]

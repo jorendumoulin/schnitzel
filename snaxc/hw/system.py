@@ -21,6 +21,14 @@ class Accelerator(ABC):
     def resolve_parents(self, core: "Core"):
         self._core = core
 
+    def param_values(self) -> dict[str, int]:
+        """Return mapping from CSR field name to CSR address."""
+        raise NotImplementedError()
+
+    def barrier_address(self) -> int:
+        """Return the CSR address to poll for completion."""
+        raise NotImplementedError()
+
     def convert_to_acc_ops(self, op: Operation) -> Sequence[Operation]:
         """
         Lowers the operation op to a sequence of acc_ops.

@@ -38,3 +38,6 @@ class Dma(Accelerator):
         csrs.append(self.dir_param())
         csrs.append(self.launch_param())
         return {param: base + idx for idx, param in enumerate(csrs)}
+
+    def barrier_address(self) -> int:
+        return self.param_values()[self.launch_param()]

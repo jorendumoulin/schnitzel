@@ -26,7 +26,8 @@ class ConvertStreamToAccfgPattern(RewritePattern):
     def match_and_rewrite(self, op: snax_stream.StreamingRegionOp, rewriter: PatternRewriter):
         dynamic_operands = [x for x in op.dynamic_operands]
         accelerator = self.ctx.system.find_accelerator(op.accelerator)
-        assert isinstance(accelerator, Dma)
+        if not isinstance(accelerator, Dma):
+            return
         setup_vals: dict[str, SSAValue | Operation] = {}
         ops_to_add: list[Operation] = []
         for operand, pattern, streamer in zip(
