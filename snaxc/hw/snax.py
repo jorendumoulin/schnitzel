@@ -9,7 +9,6 @@ from xdsl.ir import Operation, OpResult, SSAValue
 
 from snaxc.dialects import accfg, snax_stream
 from snaxc.dialects.dart import AccessPatternOp, StreamingRegionOpBase
-from snaxc.dialects.snax import StreamerConfigurationAttr
 from snaxc.dialects.snax_stream import StreamingRegionOp
 from snaxc.hw.streamers.extensions.streamer_extension import StreamerExtension
 from snaxc.hw.streamers.extensions.transpose_extension import (
@@ -96,23 +95,20 @@ class SNAXStreamer(ABC):
     Abstract base class for SNAX Accelerators with Streamer interfaces.
     """
 
-    streamer_config: StreamerConfigurationAttr
+    streamer_config: StreamerConfiguration
     streamer_names: Sequence[str]
     streamer_setup_fields: Sequence[str]
     streamer_launch_fields: Sequence[str]
 
     zero_address = 0x1000_0040
 
-    def __init__(self, streamer_config: StreamerConfiguration | StreamerConfigurationAttr) -> None:
-        if isinstance(streamer_config, StreamerConfiguration):
-            streamer_config = StreamerConfigurationAttr(streamer_config)
-
+    def __init__(self, streamer_config: StreamerConfiguration) -> None:
         self.streamer_config = streamer_config
 
         # set streamer names as a, b, c, d, ...
-        self.streamer_names = list(string.ascii_lowercase[: self.streamer_config.data.size()])
+        self.streamer_names = list(string.ascii_lowercase[: self.streamer_config.size()])
 
-        if self.streamer_config.data.system_type() == StreamerSystemType.Regular:
+        if self.streamer_config.system_type() == StreamerSystemType.Regular:
             self.streamer_setup_fields = self.get_streamer_setup_fields()
             self.streamer_launch_fields = self.get_streamer_launch_fields()
         else:
@@ -122,9 +118,9 @@ class SNAXStreamer(ABC):
     def _generate_streamer_setup_vals(self, op: StreamingRegionOp) -> Sequence[tuple[Sequence[Operation], SSAValue]]:
         result: Sequence[tuple[Sequence[Operation], SSAValue]] = []
 
-        do_broadcast = [False] * len(self.streamer_config.data.streamers)
+        do_broadcast = [False] * len(self.streamer_config.streamers)
 
-        for operand, streamer in enumerate(self.streamer_config.data.streamers):
+        for operand, streamer in enumerate(self.streamer_config.streamers):
             # streamer must generate zero pattern if the stream is coming from c0
             is_zero_pattern = False
             if isinstance(opresult := op.operands[operand], OpResult):
@@ -192,7 +188,7 @@ class SNAXStreamer(ABC):
                     result.append(([n1], n1.result))
 
         # transpose specifications
-        for operand, streamer in enumerate(self.streamer_config.data.streamers):
+        for operand, streamer in enumerate(self.streamer_config.streamers):
             if any(isinstance(opt, TransposeExtension) for opt in streamer.opts):
                 # if we want to disable transpose, we need
                 # a 1 to the transpose field, as it is an
@@ -200,7 +196,7 @@ class SNAXStreamer(ABC):
                 c0 = arith.ConstantOp.from_int_and_width(0, i32)
                 result.append(([c0], c0.result))
 
-        for operand, streamer in enumerate(self.streamer_config.data.streamers):
+        for operand, streamer in enumerate(self.streamer_config.streamers):
             if any(isinstance(opt, HasBroadcast) for opt in streamer.opts):
                 if do_broadcast[operand]:
                     c1 = arith.ConstantOp.from_int_and_width(1, i32)
@@ -214,7 +210,7 @@ class SNAXStreamer(ABC):
     def get_streamer_setup_fields(self) -> Sequence[str]:
         result: list[str] = []
 
-        for name, streamer in zip(self.streamer_names, self.streamer_config.data.streamers):
+        for name, streamer in zip(self.streamer_names, self.streamer_config.streamers):
             # base pointers
             result.extend([f"{name}_ptr_low", f"{name}_ptr_high"])
             # spatial strides
@@ -230,11 +226,11 @@ class SNAXStreamer(ABC):
                 result.append(f"{name}_channel_mask")
 
         # transpose specifications
-        for streamer, name in zip(self.streamer_config.data.streamers, self.streamer_names):
+        for streamer, name in zip(self.streamer_config.streamers, self.streamer_names):
             if any(isinstance(opt, TransposeExtension) for opt in streamer.opts):
                 result.append(f"{name}_transpose")
 
-        for streamer, name in zip(self.streamer_config.data.streamers, self.streamer_names):
+        for streamer, name in zip(self.streamer_config.streamers, self.streamer_names):
             if any(isinstance(opt, HasBroadcast) for opt in streamer.opts):
                 result.append(f"{name}_broadcast")
 
@@ -249,15 +245,15 @@ class SNAXStreamer(ABC):
         """
         result: list[str] = []
 
-        assert self.streamer_config.data.system_type() == StreamerSystemType.DmaExt, (
+        assert self.streamer_config.system_type() == StreamerSystemType.DmaExt, (
             "This method should only be called for xDMA streamer configurations"
         )
 
-        for name, streamer in zip(self.streamer_names, self.streamer_config.data.streamers):
+        for name, streamer in zip(self.streamer_names, self.streamer_config.streamers):
             # base address
             result.extend([f"{name}_ptr_low", f"{name}_ptr_high"])
 
-        for i, (name, streamer) in enumerate(zip(self.streamer_names, self.streamer_config.data.streamers)):
+        for i, (name, streamer) in enumerate(zip(self.streamer_names, self.streamer_config.streamers)):
             # spatial strides
             result.extend([f"{name}_sstride_{i}" for i in range(streamer.spatial_dim)])
             # temporal bounds
@@ -333,7 +329,7 @@ class SNAXStreamer(ABC):
         """
         Return the set of streamers used for a given op.
         """
-        return self.streamer_config.data.streamers
+        return self.streamer_config.streamers
 
     def set_stride_patterns(
         self,

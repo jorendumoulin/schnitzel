@@ -17,7 +17,13 @@ def get_all_accelerators() -> dict[str, Callable[[], type[Accelerator]]]:
 
         return Dma
 
+    def get_phs():
+        from snaxc.hw.accelerators.phs import Phs
+
+        return Phs
+
     return {
         "alu": get_alu,
         "dma": get_dma,
+        "phs": get_phs,
     }
