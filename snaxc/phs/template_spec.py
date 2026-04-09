@@ -57,7 +57,6 @@ class TemplateSpec:
     def get_iterations(self) -> Iterable[tuple[int, ...]]:
         return itertools.product(*[range(bound) for bound in self.template_bounds])
 
-
     def get_dart_template(self) -> Template:
         template = [*self.input_maps, *self.output_maps]
         template_bounds = self.template_bounds

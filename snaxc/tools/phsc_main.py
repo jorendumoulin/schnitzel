@@ -13,9 +13,10 @@ from xdsl.printer import Printer
 from xdsl.transforms.mlir_opt import MLIROptPass
 
 from snaxc.dialects import phs
-from snaxc.phs.export_to_schnitzel import call_phs_driver
 from snaxc.hw.acc_context import AccContext
+from snaxc.hw.config_parser import parse_config
 from snaxc.hw.snax_phs import SNAXPHSAccelerator
+from snaxc.phs.export_to_schnitzel import call_phs_driver
 from snaxc.phs.template_spec import TemplateSpec
 from snaxc.tools.snaxc_main import SNAXCMain
 from snaxc.transforms.hardfloat.convert_float_to_hardfloat import ConvertFloatToHardfloatPass
@@ -28,7 +29,6 @@ from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
-from snaxc.hw.config_parser import parse_config
 
 
 class PHSCMain(SNAXCMain):
@@ -136,13 +136,11 @@ class PHSCMain(SNAXCMain):
             # Strip unknown accelerator types (e.g. PHS) that parse_config
             # can't deserialize. Keep known types like "dma".
             from snaxc.hw import get_all_accelerators
+
             known_types = set(get_all_accelerators().keys())
             for cluster in system_config.get("clusters", []):
                 for core in cluster.get("cores", []):
-                    core["accelerators"] = [
-                        a for a in core.get("accelerators", [])
-                        if a.get("type") in known_types
-                    ]
+                    core["accelerators"] = [a for a in core.get("accelerators", []) if a.get("type") in known_types]
             self.ctx.system = parse_config(system_config)
 
         # If an optional explicit software file is requested, overwrite the previous module

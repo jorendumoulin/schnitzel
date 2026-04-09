@@ -1,15 +1,15 @@
 from dataclasses import dataclass
 
 from xdsl.context import Context
-from snaxc.dialects.accfg import SetupOp
-from xdsl.dialects.builtin import ModuleOp, i32
 from xdsl.dialects.arith import ConstantOp, DivUIOp, MuliOp
 from xdsl.dialects.builtin import (
     DYNAMIC_INDEX,
     FixedBitwidthType,
     IndexType,
     MemRefType,
+    ModuleOp,
     NoneAttr,
+    i32,
 )
 from xdsl.dialects.memref import (
     CopyOp,
@@ -28,6 +28,7 @@ from xdsl.pattern_rewriter import (
 from xdsl.rewriter import InsertPoint
 from xdsl.utils.hints import isa
 
+from snaxc.dialects.accfg import SetupOp
 from snaxc.dialects.snax_stream import StreamingRegionOp, StridePattern
 from snaxc.hw.acc_context import AccContext
 from snaxc.hw.accelerators.dma import Dma

@@ -28,15 +28,11 @@ class ClusterSyncPattern(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: ClusterSyncOp, rewriter: PatternRewriter):
-        rewriter.replace_matched_op(
-            InlineAsmOp("csrr x0, 0x810", "", [], [], has_side_effects=True)
-        )
+        rewriter.replace_matched_op(InlineAsmOp("csrr x0, 0x810", "", [], [], has_side_effects=True))
 
 
 class ConvertSnaxToLlvmPass(ModulePass):
     name = "convert-snax-to-llvm"
 
     def apply(self, ctx: Context, op: ModuleOp) -> None:
-        PatternRewriteWalker(
-            GreedyRewritePatternApplier([HartIdPattern(), ClusterSyncPattern()])
-        ).rewrite_module(op)
+        PatternRewriteWalker(GreedyRewritePatternApplier([HartIdPattern(), ClusterSyncPattern()])).rewrite_module(op)

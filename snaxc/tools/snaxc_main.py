@@ -11,7 +11,6 @@ from xdsl.printer import Printer
 from xdsl.tools.command_line_tool import CommandLineTool
 from xdsl.transforms.canonicalize import CanonicalizePass
 from xdsl.transforms.common_subexpression_elimination import CommonSubexpressionElimination
-from xdsl.transforms.experimental.function_constant_pinning import FunctionConstantPinningPass
 from xdsl.transforms.mlir_opt import MLIROptPass
 
 from snaxc.dialects import get_all_snax_dialects

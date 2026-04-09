@@ -1,5 +1,6 @@
 from xdsl.context import Context
 from xdsl.dialects import builtin, func, linalg, memref
+from xdsl.dialects.builtin import StringAttr
 from xdsl.ir import Attribute, Operation, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -10,8 +11,6 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 from xdsl.utils.hints import isa
-
-from xdsl.dialects.builtin import StringAttr
 
 from snaxc.dialects import dart
 
