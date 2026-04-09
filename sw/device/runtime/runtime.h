@@ -32,9 +32,6 @@ void *memcpy(void *dest, const void *src, size_t n) {
   return dest;
 }
 
-// MLIR-generated code calls this for cluster sync barriers
-void _mlir_ciface_snax_cluster_hw_barrier() { cluster_sync(); }
-
 // --- Helper Macros ---
 #define TCDM __attribute__((section(".tcdm"), aligned(64)))
 
