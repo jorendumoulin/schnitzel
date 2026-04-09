@@ -1,15 +1,33 @@
 {
-  "memory": {"name": "L3", "start": 8589934592, "size": 8589934592},
+  "memory": {
+    "name": "L3",
+    "start": 8589934592,
+    "size": 8589934592
+  },
   "clusters": [
     {
-      "memory": {"name": "L1", "start": 4294967296, "size": 65536},
+      "memory": {
+        "name": "L1",
+        "start": 4294967296,
+        "size": 65536
+      },
       "cores": [
-        {"hart_id": 1, "accelerators": []},
-        {"hart_id": 2, "accelerators": []}
+        {
+          "hart_id": 1,
+          "accelerators": []
+        },
+        {
+          "hart_id": 2,
+          "accelerators": []
+        }
       ]
     },
     {
-      "memory": {"name": "Test", "start": 0, "size": 100},
+      "memory": {
+        "name": "Test",
+        "start": 0,
+        "size": 100
+      },
       "cores": []
     }
   ]
