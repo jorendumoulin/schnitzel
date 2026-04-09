@@ -20,7 +20,7 @@ from snaxc.hw.snax import SNAXStreamer
 from snaxc.hw.streamers.streamers import HasBroadcast
 from snaxc.ir.dart.affine_transform import AffineTransform
 
-TCDM_BANK_WIDTH = 8
+TCDM_BANK_WIDTH = 4
 
 
 @dataclass
@@ -140,6 +140,7 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
             inputs=new_inputs,
             outputs=new_outputs,
             stride_patterns=snax_stride_patterns,
+            dynamic_operands=[],
             accelerator=op.accelerator.data,
             body=rewriter.move_region_contents_to_new_regions(op.body),
         )

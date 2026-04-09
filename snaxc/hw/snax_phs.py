@@ -7,6 +7,8 @@ from xdsl.pattern_rewriter import PatternRewriter
 
 from snaxc.dialects import accfg, dart, phs, snax_stream
 from snaxc.hw.accelerators.phs import Phs
+from snaxc.hw.snax import SNAXStreamer
+from snaxc.hw.system import Accelerator
 from snaxc.ir.dart.access_pattern import Template
 from snaxc.phs.decode import decode_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs
@@ -14,7 +16,7 @@ from snaxc.phs.hw_conversion import get_switch_bitwidth
 from snaxc.phs.template_spec import TemplateSpec
 
 
-class SNAXPHSAccelerator:
+class SNAXPHSAccelerator(Accelerator, SNAXStreamer):
     """
     Accelerator interface class for the SNAX PHS accelerator.
 
@@ -44,6 +46,15 @@ class SNAXPHSAccelerator:
             num_switches=true_switches,
             switch_bitwidths=switch_bitwidths,
         )
+
+        # Initialize SNAXStreamer with the PHS streamer configuration
+        SNAXStreamer.__init__(self, self.phs.streamers)
+
+    def param_values(self) -> dict[str, int]:
+        return self.phs.param_values()
+
+    def barrier_address(self) -> int:
+        return self.phs.barrier_address()
 
     def get_switch_values(
         self, op: linalg.GenericOp | dart.GenericOp

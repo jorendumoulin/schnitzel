@@ -1,6 +1,6 @@
 from abc import ABC
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import prod
 
 from xdsl.utils.str_enum import StrEnum
@@ -90,6 +90,7 @@ class Streamer:
     temporal_dims: int
     spatial_dims: tuple[int, ...]
     name_base: str
+    opts: list[StreamerOpts] = field(default_factory=list)
 
     def addr_params(self) -> str:
         return f"{self.name_base}_addr"
@@ -105,6 +106,11 @@ class Streamer:
     def ss_params(self) -> Iterable[str]:
         for i in range(self.spatial_dim):
             yield f"{self.name_base}_ss_{i}"
+
+    @property
+    def temporal_dim(self) -> int:
+        """Number of temporal dimensions"""
+        return self.temporal_dims
 
     @property
     def spatial_dim(self) -> int:
@@ -127,6 +133,11 @@ class Streamer:
         return tuple(self.access_width * prod(self.spatial_dims[i + 1 :]) for i in range(self.spatial_dim))
 
 
+class StreamerSystemType(StrEnum):
+    Regular = "regular"
+    DmaExt = "dma_ext"
+
+
 @dataclass
 class StreamerConfiguration:
     """
@@ -134,3 +145,9 @@ class StreamerConfiguration:
     """
 
     streamers: Sequence[Streamer]
+
+    def size(self) -> int:
+        return len(self.streamers)
+
+    def system_type(self) -> StreamerSystemType:
+        return StreamerSystemType.Regular
