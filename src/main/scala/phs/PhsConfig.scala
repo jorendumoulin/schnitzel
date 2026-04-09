@@ -50,12 +50,36 @@ object PhsAcceleratorConfig {
   )
 }
 
-// --- PHS metadata for config.json export ---
+// --- PHS system config for config.json export ---
 
 case class PhsMemoryConfig(name: String, start: Long, size: Long)
 object PhsMemoryConfig { implicit val rw: RW[PhsMemoryConfig] = macroRW }
 
-case class PhsCoreConfig(hart_id: Int, accelerators: List[PhsAcceleratorConfig])
+/** Accelerator entry in the PHS config. Uses a type discriminator so the
+  * Python parser can create the right accelerator object. */
+sealed trait PhsAccelEntry { def `type`: String }
+
+case class PhsAccelPhsEntry(
+    `type`: String,
+    streamers: Seq[PhsStreamerConfig],
+    numSwitches: Int,
+    switchBitwidths: Seq[Int],
+    moduleName: String,
+    svPath: String
+) extends PhsAccelEntry
+object PhsAccelPhsEntry { implicit val rw: RW[PhsAccelPhsEntry] = macroRW }
+
+case class PhsAccelDmaEntry(`type`: String) extends PhsAccelEntry
+object PhsAccelDmaEntry { implicit val rw: RW[PhsAccelDmaEntry] = macroRW }
+
+object PhsAccelEntry {
+  implicit val rw: RW[PhsAccelEntry] = RW.merge(
+    macroRW[PhsAccelPhsEntry],
+    macroRW[PhsAccelDmaEntry]
+  )
+}
+
+case class PhsCoreConfig(hart_id: Int, accelerators: List[PhsAccelEntry])
 object PhsCoreConfig { implicit val rw: RW[PhsCoreConfig] = macroRW }
 
 case class PhsClusterConfig(memory: PhsMemoryConfig, cores: List[PhsCoreConfig])
