@@ -76,7 +76,7 @@ rule compile_mlir_kernel:
     output:
         f"{BUILD}/sw.o",
     shell:
-        "{CC} {CFLAGS} -x ir -c {input} -o {output}"
+        "{CC} {CFLAGS} -x ir -c {input} -o {output} -Wno-override-module"
 
 
 # --- Step 3: Build device runtime (cmake, once) ---
