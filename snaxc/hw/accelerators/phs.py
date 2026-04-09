@@ -60,6 +60,23 @@ class Phs(Accelerator):
             streamers=StreamerConfiguration([*readers, *writers]),
         )
 
+    @staticmethod
+    def from_config(config: dict) -> "Phs":
+        """Create a Phs accelerator from a JSON config dict (as produced by PhsDriver)."""
+        input_sizes = [
+            tuple(s["spatialDimSizes"]) for s in config.get("streamers", []) if s["streamType"] == "read"
+        ]
+        output_sizes = [
+            tuple(s["spatialDimSizes"]) for s in config.get("streamers", []) if s["streamType"] == "write"
+        ]
+        return Phs.from_template(
+            name=config.get("moduleName", "phs"),
+            input_sizes=input_sizes,
+            output_sizes=output_sizes,
+            num_switches=config.get("numSwitches", 0),
+            switch_bitwidths=config.get("switchBitwidths", []),
+        )
+
     def param_values(self) -> dict[str, int]:
         """Compute CSR address map matching the Scala PhsAccelerator layout."""
         base = 0x900

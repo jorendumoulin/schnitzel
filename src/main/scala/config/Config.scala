@@ -17,12 +17,6 @@ object AluConfig { implicit val rw: RW[AluConfig] = macroRW }
 case class DmaConfig(`type`: String) extends Accelerator
 object DmaConfig { implicit val rw: RW[DmaConfig] = macroRW }
 
-// case class AluWrapper(`type`: String, config: AluConfig) extends Accelerator
-// object AluWrapper { implicit val rw: RW[AluWrapper] = macroRW }
-
-// case class DmaWrapper(`type`: String, config: DmaConfig) extends Accelerator
-// object DmaWrapper { implicit val rw: RW[DmaWrapper] = macroRW }
-
 object Accelerator {
   implicit val rw: RW[Accelerator] = RW.merge(
     macroRW[AluConfig],

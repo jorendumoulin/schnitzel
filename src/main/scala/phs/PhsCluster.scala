@@ -121,8 +121,10 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
   def getConfig: PhsClusterConfig = PhsClusterConfig(
     PhsMemoryConfig("L1", 0x1000_0000L, 0x1_0000L),
     List(
-      PhsCoreConfig(1, phsConfigs(1).toList),
-      PhsCoreConfig(2, List())
+      PhsCoreConfig(1, phsConfigs(1).map(cfg =>
+        PhsAccelPhsEntry("phs", cfg.streamers, cfg.numSwitches, cfg.switchBitwidths, cfg.moduleName, cfg.svPath)
+      ).toList),
+      PhsCoreConfig(2, List(PhsAccelDmaEntry("dma")))
     )
   )
 }
