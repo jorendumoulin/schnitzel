@@ -115,7 +115,7 @@ class Cluster extends Module {
   axiMux.io.out <> io.axi
 
   def getConfig: ClusterConfig = ClusterConfig(
-    MemoryConfig("L1", 0x1_0000_0000L, 0x1_0000L),
+    MemoryConfig("L1", 0x1000_0000L, 0x1_0000L),
     List(
       config.CoreConfig(1, List(aluAccelerator.getConfig)),
       config.CoreConfig(2, List(dma.getConfig))

@@ -119,7 +119,7 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
 
   // ---- Config export ----
   def getConfig: PhsClusterConfig = PhsClusterConfig(
-    PhsMemoryConfig("L1", 0x1_0000_0000L, 0x1_0000L),
+    PhsMemoryConfig("L1", 0x1000_0000L, 0x1_0000L),
     List(
       PhsCoreConfig(1, phsConfigs(1).toList),
       PhsCoreConfig(2, List())

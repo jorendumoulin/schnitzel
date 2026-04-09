@@ -13,13 +13,13 @@ from snaxc.transforms import get_all_snax_passes
 
 # Default system config matching the schnitzel architecture
 DEFAULT_SYSTEM_CONFIG = {
-    "memory": {"name": "L3", "start": 0x2_0000_0000, "size": 0x2_0000_0000},
+    "memory": {"name": "L3", "start": 0x8000_0000, "size": 0x4000_0000},
     "clusters": [
         {
-            "memory": {"name": "L1", "start": 0x1_0000_0000, "size": 0x1_0000},
+            "memory": {"name": "L1", "start": 0x1000_0000, "size": 0x1_0000},
             "cores": [
                 {"hart_id": 1, "accelerators": []},
-                {"hart_id": 2, "accelerators": []},
+                {"hart_id": 2, "accelerators": [{"type": "dma"}]},
             ],
         }
     ],
