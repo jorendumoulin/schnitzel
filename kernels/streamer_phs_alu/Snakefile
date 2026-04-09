@@ -21,7 +21,9 @@ DEVICE_BUILD = f"{BUILD}/device"
 # Cross-compilation settings (must match ibex-toolchain.cmake)
 CXX = "clang++"
 CC = "clang"
-CFLAGS = "-O2 --target=riscv32-unkown-elf -march=rv32imc -mabi=ilp32 -fno-builtin-printf"
+CFLAGS = (
+    "-O2 --target=riscv32-unkown-elf -march=rv32imc -mabi=ilp32 -fno-builtin-printf"
+)
 LDFLAGS = f"{CFLAGS} -fuse-ld=lld -nostartfiles -nostdlib"
 RUNTIME_INCLUDE = f"{ROOT}/sw/device/runtime"
 MLIR_INCLUDE = f"{ROOT}/sw/common/mlir"
