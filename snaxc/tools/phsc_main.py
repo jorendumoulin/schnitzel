@@ -28,7 +28,7 @@ from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
-from snaxc.util.snax_memory import L1, L3
+from snaxc.hw.config_parser import parse_config
 
 
 class PHSCMain(SNAXCMain):
@@ -51,8 +51,6 @@ class PHSCMain(SNAXCMain):
             output_maps=(AffineMap.from_callable(lambda y: (y,)),),
             template_bounds=(4,),
         )
-        self.ctx.register_memory(L1)
-        self.ctx.register_memory(L3)
         self.setup_input_pipeline()
 
     def run(self):
@@ -67,17 +65,11 @@ class PHSCMain(SNAXCMain):
         module.verify()
         hardware_module = module.clone()
 
-        # Avoid late binding trap in lambda
-        def phs_register(accelerator: SNAXPHSAccelerator) -> SNAXPHSAccelerator:
-            return accelerator
-
         accelerators: list[SNAXPHSAccelerator] = []
         for hw_op in hardware_module.ops:
             if isinstance(hw_op, phs.PEOp):
                 # Use a clone to prevent downstream changes messing up accelerator registration
                 accelerator = SNAXPHSAccelerator(hw_op.clone(), self.template_spec)
-                assert isinstance(self.ctx, AccContext)
-                self.ctx.register_accelerator(accelerator.name, phs_register(accelerator))
                 accelerators.append(accelerator)
 
         # Remaining pipelines can only be setup after accelerators have been registered
@@ -140,7 +132,18 @@ class PHSCMain(SNAXCMain):
 
         # Generate schnitzel SoC verilog if requested
         if self.args.output_schnitzel_dir:
-            call_phs_driver(accelerators, self.args.output_hardware, self.args.output_schnitzel_dir)
+            system_config = call_phs_driver(accelerators, self.args.output_hardware, self.args.output_schnitzel_dir)
+            # Strip unknown accelerator types (e.g. PHS) that parse_config
+            # can't deserialize. Keep known types like "dma".
+            from snaxc.hw import get_all_accelerators
+            known_types = set(get_all_accelerators().keys())
+            for cluster in system_config.get("clusters", []):
+                for core in cluster.get("cores", []):
+                    core["accelerators"] = [
+                        a for a in core.get("accelerators", [])
+                        if a.get("type") in known_types
+                    ]
+            self.ctx.system = parse_config(system_config)
 
         # If an optional explicit software file is requested, overwrite the previous module
         if self.args.software_file:

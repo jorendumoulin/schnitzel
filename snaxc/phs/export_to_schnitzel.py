@@ -11,8 +11,7 @@ import subprocess
 import sys
 from collections.abc import Sequence
 
-from snaxc.accelerators.snax_phs import SNAXPHSAccelerator
-from snaxc.phs.hw_conversion import get_switch_bitwidth
+from snaxc.hw.snax_phs import SNAXPHSAccelerator
 
 
 def get_schnitzel_path() -> str:
@@ -42,33 +41,19 @@ def build_schnitzel_config(
     """
     configs: list[dict[str, object]] = []
     for acc in accelerators:
-        pe = acc.pe
-        spec = acc.template_spec
+        phs = acc.phs
 
-        # Streamer configs
+        # Streamer configs from the Phs accelerator
         streamer_cfgs: list[dict[str, str | int | list[int]]] = []
-        for input_size in spec.get_input_sizes():
+        for streamer in phs.streamers.streamers:
+            is_writer = streamer.name_base.startswith("out_")
             streamer_cfgs.append(
                 {
-                    "streamType": "read",
-                    "nTemporalDims": len(input_size),
-                    "spatialDimSizes": list(input_size),
+                    "streamType": "write" if is_writer else "read",
+                    "nTemporalDims": streamer.temporal_dims,
+                    "spatialDimSizes": list(streamer.spatial_dims),
                 }
             )
-        for output_size in spec.get_output_sizes():
-            streamer_cfgs.append(
-                {
-                    "streamType": "write",
-                    "nTemporalDims": len(output_size),
-                    "spatialDimSizes": list(output_size),
-                }
-            )
-
-        # Switches: count true switches and get their bitwidths
-        true_switches = pe.get_true_switches()
-        switch_bitwidths: list[int] = [
-            get_switch_bitwidth(arg) for arg in pe.get_switches() if arg.get_unique_use() is not None
-        ][:true_switches]
 
         # Module name: PEOp sym_name + "_array" (matches firtool output convention)
         module_name = acc.name + "_array"
@@ -76,8 +61,8 @@ def build_schnitzel_config(
         configs.append(
             {
                 "streamers": streamer_cfgs,
-                "numSwitches": true_switches,
-                "switchBitwidths": switch_bitwidths,
+                "numSwitches": phs.num_switches,
+                "switchBitwidths": phs.switch_bitwidths,
                 "moduleName": module_name,
                 "svPath": sv_path,
             }
@@ -91,9 +76,11 @@ def call_phs_driver(
     accelerators: Sequence[SNAXPHSAccelerator],
     output_hardware: str,
     output_dir: str,
-) -> None:
+) -> dict:
     """
     Call the schnitzel PhsDriver via mill to generate SoC verilog.
+
+    Returns the system config JSON (as a dict) produced by the hardware generator.
 
     Parameters
     ----------
@@ -130,3 +117,8 @@ def call_phs_driver(
     except subprocess.CalledProcessError as e:
         print(f"Error during schnitzel hardware generation:\n{e}", file=sys.stderr)
         raise SystemExit(e.returncode or 1)
+
+    # Read the system config produced by PhsDriver
+    config_path = os.path.join(abs_output_dir, "config.json")
+    with open(config_path) as f:
+        return json.load(f)
