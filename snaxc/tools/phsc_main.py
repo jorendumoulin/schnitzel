@@ -135,13 +135,27 @@ class PHSCMain(SNAXCMain):
             system_config = call_phs_driver(accelerators, self.args.output_hardware, self.args.output_schnitzel_dir)
             # Strip unknown accelerator types (e.g. PHS) that parse_config
             # can't deserialize. Keep known types like "dma".
+            # Inject DMA on core with hart_id=2 (core 0 in schnitzel,
+            # which has the DMA hardware but PhsCluster doesn't report it).
             from snaxc.hw import get_all_accelerators
 
             known_types = set(get_all_accelerators().keys())
             for cluster in system_config.get("clusters", []):
                 for core in cluster.get("cores", []):
                     core["accelerators"] = [a for a in core.get("accelerators", []) if a.get("type") in known_types]
+                # Add DMA to core with hart_id=2 if it has no accelerators
+                for core in cluster.get("cores", []):
+                    if core.get("hart_id") == 2 and not core["accelerators"]:
+                        core["accelerators"] = [{"type": "dma"}]
             self.ctx.system = parse_config(system_config)
+
+            # Register PHS accelerators in the system so passes can find them
+            for acc in accelerators:
+                for core in self.ctx.system.clusters[0].cores:
+                    if core.hart_id == 1:
+                        core.accelerators.append(acc)
+                        acc.resolve_parents(core)
+                        break
 
         # If an optional explicit software file is requested, overwrite the previous module
         if self.args.software_file:
