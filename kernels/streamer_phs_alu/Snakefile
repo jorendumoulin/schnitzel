@@ -1,9 +1,11 @@
 """
 End-to-end PHS build flow for the streamer_phs_alu kernel on schnitzel.
 
-  phsc (MLIR → SV + SoC verilog) → verilator (sim binary)
-                                  → clang (test ELF)
-                                  → simulate & verify
+  phsc (MLIR → SV + SoC verilog + sw.llvm.mlir)
+    → mlir-translate (sw.ll)
+    → clang (sw.o)
+    → link with runtime → test.elf
+    → verilator sim → simulate
 
 Usage: pixi run -e phs snakemake -j$(nproc)
 """
@@ -16,6 +18,15 @@ GENERATED = os.path.abspath(f"{BUILD}/generated")
 SIM_BUILD = f"{BUILD}/sim"
 DEVICE_BUILD = f"{BUILD}/device"
 
+# Cross-compilation settings (must match ibex-toolchain.cmake)
+CXX = "clang++"
+CC = "clang"
+CFLAGS = "-O2 --target=riscv32-unkown-elf -march=rv32imc -mabi=ilp32 -fno-builtin-printf"
+LDFLAGS = f"{CFLAGS} -fuse-ld=lld -nostartfiles -nostdlib"
+RUNTIME_INCLUDE = f"{ROOT}/sw/device/runtime"
+MLIR_INCLUDE = f"{ROOT}/sw/common/mlir"
+LINKER_SCRIPT = f"{RUNTIME_INCLUDE}/link.ld"
+
 
 rule all:
     input:
@@ -23,8 +34,7 @@ rule all:
 
 
 # --- Step 1: PHS compilation + schnitzel hardware generation ---
-# phsc compiles MLIR → BlackBox SV, then calls PhsDriver via mill
-# to generate the full SoC verilog in one step.
+# phsc compiles MLIR → BlackBox SV + SoC verilog + lowered software MLIR
 
 
 rule phsc:
@@ -33,19 +43,83 @@ rule phsc:
         schedule="transform_schedule.mlir",
         software="test_software.mlir",
     output:
+        sw=f"{BUILD}/sw.llvm.mlir",
         top=f"{GENERATED}/Top.sv",
         filelist=f"{GENERATED}/filelist.f",
     shell:
         """
         phsc {input.mlir} {input.schedule} \
             --software-file {input.software} \
-            -o {BUILD}/sw.mlir \
+            -o {output.sw} \
             --output-hardware {GENERATED}/acc1_array.sv \
             --output-schnitzel-dir {GENERATED}
         """
 
 
-# --- Step 2: Build simulator (Verilator) ---
+# --- Step 2: Compile PHS software kernel ---
+
+
+rule translate_mlir:
+    input:
+        f"{BUILD}/sw.llvm.mlir",
+    output:
+        f"{BUILD}/sw.ll",
+    shell:
+        "mlir-translate --mlir-to-llvmir -o {output} {input}"
+
+
+rule compile_mlir_kernel:
+    input:
+        f"{BUILD}/sw.ll",
+    output:
+        f"{BUILD}/sw.o",
+    shell:
+        "{CC} {CFLAGS} -x ir -c {input} -o {output}"
+
+
+# --- Step 3: Build device runtime (cmake, once) ---
+
+
+rule configure_device:
+    output:
+        ninja=f"{DEVICE_BUILD}/build.ninja",
+    shell:
+        "cmake -B {DEVICE_BUILD} -S {ROOT}/sw/device -G Ninja"
+
+
+rule build_device_runtime:
+    input:
+        ninja=f"{DEVICE_BUILD}/build.ninja",
+    output:
+        runtime=f"{DEVICE_BUILD}/runtime/libdevice_runtime.a",
+    shell:
+        "cmake --build {DEVICE_BUILD} --target device_runtime"
+
+
+# --- Step 4: Compile and link test harness ---
+
+
+rule compile_main:
+    input:
+        "main.cpp",
+    output:
+        f"{BUILD}/main.o",
+    shell:
+        "{CXX} {CFLAGS} -I{RUNTIME_INCLUDE} -I{MLIR_INCLUDE} -c {input} -o {output}"
+
+
+rule link:
+    input:
+        sw=f"{BUILD}/sw.o",
+        main=f"{BUILD}/main.o",
+        runtime=f"{DEVICE_BUILD}/runtime/libdevice_runtime.a",
+    output:
+        f"{BUILD}/test.elf",
+    shell:
+        "{CC} {LDFLAGS} -T{LINKER_SCRIPT} {input.sw} {input.main} {input.runtime} -o {output}"
+
+
+# --- Step 5: Build simulator (Verilator) ---
 
 
 rule configure_sim:
@@ -68,32 +142,13 @@ rule build_sim:
         "cmake --build {SIM_BUILD} -j{threads}"
 
 
-# --- Step 3: Build test software ---
-
-
-rule configure_device:
-    output:
-        ninja=f"{DEVICE_BUILD}/build.ninja",
-    shell:
-        "cmake -B {DEVICE_BUILD} -S {ROOT}/sw/device -G Ninja"
-
-
-rule build_device:
-    input:
-        ninja=f"{DEVICE_BUILD}/build.ninja",
-    output:
-        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
-    shell:
-        "cmake --build {DEVICE_BUILD}"
-
-
-# --- Step 4: Simulate ---
+# --- Step 6: Simulate ---
 
 
 rule simulate:
     input:
         sim=f"{SIM_BUILD}/sim",
-        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
+        elf=f"{BUILD}/test.elf",
     output:
         log=f"{BUILD}/test.log",
     shell:
