@@ -34,10 +34,11 @@ from snaxc.hw.accelerators.dma import Dma
 from snaxc.hw.system import Cluster, System
 
 
-def find_dma(system: System, source: StringAttr, dest: StringAttr) -> tuple[Dma, bool]:
+def find_dma(system: System, source: StringAttr, dest: StringAttr) -> tuple[Dma, bool] | None:
     """
     Find relevant dma engine for a transfer from source to destination.
-    Returns the accelerator object and a bool whether to swap source / destination.
+    Returns the accelerator object and a bool whether to swap source / destination,
+    or None if no DMA engine is reachable from either memory.
     """
 
     def get_dma_acc(mem: StringAttr) -> Dma | None:
@@ -54,9 +55,10 @@ def find_dma(system: System, source: StringAttr, dest: StringAttr) -> tuple[Dma,
     # first try destination
     if (dma := get_dma_acc(dest)) is not None:
         return dma, False
-    else:
-        assert (dma := get_dma_acc(source)) is not None
+    elif (dma := get_dma_acc(source)) is not None:
         return dma, True
+    else:
+        return None
 
 
 @dataclass
@@ -66,23 +68,34 @@ class CopyToDmaPattern(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: CopyOp, rewriter: PatternRewriter):
         # Only handling types with a known bitwidth:
-        assert isa(op.source.type, MemRefType[FixedBitwidthType])
-        assert isa(op.destination.type, MemRefType[FixedBitwidthType])
+        if not isa(op.source.type, MemRefType[FixedBitwidthType]):
+            return
+        if not isa(op.destination.type, MemRefType[FixedBitwidthType]):
+            return
 
         # And a known memory space
-        assert isinstance(source_space := op.source.type.memory_space, StringAttr)
-        assert isinstance(dest_space := op.destination.type.memory_space, StringAttr)
+        if not isinstance(source_space := op.source.type.memory_space, StringAttr):
+            return
+        if not isinstance(dest_space := op.destination.type.memory_space, StringAttr):
+            return
 
         # Currently, only handling memrefs without layouts
-        assert isinstance(op.source.type.layout, NoneAttr)
-        assert isinstance(op.destination.type.layout, NoneAttr)
+        if not isinstance(op.source.type.layout, NoneAttr):
+            return
+        if not isinstance(op.destination.type.layout, NoneAttr):
+            return
 
-        # Assert shape and layout are equal for both source and desitnation
-        assert op.source.type.get_shape() == op.destination.type.get_shape()
-        assert (element_type := op.source.type.get_element_type()) == op.destination.type.get_element_type()
+        # Shapes and element types must match
+        if op.source.type.get_shape() != op.destination.type.get_shape():
+            return
+        if (element_type := op.source.type.get_element_type()) != op.destination.type.get_element_type():
+            return
 
-        # Get relevant dma
-        dma, reverse_ops = find_dma(self.system, source_space, dest_space)
+        # Get relevant dma — skip if no DMA is reachable (e.g. L3→L3 copies)
+        result = find_dma(self.system, source_space, dest_space)
+        if result is None:
+            return
+        dma, reverse_ops = result
 
         # Compute total size of the transfer:
         total_size_op = ConstantOp.from_int_and_width(element_type.size, IndexType())
