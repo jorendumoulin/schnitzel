@@ -8,7 +8,6 @@ from xdsl.dialects.builtin import (
     IndexType,
     MemRefType,
     ModuleOp,
-    NoneAttr,
     i32,
 )
 from xdsl.dialects.memref import (
@@ -78,12 +77,6 @@ class CopyToDmaPattern(RewritePattern):
         if not isinstance(source_space := op.source.type.memory_space, StringAttr):
             return
         if not isinstance(dest_space := op.destination.type.memory_space, StringAttr):
-            return
-
-        # Currently, only handling memrefs without layouts
-        if not isinstance(op.source.type.layout, NoneAttr):
-            return
-        if not isinstance(op.destination.type.layout, NoneAttr):
             return
 
         # Shapes and element types must match
