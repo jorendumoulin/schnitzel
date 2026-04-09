@@ -48,14 +48,17 @@ def ensure_access_granularity(
     # this is a hack that works, this information needs to come from accelerators:
     assert isa(operand.type, MemRefType[builtin.FixedBitwidthType])
 
+    # TODO: these granularity values should come from the system config
+    # (TCDM bank count, bank width, etc.) instead of being hardcoded.
+    # For schnitzel with 32-bit TCDM, no interleaving adjustment is needed.
     if schedule_dim >= spatial_dims(ctx, op):
         # we are in temporal regime
-        temporal_access_granularity = 8 if operand.type.get_element_type().bitwidth == 8 else 16  # in elements
+        temporal_access_granularity = 1
         if current_stride % temporal_access_granularity != 0:
             current_stride += (temporal_access_granularity - current_stride) % 64
     else:
         # we are in spatial regime
-        spatial_access_granularity = 8 if operand.type.get_element_type().bitwidth == 8 else 2  # in elements
+        spatial_access_granularity = 1
         if current_stride % spatial_access_granularity != 0:
             current_stride += (spatial_access_granularity - current_stride) % 64
 
