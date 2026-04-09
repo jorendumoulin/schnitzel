@@ -108,19 +108,29 @@ class CopyToDmaPattern(RewritePattern):
         source_ptr_op = ExtractAlignedPointerAsIndexOp.get(op.source)
         dest_ptr_op = ExtractAlignedPointerAsIndexOp.get(op.destination)
 
+        # DMA hardware: streamer[0]=TCDM (local), streamer[1]=AXI (remote).
+        # The dir flag controls transfer direction (0=AXI→TCDM, 1=TCDM→AXI).
+        # For L3→L1 (reverse_ops=False): L1 ptr → TCDM streamer, L3 ptr → AXI streamer
+        # For L1→L3 (reverse_ops=True):  L1 ptr → TCDM streamer, L3 ptr → AXI streamer
+        # So TCDM always gets the dest for L3→L1 and source for L1→L3.
         if reverse_ops:
-            source_ptr_op, dest_ptr_op = dest_ptr_op, source_ptr_op
+            # L1→L3: source is L1 (TCDM), dest is L3 (AXI)
+            tcdm_ptr_op, axi_ptr_op = source_ptr_op, dest_ptr_op
+        else:
+            # L3→L1: source is L3 (AXI), dest is L1 (TCDM)
+            tcdm_ptr_op, axi_ptr_op = dest_ptr_op, source_ptr_op
 
         # Create simple stride patterns:
+        # Unused temporal dims get bound=0 (hardware skips them)
         source_streamer = dma.streamers.streamers[0]
         source_pattern = StridePattern(
-            upper_bounds=[1] * (source_streamer.temporal_dims - 1) + [DYNAMIC_INDEX],
+            upper_bounds=[0] * (source_streamer.temporal_dims - 1) + [DYNAMIC_INDEX],
             temporal_strides=[0] * (source_streamer.temporal_dims - 1) + [source_streamer.full_width],
             spatial_strides=source_streamer.byte_offsets,
         )
         dest_streamer = dma.streamers.streamers[1]
         dest_pattern = StridePattern(
-            upper_bounds=[1] * (dest_streamer.temporal_dims - 1) + [DYNAMIC_INDEX],
+            upper_bounds=[0] * (dest_streamer.temporal_dims - 1) + [DYNAMIC_INDEX],
             temporal_strides=[0] * (dest_streamer.temporal_dims - 1) + [dest_streamer.full_width],
             spatial_strides=dest_streamer.byte_offsets,
         )
@@ -130,16 +140,17 @@ class CopyToDmaPattern(RewritePattern):
         dir_op = SetupOp({dma.dir_param(): dir_val}, dma.name)
 
         # Now create streaming region op:
+        # inputs[0] → streamer[0] (TCDM), outputs[0] → streamer[1] (AXI)
         new_op = StreamingRegionOp(
-            inputs=[source_ptr_op.aligned_pointer],
-            outputs=[dest_ptr_op.aligned_pointer],
+            inputs=[tcdm_ptr_op.aligned_pointer],
+            outputs=[axi_ptr_op.aligned_pointer],
             stride_patterns=(source_pattern, dest_pattern),
             dynamic_operands=[total_size_op, total_size_op],
             accelerator=dma.name,
             body=Region(Block([dir_val, dir_op])),
         )
 
-        rewriter.replace_matched_op((source_ptr_op, dest_ptr_op, new_op))
+        rewriter.replace_matched_op((source_ptr_op, dest_ptr_op, new_op))  # both ptr ops needed for their SSA values
 
 
 @dataclass(frozen=True)
