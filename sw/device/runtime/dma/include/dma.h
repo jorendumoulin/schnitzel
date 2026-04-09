@@ -9,7 +9,7 @@ extern "C" {
 
 /**
  * DMA-accelerated memory copy function.
- * 
+ *
  * @param dest Pointer to the destination memory location
  * @param src Pointer to the source memory location
  * @param count Number of bytes to copy
