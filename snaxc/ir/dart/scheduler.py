@@ -152,7 +152,7 @@ def is_memory_flexible_enough(template: Template, schedule: Schedule, element_si
     There must be one spatial stride of 1 that doesn't need more fine-grained
     temporal access within one bank, such that that dimension can be packed together.
     """
-    TCDM_BANK_WIDTH = 8
+    TCDM_BANK_WIDTH = 4
     # We can only apply this check if there are temporal dimensions to investigate
     # their access granularity:
     if not schedule.num_dims > template.num_dims:
