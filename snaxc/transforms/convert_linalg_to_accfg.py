@@ -124,8 +124,7 @@ def _weave_states_in_region(
                     accel = op.accelerator.data
                     if accel in state and op.in_state != state[accel]:
                         new_op = accfg.SetupOp(
-                            op.values,
-                            op.param_names,
+                            dict(op.iter_params()),
                             op.accelerator,
                             state[accel],
                         )
@@ -193,7 +192,7 @@ def _weave_states_in_region(
                     for acc_name in updated_accelerators:
                         if acc_name not in state:
                             # create empty setup op
-                            empty_setup = accfg.SetupOp([], [], acc_name)
+                            empty_setup = accfg.SetupOp({}, acc_name)
                             # insert op before the scf.for
                             rewriter.insert_op(empty_setup, InsertPoint.before(op))
                             # register it as an input
