@@ -1,9 +1,7 @@
 from xdsl.dialects import linalg, memref
 from xdsl.ir import Operation
 
-from snaxc.dialects import dart
 from snaxc.hw.acc_context import AccContext
-from snaxc.hw.streamers.extensions import XDMA_EXT_SET
 
 
 def dispatch_to_dm(op: Operation, ctx: AccContext):
@@ -11,22 +9,6 @@ def dispatch_to_dm(op: Operation, ctx: AccContext):
     for now, this is only memref copy operations"""
     if isinstance(op, memref.CopyOp):
         return True
-    if isinstance(op, dart.StreamingRegionOpBase):
-        assert op.accelerator
-        accelerator_type = ctx.get_acc(op.accelerator.data)
-        if isinstance(accelerator_type, SNAXXDMAAccelerator) and isinstance(
-            str_op := op.body.block.first_op, dart.GenericOp
-        ):
-            kernel_op = str_op.body.block.first_op
-            # Only dispatch to dm if the kernel is provided by a StreamerExtension
-            if any(
-                [
-                    ext.supported_kernel.is_same_kernel(kernel_op)
-                    for ext in XDMA_EXT_SET
-                    if ext.supported_kernel is not None
-                ]
-            ):
-                return True
     return False
 
 
@@ -38,23 +20,4 @@ def dispatch_to_compute(op: Operation, ctx: AccContext):
     """
     if isinstance(op, linalg.GenericOp):
         return True
-    if isinstance(op, dart.StreamingRegionOpBase):
-        assert op.accelerator
-        accelerator_type = ctx.get_acc(op.accelerator.data)
-        if isinstance(accelerator_type, SNAXXDMAAccelerator) and isinstance(
-            str_op := op.body.block.first_op, dart.GenericOp
-        ):
-            kernel_op = str_op.body.block.first_op
-            # Dont dispatch to compute if the kernel is provided by a StreamerExtension
-            if any(
-                [
-                    not ext.supported_kernel.is_same_kernel(kernel_op)
-                    for ext in XDMA_EXT_SET
-                    if ext.supported_kernel is not None
-                ]
-            ):
-                return False
-            return True
-        return True
-
     return False
