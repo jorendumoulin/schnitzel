@@ -6,10 +6,9 @@ from typing import cast
 from minimalloc import Buffer, Problem  # pyright: ignore[reportMissingTypeStubs]
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, llvm
-from xdsl.dialects.builtin import StringAttr
+from xdsl.dialects.builtin import IndexType, IntegerAttr, StringAttr
 from xdsl.dialects.memref import DeallocOp
 from xdsl.ir import Operation, OpResult, Sequence, SSAValue
-from xdsl.parser import IndexType, IntegerAttr, StringAttr
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     PatternRewriter,
