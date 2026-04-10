@@ -1,7 +1,7 @@
 from abc import ABC
 from collections.abc import Sequence
 
-from xdsl.ir import SSAValue
+from xdsl.ir import Operation, SSAValue
 
 from snaxc.dialects.dart import StreamingRegionOpBase
 from snaxc.dialects.snax_stream import StridePattern
@@ -38,7 +38,7 @@ class StreamerAccelerator(ABC):
         Sequence[SSAValue],
         Sequence[SSAValue],
         Sequence[StridePattern],
-        list,
+        list[Operation],
     ]:
         """
         Hook to customize stride patterns after scheduling and layout resolution.

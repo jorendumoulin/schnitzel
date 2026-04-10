@@ -6,13 +6,15 @@ from xdsl.dialects import get_all_dialects
 from xdsl.transforms import get_all_passes
 from xdsl.xdsl_opt_main import xDSLOptMain
 
+from typing import Any
+
 from snaxc.dialects import get_all_snax_dialects
 from snaxc.hw.acc_context import AccContext
 from snaxc.hw.config_parser import parse_config
 from snaxc.transforms import get_all_snax_passes
 
 # Default system config matching the schnitzel architecture
-DEFAULT_SYSTEM_CONFIG = {
+DEFAULT_SYSTEM_CONFIG: dict[str, Any] = {
     "memory": {"name": "L3", "start": 0x8000_0000, "size": 0x4000_0000},
     "clusters": [
         {

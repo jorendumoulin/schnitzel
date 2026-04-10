@@ -94,7 +94,7 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
         """Generate all setup values: streamer configs + switch values."""
         result: list[tuple[Sequence[Operation], SSAValue]] = []
 
-        for operand, pattern, streamer in zip(
+        for operand, pattern, _streamer in zip(
             (*op.inputs, *op.outputs), op.stride_patterns.data, self.phs.streamers.streamers
         ):
             result.append(([], operand))
