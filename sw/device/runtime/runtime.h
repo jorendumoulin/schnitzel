@@ -2,7 +2,6 @@
 #define RUNTIME_H
 
 #include <stddef.h>
-#define VERBOSE
 
 #ifdef __cplusplus
 extern "C" {
