@@ -281,7 +281,6 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return SnaxBufferize
 
-
     def get_snax_lower_mcycle():
         from snaxc.transforms.snax_lower_mcycle import SNAXLowerMCycle
 
