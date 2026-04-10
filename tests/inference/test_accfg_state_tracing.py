@@ -10,9 +10,9 @@ ACC = "acc1"
 def test_simple_setup_tracing():
     a, b, c = tuple(BlockArgument(builtin.i32, Block(), i) for i in range(3))
 
-    empty_setup = accfg.SetupOp([], [], ACC)
+    empty_setup = accfg.SetupOp({}, ACC)
 
-    full_setup = accfg.SetupOp([a, b, c], ["A", "B", "C"], ACC, empty_setup)
+    full_setup = accfg.SetupOp({"A": a, "B": b, "C": c}, ACC, empty_setup)
 
     assert infer_state_of(empty_setup.out_state) == {}
 
@@ -23,11 +23,11 @@ def test_simple_setup_tracing():
         a,
         [accfg.StateType("acc1")],
         [
-            s1 := accfg.SetupOp([b], ["A"], ACC, full_setup),
+            s1 := accfg.SetupOp({"A": b}, ACC, full_setup),
             scf.YieldOp(s1),
         ],
         [
-            s2 := accfg.SetupOp([c], ["B"], ACC, full_setup),
+            s2 := accfg.SetupOp({"B": c}, ACC, full_setup),
             scf.YieldOp(s2),
         ],
     )
