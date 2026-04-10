@@ -1,12 +1,11 @@
 import argparse
 import json
 from collections.abc import Sequence
+from typing import Any
 
 from xdsl.dialects import get_all_dialects
 from xdsl.transforms import get_all_passes
 from xdsl.xdsl_opt_main import xDSLOptMain
-
-from typing import Any
 
 from snaxc.dialects import get_all_snax_dialects
 from snaxc.hw.acc_context import AccContext
