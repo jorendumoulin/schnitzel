@@ -86,4 +86,4 @@ rule build_device:
     output:
         elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
     shell:
-        "cmake --build {DEVICE_BUILD}"
+        "cmake --build {DEVICE_BUILD} --target alu_accelerator_test.elf"
