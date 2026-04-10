@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from xdsl.ir import SSAValue
 
 from snaxc.dialects.dart import StreamingRegionOpBase
-from snaxc.dialects.snax_stream import StreamingRegionOp, StridePattern
+from snaxc.dialects.snax_stream import StridePattern
 from snaxc.hw.streamers.streamers import Streamer, StreamerConfiguration
 from snaxc.ir.dart.access_pattern import Template
 

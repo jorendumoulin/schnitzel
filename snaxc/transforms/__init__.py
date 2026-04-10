@@ -172,7 +172,6 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return DartSchedulerPass
 
-
     def get_dispatch_linalg_phs():
         from snaxc.transforms.phs.dispatch_linalg_phs import DispatchLinalgPHS
 
