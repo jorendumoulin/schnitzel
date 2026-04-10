@@ -16,8 +16,7 @@ from xdsl.pattern_rewriter import (
 
 from snaxc.dialects import dart, snax_stream
 from snaxc.hw import AccContext
-from snaxc.hw.snax import SNAXStreamer
-from snaxc.hw.streamers.streamers import HasBroadcast
+from snaxc.hw.streamer_accelerator import StreamerAccelerator
 from snaxc.ir.dart.affine_transform import AffineTransform
 
 TCDM_BANK_WIDTH = 4
@@ -37,7 +36,7 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
     def match_and_rewrite(self, op: dart.AccessPatternOp, rewriter: PatternRewriter):
         assert op.accelerator
         accelerator_type = self.ctx.get_acc(op.accelerator.data)
-        assert isinstance(accelerator_type, SNAXStreamer)
+        assert isinstance(accelerator_type, StreamerAccelerator)
         template = accelerator_type.get_template(op)
         streamers = accelerator_type.get_streamers(op)
 
@@ -100,12 +99,7 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
                     applied_bound = spat_size // bound
                     next_stride, next_bound = next(access_iter)
                     if applied_stride != next_stride:
-                        # next stride of 0 is allowed in case of broadcasting, but then the
-                        # next stride should be forced to 0
-                        if next_stride == 0 and any(isinstance(opt, HasBroadcast) for opt in streamers[operand].opts):
-                            stride, bound = (0, next_bound // applied_bound)
-                        else:
-                            raise RuntimeError("Non-contiguous access is not possible for this streamer configuration")
+                        raise RuntimeError("Non-contiguous access is not possible for this streamer configuration")
                     else:
                         stride, bound = (
                             applied_stride * applied_bound,

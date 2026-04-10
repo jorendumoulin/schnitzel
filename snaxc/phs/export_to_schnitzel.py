@@ -11,7 +11,7 @@ import subprocess
 import sys
 from collections.abc import Sequence
 
-from snaxc.hw.snax_phs import SNAXPHSAccelerator
+from snaxc.hw.phs_accelerator import PhsAccelerator
 
 
 def get_schnitzel_path() -> str:
@@ -21,7 +21,7 @@ def get_schnitzel_path() -> str:
 
 
 def build_schnitzel_config(
-    accelerators: Sequence[SNAXPHSAccelerator],
+    accelerators: Sequence[PhsAccelerator],
     sv_path: str,
 ) -> str:
     """
@@ -73,7 +73,7 @@ def build_schnitzel_config(
 
 
 def call_phs_driver(
-    accelerators: Sequence[SNAXPHSAccelerator],
+    accelerators: Sequence[PhsAccelerator],
     output_hardware: str,
     output_dir: str,
 ) -> dict:

@@ -12,7 +12,7 @@ from xdsl.pattern_rewriter import (
 )
 
 from snaxc.hw import AccContext
-from snaxc.hw.snax_phs import SNAXPHSAccelerator
+from snaxc.hw.phs_accelerator import PhsAccelerator
 from snaxc.phs.decode import MappingNotFoundError, decode_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs
 
@@ -23,9 +23,9 @@ class DispatchLinalgPhsPattern(RewritePattern):
     compute kernel template.
     """
 
-    accelerators: Iterable[SNAXPHSAccelerator] = []
+    accelerators: Iterable[PhsAccelerator] = []
 
-    def __init__(self, accelerators: Iterable[SNAXPHSAccelerator]) -> None:
+    def __init__(self, accelerators: Iterable[PhsAccelerator]) -> None:
         self.accelerators = accelerators
 
     @op_type_rewrite_pattern
@@ -63,7 +63,7 @@ class DispatchLinalgPHS(ModulePass):
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         assert isinstance(ctx, AccContext)
         # Get PHS accelerators from the system context
-        accelerators = [acc for acc in ctx.system.iter_accelerators() if isinstance(acc, SNAXPHSAccelerator)]
+        accelerators = [acc for acc in ctx.system.iter_accelerators() if isinstance(acc, PhsAccelerator)]
 
         # dispatch
         PatternRewriteWalker(DispatchLinalgPhsPattern(accelerators), apply_recursively=False).rewrite_module(op)
