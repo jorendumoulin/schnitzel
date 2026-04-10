@@ -76,7 +76,7 @@ def call_phs_driver(
     accelerators: Sequence[PhsAccelerator],
     output_hardware: str,
     output_dir: str,
-) -> dict:
+) -> dict[str, object]:
     """
     Call the schnitzel PhsDriver via mill to generate SoC verilog.
 

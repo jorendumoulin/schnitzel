@@ -133,6 +133,7 @@ class PHSCMain(SNAXCMain):
         # Generate schnitzel SoC verilog if requested
         if self.args.output_schnitzel_dir:
             system_config = call_phs_driver(accelerators, self.args.output_hardware, self.args.output_schnitzel_dir)
+            assert isinstance(self.ctx, AccContext)
             self.ctx.system = parse_config(system_config)
 
             # Replace the Phs accelerator from config with the full PhsAccelerator

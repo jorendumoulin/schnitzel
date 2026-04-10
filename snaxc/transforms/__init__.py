@@ -90,10 +90,10 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return ConvertMemrefToArithPass
 
-    def get_convert_stream_to_acc():
-        from snaxc.transforms.convert_stream_to_acc import ConvertStreamToAccPass
+    def get_convert_stream_to_accfg():
+        from snaxc.transforms.convert_stream_to_accfg import ConvertStreamToAccfgPass
 
-        return ConvertStreamToAccPass
+        return ConvertStreamToAccfgPass
 
     def get_convert_pe_to_hw():
         from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
@@ -346,7 +346,7 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "convert-linalg-to-dart": get_convert_linalg_to_dart,
         "convert-linalg-to-kernel": get_convert_linalg_to_kernel,
         "convert-memref-to-arith": get_convert_memref_to_arith,
-        "convert-stream-to-acc": get_convert_stream_to_acc,
+        "convert-stream-to-accfg": get_convert_stream_to_accfg,
         "convert-snax-to-llvm": get_convert_snax_to_llvm,
         "convert-tosa-to-kernel": get_convert_tosa_to_kernel,
         "dart-fuse-operations": get_dart_fuse_operations,

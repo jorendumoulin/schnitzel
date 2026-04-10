@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Any
 
 from snaxc.hw.streamers.streamers import Streamer, StreamerConfiguration
 from snaxc.hw.system import Accelerator
@@ -19,7 +20,7 @@ class Phs(Accelerator):
     """Element access width in bytes (schnitzel default: 4 = 32-bit)"""
 
     num_switches: int = 0
-    switch_bitwidths: list[int] = field(default_factory=list)
+    switch_bitwidths: list[int] = field(default_factory=lambda: list[int]())
 
     streamers: StreamerConfiguration = field(default_factory=lambda: StreamerConfiguration([]))
 
@@ -61,16 +62,21 @@ class Phs(Accelerator):
         )
 
     @staticmethod
-    def from_config(config: dict) -> "Phs":
+    def from_config(config: dict[str, Any]) -> "Phs":
         """Create a Phs accelerator from a JSON config dict (as produced by PhsDriver)."""
-        input_sizes = [tuple(s["spatialDimSizes"]) for s in config.get("streamers", []) if s["streamType"] == "read"]
-        output_sizes = [tuple(s["spatialDimSizes"]) for s in config.get("streamers", []) if s["streamType"] == "write"]
+        streamers: list[dict[str, Any]] = config.get("streamers", [])
+        input_sizes: list[tuple[int, ...]] = [
+            tuple(s["spatialDimSizes"]) for s in streamers if s["streamType"] == "read"
+        ]
+        output_sizes: list[tuple[int, ...]] = [
+            tuple(s["spatialDimSizes"]) for s in streamers if s["streamType"] == "write"
+        ]
         return Phs.from_template(
-            name=config.get("moduleName", "phs"),
+            name=str(config.get("moduleName", "phs")),
             input_sizes=input_sizes,
             output_sizes=output_sizes,
-            num_switches=config.get("numSwitches", 0),
-            switch_bitwidths=config.get("switchBitwidths", []),
+            num_switches=int(config.get("numSwitches", 0)),
+            switch_bitwidths=list(config.get("switchBitwidths", [])),
         )
 
     def param_values(self) -> dict[str, int]:

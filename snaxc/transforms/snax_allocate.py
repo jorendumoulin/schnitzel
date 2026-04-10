@@ -160,7 +160,7 @@ class StaticAllocs(RewritePattern):
 
     get_memory: Callable[[str], Memory]
 
-    current_addresses: dict[str, int] = field(default_factory=dict)
+    current_addresses: dict[str, int] = field(default_factory=lambda: dict[str, int]())
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: snax.Alloc, rewriter: PatternRewriter):
