@@ -28,7 +28,6 @@ from snaxc.ir.dart.access_pattern import Template
 c0_attr = builtin.IntegerAttr(0, builtin.IndexType())
 
 
-
 class SNAXStreamer(ABC):
     """
     Abstract base class for SNAX Accelerators with Streamer interfaces.
@@ -288,5 +287,3 @@ class SNAXStreamer(ABC):
         operation, along with a list of ops to add to the IR.
         """
         return (op.inputs, op.outputs, snax_stride_patterns, [])
-
-
