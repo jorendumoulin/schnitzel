@@ -63,10 +63,7 @@ class DispatchLinalgPHS(ModulePass):
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         assert isinstance(ctx, AccContext)
         # Get PHS accelerators from the system context
-        accelerators = [
-            acc for acc in ctx.system.iter_accelerators()
-            if isinstance(acc, SNAXPHSAccelerator)
-        ]
+        accelerators = [acc for acc in ctx.system.iter_accelerators() if isinstance(acc, SNAXPHSAccelerator)]
 
         # dispatch
         PatternRewriteWalker(DispatchLinalgPhsPattern(accelerators), apply_recursively=False).rewrite_module(op)
