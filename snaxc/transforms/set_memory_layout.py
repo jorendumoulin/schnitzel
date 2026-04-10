@@ -20,7 +20,7 @@ from snaxc.dialects import dart
 from snaxc.dialects.snax import LayoutCast
 from snaxc.dialects.tsl import TiledStridedLayoutAttr
 from snaxc.hw.acc_context import AccContext
-from snaxc.hw.snax import SNAXStreamer
+from snaxc.hw.streamer_accelerator import StreamerAccelerator
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
 from snaxc.ir.tsl import Stride, TiledStride, TiledStridedLayout
 
@@ -32,7 +32,7 @@ def spatial_dims(ctx: AccContext, op: dart.ScheduleOp) -> int:
     # get accelerator
     assert op.accelerator
     accelerator_type = ctx.get_acc(op.accelerator.data)
-    assert isinstance(accelerator_type, SNAXStreamer)
+    assert isinstance(accelerator_type, StreamerAccelerator)
     template = accelerator_type.get_template(op)
     return template[0].pattern.num_dims
 

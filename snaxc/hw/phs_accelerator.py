@@ -7,7 +7,7 @@ from xdsl.pattern_rewriter import PatternRewriter
 
 from snaxc.dialects import accfg, dart, phs, snax_stream
 from snaxc.hw.accelerators.phs import Phs
-from snaxc.hw.snax import SNAXStreamer
+from snaxc.hw.streamer_accelerator import StreamerAccelerator
 from snaxc.hw.system import Accelerator
 from snaxc.ir.dart.access_pattern import Template
 from snaxc.phs.decode import decode_abstract_graph
@@ -16,9 +16,9 @@ from snaxc.phs.hw_conversion import get_switch_bitwidth
 from snaxc.phs.template_spec import TemplateSpec
 
 
-class SNAXPHSAccelerator(Accelerator, SNAXStreamer):
+class PhsAccelerator(Accelerator, StreamerAccelerator):
     """
-    Accelerator interface class for the SNAX PHS accelerator.
+    Accelerator interface class for PHS accelerators.
 
     Wraps a Phs accelerator config with the PEOp and TemplateSpec
     needed for code generation and hardware export.
@@ -47,8 +47,8 @@ class SNAXPHSAccelerator(Accelerator, SNAXStreamer):
             switch_bitwidths=switch_bitwidths,
         )
 
-        # Initialize SNAXStreamer with the PHS streamer configuration
-        SNAXStreamer.__init__(self, self.phs.streamers)
+        # Initialize StreamerAccelerator with the PHS streamer configuration
+        StreamerAccelerator.__init__(self, self.phs.streamers)
 
     def param_values(self) -> dict[str, int]:
         return self.phs.param_values()
@@ -70,7 +70,6 @@ class SNAXPHSAccelerator(Accelerator, SNAXStreamer):
         if not isinstance(op, snax_stream.StreamingRegionOp):
             return []
 
-        # Get streamer setup values, switch values, and loop bound
         args = self._generate_stream_setup_vals(op)
 
         ops_to_insert: list[Operation] = []
@@ -92,32 +91,23 @@ class SNAXPHSAccelerator(Accelerator, SNAXStreamer):
     def _generate_stream_setup_vals(
         self, op: snax_stream.StreamingRegionOp
     ) -> Sequence[tuple[Sequence[Operation], SSAValue]]:
-        """Generate all setup values: streamer configs + switch values + loop bound."""
+        """Generate all setup values: streamer configs + switch values."""
         result: list[tuple[Sequence[Operation], SSAValue]] = []
 
-        # Streamer setup values (addr, temporal strides, upper bounds, spatial strides)
         for operand, pattern, streamer in zip(
             (*op.inputs, *op.outputs), op.stride_patterns.data, self.phs.streamers.streamers
         ):
-            # Base address
             result.append(([], operand))
-
-            # Temporal strides
             for ts in pattern.temporal_strides:
                 c = arith.ConstantOp.from_int_and_width(ts.data, 32)
                 result.append(([c], c.result))
-
-            # Upper bounds
             for ub in pattern.upper_bounds:
                 c = arith.ConstantOp.from_int_and_width(ub.data, 32)
                 result.append(([c], c.result))
-
-            # Spatial strides
             for ss in pattern.spatial_strides:
                 c = arith.ConstantOp.from_int_and_width(ss.data, 32)
                 result.append(([c], c.result))
 
-        # Switch values (decoded from PEOp graph)
         generic = op.regions[0].ops.first
         assert isinstance(generic, linalg.GenericOp | dart.GenericOp)
         result.extend(self.get_switch_values(generic))
@@ -128,7 +118,6 @@ class SNAXPHSAccelerator(Accelerator, SNAXStreamer):
         """Generate the accfg.accelerator op with CSR address mappings."""
         param_vals = self.phs.param_values()
         launch_field = "start"
-        # Barrier address is the next CSR after all params + launch
         barrier_addr = 0x900 + len(param_vals) + 1
 
         return accfg.AcceleratorOp(

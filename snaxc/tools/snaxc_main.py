@@ -33,7 +33,6 @@ from snaxc.transforms.dart.convert_linalg_to_dart import ConvertLinalgToDart
 from snaxc.transforms.dart.dart_fuse_operations import DartFuseOperationsPass
 from snaxc.transforms.dart.dart_layout_resolution import DartLayoutResolutionPass
 from snaxc.transforms.dart.dart_scheduler import DartSchedulerPass
-from snaxc.transforms.dispatch_kernels import DispatchKernels
 from snaxc.transforms.dispatch_regions import DispatchRegions
 from snaxc.transforms.frontend.frontend_transform import FrontendTransformPass
 from snaxc.transforms.frontend.preprocess_mlir import PreprocessPass
@@ -202,7 +201,6 @@ class SNAXCMain(CommandLineTool):
         # Standard lowering pipeline:
         if not phs:
             pass_pipeline.append(ConvertLinalgToKernel())
-            pass_pipeline.append(DispatchKernels())
         else:
             pass_pipeline.append(DispatchLinalgPHS())
         pass_pipeline.append(ConvertLinalgToDart())

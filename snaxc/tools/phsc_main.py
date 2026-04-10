@@ -15,7 +15,7 @@ from xdsl.transforms.mlir_opt import MLIROptPass
 from snaxc.dialects import phs
 from snaxc.hw.acc_context import AccContext
 from snaxc.hw.config_parser import parse_config
-from snaxc.hw.snax_phs import SNAXPHSAccelerator
+from snaxc.hw.phs_accelerator import PhsAccelerator
 from snaxc.phs.export_to_schnitzel import call_phs_driver
 from snaxc.phs.template_spec import TemplateSpec
 from snaxc.tools.snaxc_main import SNAXCMain
@@ -65,11 +65,11 @@ class PHSCMain(SNAXCMain):
         module.verify()
         hardware_module = module.clone()
 
-        accelerators: list[SNAXPHSAccelerator] = []
+        accelerators: list[PhsAccelerator] = []
         for hw_op in hardware_module.ops:
             if isinstance(hw_op, phs.PEOp):
                 # Use a clone to prevent downstream changes messing up accelerator registration
-                accelerator = SNAXPHSAccelerator(hw_op.clone(), self.template_spec)
+                accelerator = PhsAccelerator(hw_op.clone(), self.template_spec)
                 accelerators.append(accelerator)
 
         # Remaining pipelines can only be setup after accelerators have been registered
@@ -135,7 +135,7 @@ class PHSCMain(SNAXCMain):
             system_config = call_phs_driver(accelerators, self.args.output_hardware, self.args.output_schnitzel_dir)
             self.ctx.system = parse_config(system_config)
 
-            # Replace the Phs accelerator from config with the full SNAXPHSAccelerator
+            # Replace the Phs accelerator from config with the full PhsAccelerator
             # (which has the PEOp and TemplateSpec needed for code generation)
             for acc in accelerators:
                 for core in self.ctx.system.clusters[0].cores:

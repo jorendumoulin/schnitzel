@@ -172,10 +172,6 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return DartSchedulerPass
 
-    def get_dispatch_kernels():
-        from snaxc.transforms.dispatch_kernels import DispatchKernels
-
-        return DispatchKernels
 
     def get_dispatch_linalg_phs():
         from snaxc.transforms.phs.dispatch_linalg_phs import DispatchLinalgPHS
@@ -358,7 +354,6 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "dart-layout-resolution": get_dart_layout_resolution,
         "dart_bufferize": get_dart_bufferize,
         "dart-scheduler": get_dart_scheduler,
-        "dispatch-kernels": get_dispatch_kernels,
         "dispatch-linalg-phs": get_dispatch_linalg_phs,
         "dispatch-regions": get_dispatch_regions,
         "frontend-static-inline": get_frontend_static_inline,

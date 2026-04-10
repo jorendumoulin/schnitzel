@@ -19,7 +19,7 @@ from xdsl.pattern_rewriter import (
 
 from snaxc.dialects import dart
 from snaxc.hw import AccContext
-from snaxc.hw.snax import SNAXStreamer
+from snaxc.hw.streamer_accelerator import StreamerAccelerator
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
 from snaxc.ir.dart.scheduler import (
     is_memory_flexible_enough,
@@ -43,7 +43,7 @@ class AutoflowScheduler(RewritePattern):
     def match_and_rewrite(self, op: dart.OperationOp, rewriter: PatternRewriter):
         assert op.accelerator
         accelerator_type = self.ctx.get_acc(op.accelerator.data)
-        assert isinstance(accelerator_type, SNAXStreamer)
+        assert isinstance(accelerator_type, StreamerAccelerator)
         template = accelerator_type.get_template(op)
 
         # Make sure the operands are memrefs
