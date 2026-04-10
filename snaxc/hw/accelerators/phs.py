@@ -71,8 +71,12 @@ class Phs(Accelerator):
         output_sizes: list[tuple[int, ...]] = [
             tuple(s["spatialDimSizes"]) for s in streamers if s["streamType"] == "write"
         ]
+        # moduleName from Scala is "{name}_array"; strip the suffix to get the
+        # accelerator name that matches the PEOp sym_name.
+        module_name = str(config.get("moduleName", "phs"))
+        name = module_name.removesuffix("_array")
         return Phs.from_template(
-            name=str(config.get("moduleName", "phs")),
+            name=name,
             input_sizes=input_sizes,
             output_sizes=output_sizes,
             num_switches=int(config.get("numSwitches", 0)),

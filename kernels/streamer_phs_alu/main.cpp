@@ -30,7 +30,9 @@ int main() {
 
   // The MLIR-compiled function handles DMA copies, accelerator CSR
   // programming, and synchronization internally.
+  unsigned long cycle_start = read_csr(0xb00); // mcycle
   _mlir_ciface_streamer_add(&memrefA, &memrefB, &memrefO);
+  unsigned long cycle_end = read_csr(0xb00);
 
   cluster_sync();
 
@@ -43,6 +45,8 @@ int main() {
         err++;
       }
     }
+
+    printf("Kernel cycles: %d\n", (int)(cycle_end - cycle_start));
 
     if (err == 0) {
       printf("TEST PASSED!\n");
