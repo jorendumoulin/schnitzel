@@ -12,6 +12,7 @@ from snaxc.phs.combine import append_to_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs
 
 MAGIC_ATTR_NAME = "phs_acc"
+BOUNDS_ATTR_NAME = "phs_array_bounds"
 
 
 class EncodeLinalgGeneric(RewritePattern):
@@ -29,6 +30,10 @@ class EncodeLinalgGeneric(RewritePattern):
         # Convert the linalg body to a phs body in a pe operation
         pe = convert_generic_body_to_phs(linalg_op, acc_symbol_ref.string_value(), rewriter)
 
+        # Pick up optional array bounds annotation
+        if BOUNDS_ATTR_NAME in linalg_op.attributes:
+            pe.attributes[BOUNDS_ATTR_NAME] = linalg_op.attributes[BOUNDS_ATTR_NAME]
+
         # Get enclosing module_op
         toplevel = linalg_op.get_toplevel_object()
         assert isinstance(toplevel, ModuleOp), "Expect top-level IR object to be a ModuleOp"
@@ -45,6 +50,9 @@ class EncodeLinalgGeneric(RewritePattern):
             msg = f"Symbol for {acc_symbol_ref.string_value()} already exists, but is not a PEOp"
             assert isinstance(abstract_pe, phs.PEOp), msg
             append_to_abstract_graph(pe, abstract_pe)
+            # Propagate array bounds to existing PE if not already set
+            if BOUNDS_ATTR_NAME not in abstract_pe.attributes and BOUNDS_ATTR_NAME in pe.attributes:
+                abstract_pe.attributes[BOUNDS_ATTR_NAME] = pe.attributes[BOUNDS_ATTR_NAME]
 
 
 class PhsEncodePass(ModulePass):

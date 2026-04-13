@@ -28,7 +28,7 @@ from snaxc.transforms.phs.encode import PhsEncodePass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
-from snaxc.transforms.phs.instantiate_pe_array import InstantiatePEArrayPass
+from snaxc.transforms.phs.instantiate_pe_array import BOUNDS_ATTR_NAME, InstantiatePEArrayPass, derive_template_spec
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
 
 
@@ -69,8 +69,14 @@ class PHSCMain(SNAXCMain):
         accelerators: list[PhsAccelerator] = []
         for hw_op in hardware_module.ops:
             if isinstance(hw_op, phs.PEOp):
+                # Derive template spec from annotation if present, otherwise use fallback
+                if BOUNDS_ATTR_NAME in hw_op.attributes:
+                    bounds = hw_op.attributes[BOUNDS_ATTR_NAME].get_values()
+                    template_spec = derive_template_spec(hw_op, bounds)
+                else:
+                    template_spec = self.template_spec
                 # Use a clone to prevent downstream changes messing up accelerator registration
-                accelerator = PhsAccelerator(hw_op.clone(), self.template_spec)
+                accelerator = PhsAccelerator(hw_op.clone(), template_spec)
                 accelerators.append(accelerator)
 
         # Remaining pipelines can only be setup after accelerators have been registered

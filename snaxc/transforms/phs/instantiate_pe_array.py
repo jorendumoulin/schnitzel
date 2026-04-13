@@ -103,14 +103,41 @@ def _build_pe_array_body(pe: phs.PEOp, template_spec: TemplateSpec) -> phs.PEArr
     )
 
 
+BOUNDS_ATTR_NAME = "phs_array_bounds"
+
+
+def derive_template_spec(pe: phs.PEOp, bounds: tuple[int, ...]) -> TemplateSpec:
+    """Derive a TemplateSpec from a PEOp and array bounds using identity maps."""
+    num_data = len(pe.data_operands())
+    num_outputs = len(pe.get_terminator().operands)
+    num_dims = len(bounds)
+    input_maps = tuple(AffineMap.identity(num_dims) for _ in range(num_data))
+    output_maps = tuple(AffineMap.identity(num_dims) for _ in range(num_outputs))
+    return TemplateSpec(input_maps=input_maps, output_maps=output_maps, template_bounds=bounds)
+
+
 @dataclass(frozen=True)
 class InstantiatePEArrays(RewritePattern):
-    template_spec: TemplateSpec
+    fallback_template_spec: TemplateSpec | None
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, pe: phs.PEOp, rewriter: PatternRewriter):
-        array_op = _build_pe_array_body(pe, self.template_spec)
+        # Read array bounds from PE attribute if present
+        if BOUNDS_ATTR_NAME in pe.attributes:
+            bounds_attr = pe.attributes[BOUNDS_ATTR_NAME]
+            bounds = bounds_attr.get_values()
+            template_spec = derive_template_spec(pe, bounds)
+        elif self.fallback_template_spec is not None:
+            template_spec = self.fallback_template_spec
+        else:
+            return
+
+        array_op = _build_pe_array_body(pe, template_spec)
         rewriter.insert_op(array_op, InsertPoint.after(pe))
+
+        # Remove the bounds attribute — it's been consumed
+        if BOUNDS_ATTR_NAME in pe.attributes:
+            del pe.attributes[BOUNDS_ATTR_NAME]
 
 
 @dataclass(frozen=True)
@@ -120,19 +147,19 @@ class InstantiatePEArrayPass(ModulePass):
     template_spec: TemplateSpec | tuple[int, ...] | None = None
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
-        if self.template_spec is None:
-            return
-        if not isinstance(self.template_spec, TemplateSpec):
-            fixed_input_maps = (
-                AffineMap.from_callable(lambda y: (y,)),
-                AffineMap.from_callable(lambda y: (y,)),
-            )
-            fixed_output_maps = (AffineMap.from_callable(lambda y: (y,)),)
-            template_spec = TemplateSpec(
-                input_maps=fixed_input_maps, output_maps=fixed_output_maps, template_bounds=self.template_spec
-            )
-        else:
-            template_spec = self.template_spec
-        PatternRewriteWalker(InstantiatePEArrays(template_spec=template_spec), apply_recursively=False).rewrite_module(
-            op
-        )
+        fallback: TemplateSpec | None = None
+        if self.template_spec is not None:
+            if not isinstance(self.template_spec, TemplateSpec):
+                fixed_input_maps = (
+                    AffineMap.from_callable(lambda y: (y,)),
+                    AffineMap.from_callable(lambda y: (y,)),
+                )
+                fixed_output_maps = (AffineMap.from_callable(lambda y: (y,)),)
+                fallback = TemplateSpec(
+                    input_maps=fixed_input_maps, output_maps=fixed_output_maps, template_bounds=self.template_spec
+                )
+            else:
+                fallback = self.template_spec
+        PatternRewriteWalker(
+            InstantiatePEArrays(fallback_template_spec=fallback), apply_recursively=False
+        ).rewrite_module(op)
