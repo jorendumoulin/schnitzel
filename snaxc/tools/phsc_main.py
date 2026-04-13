@@ -4,9 +4,10 @@ import subprocess
 import sys
 from collections.abc import Sequence
 from io import StringIO
+from typing import cast
 
+from xdsl.dialects import builtin
 from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.affine import AffineMap
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
@@ -17,7 +18,6 @@ from snaxc.hw.acc_context import AccContext
 from snaxc.hw.config_parser import parse_config
 from snaxc.hw.phs_accelerator import PhsAccelerator
 from snaxc.phs.export_to_schnitzel import call_phs_driver
-from snaxc.phs.template_spec import TemplateSpec
 from snaxc.tools.snaxc_main import SNAXCMain
 from snaxc.transforms.hardfloat.convert_float_to_hardfloat import ConvertFloatToHardfloatPass
 from snaxc.transforms.hardfloat.convert_hardfloat_to_hw import ConvertHardfloatToHw
@@ -28,7 +28,7 @@ from snaxc.transforms.phs.encode import PhsEncodePass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
-from snaxc.transforms.phs.instantiate_pe_array import InstantiatePEArrayPass
+from snaxc.transforms.phs.instantiate_pe_array import BOUNDS_ATTR_NAME, InstantiatePEArrayPass, derive_template_spec
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
 
 
@@ -45,13 +45,6 @@ class PHSCMain(SNAXCMain):
 
         self.ctx = AccContext(allow_unregistered=True)
         self.register_all_dialects()
-
-        # FIXED TEMPLATE FOR NOW
-        self.template_spec = TemplateSpec(
-            input_maps=(AffineMap.from_callable(lambda y: (y,)), AffineMap.from_callable(lambda y: (y,))),
-            output_maps=(AffineMap.from_callable(lambda y: (y,)),),
-            template_bounds=(4,),
-        )
         self.setup_input_pipeline()
 
     def run(self):
@@ -69,8 +62,19 @@ class PHSCMain(SNAXCMain):
         accelerators: list[PhsAccelerator] = []
         for hw_op in hardware_module.ops:
             if isinstance(hw_op, phs.PEOp):
+                assert BOUNDS_ATTR_NAME in hw_op.attributes, (
+                    f"PEOp @{hw_op.name_prop.data} missing {BOUNDS_ATTR_NAME} attribute"
+                )
+                bounds_attr = hw_op.attributes[BOUNDS_ATTR_NAME]
+                if isinstance(bounds_attr, builtin.DenseArrayBase):
+                    bounds = bounds_attr.get_values()
+                elif isinstance(bounds_attr, builtin.DenseIntOrFPElementsAttr):
+                    bounds = cast(tuple[int, ...], bounds_attr.get_values())
+                else:
+                    raise ValueError(f"Unexpected type for {BOUNDS_ATTR_NAME}: {type(bounds_attr)}")
+                template_spec = derive_template_spec(hw_op, bounds)
                 # Use a clone to prevent downstream changes messing up accelerator registration
-                accelerator = PhsAccelerator(hw_op.clone(), self.template_spec)
+                accelerator = PhsAccelerator(hw_op.clone(), template_spec)
                 accelerators.append(accelerator)
 
         # Remaining pipelines can only be setup after accelerators have been registered
@@ -256,7 +260,7 @@ class PHSCMain(SNAXCMain):
         hardware_pass_pipeline.append(PhsConvertFloatToInt())
         hardware_pass_pipeline.append(ConvertFloatToHardfloatPass())
         hardware_pass_pipeline.append(PhsRemoveOneOptionSwitchesPass())
-        hardware_pass_pipeline.append(InstantiatePEArrayPass(self.template_spec))
+        hardware_pass_pipeline.append(InstantiatePEArrayPass())
         hardware_pass_pipeline.append(ConvertPEToHWPass())
         hardware_pass_pipeline.append(FinalizePhsToHWPass())
         hardware_pass_pipeline.append(ReconcileRecodesPass())

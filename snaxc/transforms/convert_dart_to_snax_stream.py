@@ -106,7 +106,10 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
                             next_bound // applied_bound,
                         )
                 else:
-                    raise NotImplementedError()
+                    # bound > spat_size: the access bound is larger than the streamer spatial dim.
+                    # Split: spatial takes spat_size elements, remainder goes to the next dimension.
+                    assert bound % spat_size == 0
+                    stride, bound = (stride * spat_size, bound // spat_size)
 
             # remaining are temporal strides
             while stride is not None and bound is not None:
