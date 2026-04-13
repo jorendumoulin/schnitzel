@@ -7,7 +7,6 @@ from xdsl.ir import BlockArgument, SSAValue, TypeAttribute
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import PatternRewriter, PatternRewriteWalker, RewritePattern, op_type_rewrite_pattern
 from xdsl.rewriter import InsertPoint
-
 from xdsl.traits import SymbolTable
 
 from snaxc.dialects import phs
@@ -58,14 +57,10 @@ class ConvertPEArrayOps(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, array_op: phs.PEArrayOp, rewriter: PatternRewriter):
         # Find the first PEInstanceOp to determine switch types from the target PE module
-        first_instance = next(
-            (op for op in array_op.body.ops if isinstance(op, phs.PEInstanceOp)), None
-        )
+        first_instance = next((op for op in array_op.body.ops if isinstance(op, phs.PEInstanceOp)), None)
         switch_port_types: list[TypeAttribute] = []
         if first_instance is not None:
-            switch_port_types = _get_switch_port_types(
-                self.module, first_instance.pe_ref.string_value()
-            )
+            switch_port_types = _get_switch_port_types(self.module, first_instance.pe_ref.string_value())
 
         # Build hw port declaration, converting switch ports from index to correct int type
         ports: list[hw.ModulePort] = []
@@ -115,9 +110,7 @@ class ConvertPEArrayOps(RewritePattern):
         for arg_idx, int_type in switch_arg_type_map.items():
             block_arg = hw_block.args[arg_idx]
             new_arg = hw_block.insert_arg(int_type, arg_idx)
-            cast_op, cast_res = builtin.UnrealizedConversionCastOp.cast_one(
-                new_arg, builtin.IndexType()
-            )
+            cast_op, cast_res = builtin.UnrealizedConversionCastOp.cast_one(new_arg, builtin.IndexType())
             rewriter.replace_all_uses_with(block_arg, cast_res)
             rewriter.insert_op(cast_op, insertion_point=ip)
             hw_block.erase_arg(block_arg)
@@ -147,9 +140,7 @@ def _get_switch_port_types(module: builtin.ModuleOp, pe_ref: str) -> list[TypeAt
     return switch_types
 
 
-def _convert_pe_instance(
-    instance: phs.PEInstanceOp, rewriter: PatternRewriter, module: builtin.ModuleOp
-):
+def _convert_pe_instance(instance: phs.PEInstanceOp, rewriter: PatternRewriter, module: builtin.ModuleOp):
     """Convert a phs.instance to hw.instance, casting switch types to match the PE module."""
     in_port_list: list[tuple[str, SSAValue]] = []
     out_port_list: list[tuple[str, TypeAttribute]] = []
@@ -163,9 +154,7 @@ def _convert_pe_instance(
     for i, switch in enumerate(instance.switches):
         if i < len(switch_port_types) and isinstance(switch.type, builtin.IndexType):
             # Cast index -> correct integer type
-            cast_op, cast_res = builtin.UnrealizedConversionCastOp.cast_one(
-                switch, switch_port_types[i]
-            )
+            cast_op, cast_res = builtin.UnrealizedConversionCastOp.cast_one(switch, switch_port_types[i])
             rewriter.insert_op(cast_op, InsertPoint.before(instance))
             in_port_list.append((f"switch_{i}", cast_res))
         else:

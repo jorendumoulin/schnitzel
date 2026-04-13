@@ -710,9 +710,7 @@ class PEArrayOp(IRDLOperation):
         parser.parse_punctuation("->")
 
         # Parse output types
-        out_types: list[Attribute] = parser.parse_comma_separated_list(
-            Parser.Delimiter.PAREN, parser.parse_type
-        )
+        out_types: list[Attribute] = parser.parse_comma_separated_list(Parser.Delimiter.PAREN, parser.parse_type)
 
         region = parser.parse_region(arguments=block_args)
 

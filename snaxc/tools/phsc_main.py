@@ -26,9 +26,9 @@ from snaxc.transforms.phs.convert_float_to_int import PhsConvertFloatToInt
 from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
 from snaxc.transforms.phs.encode import PhsEncodePass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
-from snaxc.transforms.phs.instantiate_pe_array import InstantiatePEArrayPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
+from snaxc.transforms.phs.instantiate_pe_array import InstantiatePEArrayPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
 
 
