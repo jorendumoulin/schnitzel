@@ -19,65 +19,103 @@ from snaxc.phs.hw_conversion import (
 from snaxc.phs.template_spec import TemplateSpec
 
 
-def _build_pe_array_body(pe: phs.PEOp, template_spec: TemplateSpec) -> phs.PEArrayOp:
+def _build_pe_array_body(
+    pe: phs.PEOp,
+    template_spec: TemplateSpec,
+) -> phs.PEArrayOp:
     """
-    Build a PEArrayOp with explicit wiring in the body:
-    - hw.array_get to extract inputs from arrays
-    - phs.instance to instantiate PEs
-    - hw.array_create to assemble outputs
-    - phs.yield to return results
+    Build a PEArrayOp with explicit wiring derived from the TemplateSpec maps.
+
+    For each PE data input, the corresponding input_map determines connectivity:
+    - Map produces non-empty shape (e.g. (d0) -> (d0)): input comes from an array,
+      indexed per PE iteration. This is a **parallel** input.
+    - Map produces empty shape (e.g. (d0) -> ()): input is scalar and does not vary
+      across iterations. If a matching scalar output exists, this forms a **chain**:
+      the output of PE[i] feeds into the input of PE[i+1], with the first PE getting
+      an initial value from a block arg.
+
+    Similarly for outputs:
+    - Non-empty shape: outputs are collected into an array.
+    - Empty shape: scalar output. If chained, yields the last PE's result.
+
+    This handles data-parallel, reductions, and mixed cases uniformly.
     """
-    # Compute array port types
     input_sizes = template_spec.get_input_sizes()
     output_sizes = template_spec.get_output_sizes()
 
-    # Build input types: data ports are shaped arrays, switch ports are scalar index
-    in_types: list[Attribute] = []
     data_operands = pe.data_operands()
     switches = pe.get_switches()
-
-    for data_opnd, input_size in zip(data_operands, input_sizes, strict=True):
-        assert isa(data_opnd.type, builtin.AnySignlessIntegerType)
-        in_types.append(create_shaped_hw_array_type(data_opnd.type, input_size))
-
-    for _switch in switches:
-        in_types.append(builtin.IndexType())
-
-    # Build output types: shaped arrays
     yield_op = pe.get_terminator()
-    out_types: list[Attribute] = []
-    for output, output_size in zip(yield_op.operands, output_sizes, strict=True):
-        assert isa(output.type, builtin.AnySignlessIntegerType)
-        out_types.append(cast(Attribute, create_shaped_hw_array_type(output.type, output_size)))
-
-    # Create block with input args
-    block = Block(arg_types=in_types)
-
-    num_data = len(data_operands)
-    data_args = list(block.args[:num_data])
-    switch_args = list(block.args[num_data:])
-
-    # Result types for each PE instance (scalar, not arrays)
     pe_result_types = list(yield_op.operand_types)
 
-    # FIXME: Only support single output
-    assert len(output_sizes) == 1, "Currently only support single output for array generation"
-    pe_outputs: list[SSAValue] = []
+    # Determine which inputs are chained (scalar) vs parallel (array)
+    # by looking at the shape each input map produces
+    chained_inputs: set[int] = set()
+    for i, input_size in enumerate(input_sizes):
+        if len(input_size) == 0:
+            chained_inputs.add(i)
 
-    all_maps = template_spec.input_maps + template_spec.output_maps
+    # Determine which outputs are chained (scalar) vs parallel (array)
+    chained_outputs: set[int] = set()
+    for j, output_size in enumerate(output_sizes):
+        if len(output_size) == 0:
+            chained_outputs.add(j)
+
+    # Build input types for the array block args
+    in_types: list[Attribute] = []
+    parallel_arg_indices: dict[int, int] = {}  # pe_data_idx -> block_arg_idx
+    chained_arg_indices: dict[int, int] = {}  # pe_data_idx -> block_arg_idx
+
+    for i, data_opnd in enumerate(data_operands):
+        assert isa(data_opnd.type, builtin.AnySignlessIntegerType)
+        if i in chained_inputs:
+            chained_arg_indices[i] = len(in_types)
+            in_types.append(cast(Attribute, data_opnd.type))
+        else:
+            parallel_arg_indices[i] = len(in_types)
+            in_types.append(create_shaped_hw_array_type(data_opnd.type, input_sizes[i]))
+
+    for _ in switches:
+        in_types.append(builtin.IndexType())
+
+    # Build output types
+    out_types: list[Attribute] = []
+    for j in range(len(pe_result_types)):
+        if j in chained_outputs:
+            out_types.append(pe_result_types[j])
+        else:
+            assert isa(yield_op.operands[j].type, builtin.AnySignlessIntegerType)
+            out_types.append(cast(Attribute, create_shaped_hw_array_type(yield_op.operands[j].type, output_sizes[j])))
+
+    # Create block
+    block = Block(arg_types=in_types)
+    switch_args = list(block.args[len(in_types) - len(switches) :])
+
+    pe_outputs_per_result: list[list[SSAValue]] = [[] for _ in range(len(pe_result_types))]
+    prev_pe_outputs: list[SSAValue | None] = [None] * len(pe_result_types)
 
     for indexes in template_spec.get_iterations():
         instance_data_operands: list[SSAValue] = []
 
-        # Extract data inputs from arrays using affine maps
-        for i, data_arg in enumerate(data_args):
-            input_indexes = all_maps[i].eval(indexes, ())
-            array_val = SSAValue.get(data_arg, type=hw.ArrayType)
-            indexing_ops, val = get_from_shaped_hw_array(array_val, input_indexes)
-            block.add_ops(indexing_ops)
-            instance_data_operands.append(SSAValue.get(val))
+        for i in range(len(data_operands)):
+            if i in chained_inputs:
+                if prev_pe_outputs[0] is None:
+                    # First PE: use the initial value block arg
+                    instance_data_operands.append(block.args[chained_arg_indices[i]])
+                else:
+                    # Subsequent PEs: use previous PE's output
+                    # Match chained input to the corresponding chained output
+                    instance_data_operands.append(prev_pe_outputs[0])
+                    # TODO: support multiple chained pairs by matching input/output indices
+            else:
+                # Parallel: index into array
+                arg_idx = parallel_arg_indices[i]
+                input_indexes = template_spec.input_maps[i].eval(indexes, ())
+                array_val = SSAValue.get(block.args[arg_idx], type=hw.ArrayType)
+                indexing_ops, val = get_from_shaped_hw_array(array_val, input_indexes)
+                block.add_ops(indexing_ops)
+                instance_data_operands.append(SSAValue.get(val))
 
-        # Create phs.instance
         instance_name = f"{pe.name_prop.data}_pe_{'_'.join(str(idx) for idx in indexes)}"
         instance = phs.PEInstanceOp(
             instance_name=instance_name,
@@ -88,12 +126,24 @@ def _build_pe_array_body(pe: phs.PEOp, template_spec: TemplateSpec) -> phs.PEArr
         )
         block.add_op(instance)
 
-        assert len(instance.res) == 1
-        pe_outputs.append(instance.res[0])
+        for j in range(len(pe_result_types)):
+            pe_outputs_per_result[j].append(instance.res[j])
+            prev_pe_outputs[j] = instance.res[j]
 
-    # Assemble output arrays
-    ops, out_array_val = create_shaped_hw_array(pe_outputs, output_sizes[0])
-    block.add_ops([*ops, phs.YieldOp(out_array_val)])
+    # Build outputs
+    yield_operands: list[SSAValue] = []
+    for j in range(len(pe_result_types)):
+        if j in chained_outputs:
+            # Chained: yield the last PE's output (scalar)
+            assert prev_pe_outputs[j] is not None
+            yield_operands.append(prev_pe_outputs[j])
+        else:
+            # Parallel: assemble output array
+            ops, out_array_val = create_shaped_hw_array(pe_outputs_per_result[j], output_sizes[j])
+            block.add_ops(ops)
+            yield_operands.append(out_array_val)
+
+    block.add_op(phs.YieldOp(*yield_operands))
 
     function_type = builtin.FunctionType.from_lists(in_types, out_types)
     return phs.PEArrayOp(
