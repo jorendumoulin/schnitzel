@@ -8,6 +8,8 @@ from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import PatternRewriter, PatternRewriteWalker, RewritePattern, op_type_rewrite_pattern
 from xdsl.rewriter import InsertPoint
 
+from xdsl.traits import SymbolTable
+
 from snaxc.dialects import phs
 from snaxc.phs.hw_conversion import get_pe_port_decl, get_switch_bitwidth
 
@@ -51,6 +53,8 @@ class ConvertPeOps(RewritePattern):
 class ConvertPEArrayOps(RewritePattern):
     """Convert PEArrayOp to hw.module by converting instances and yield."""
 
+    module: builtin.ModuleOp
+
     @op_type_rewrite_pattern
     def match_and_rewrite(self, array_op: phs.PEArrayOp, rewriter: PatternRewriter):
         # Build hw port declaration from the PEArrayOp function type
@@ -84,15 +88,12 @@ class ConvertPEArrayOps(RewritePattern):
         )
         rewriter.replace_op(array_op, [hw_mod])
 
-        # Convert phs.instance -> hw.instance inside the body
+        # Convert phs.instance -> hw.instance inside the body,
+        # looking up the target PE hw.module to get correct switch types
         hw_block = hw_mod.regions[0].block
         for op in list(hw_block.ops):
             if isinstance(op, phs.PEInstanceOp):
-                _convert_pe_instance(op, rewriter)
-
-        # Convert switches from IndexType to IntegerType
-        # PEInstanceOp switches are IndexType, but hw.instance needs IntegerType
-        # This is handled by the switch casts already in the PE module
+                _convert_pe_instance(op, rewriter, self.module)
 
         # Replace phs.yield with hw.output
         hw_yield = hw_block.ops.last
@@ -101,19 +102,41 @@ class ConvertPEArrayOps(RewritePattern):
         rewriter.replace_op(hw_yield, output_op)
 
 
-def _convert_pe_instance(instance: phs.PEInstanceOp, rewriter: PatternRewriter):
-    """Convert a phs.instance to hw.instance."""
+def _get_switch_port_types(module: builtin.ModuleOp, pe_ref: str) -> list[TypeAttribute]:
+    """Look up the PE's hw.module to get the actual switch port types."""
+    pe_mod = SymbolTable.lookup_symbol(module, pe_ref)
+    if not isinstance(pe_mod, hw.HWModuleOp):
+        return []
+    switch_types: list[TypeAttribute] = []
+    for port in pe_mod.module_type.ports:
+        if port.dir.data == hw.Direction.INPUT and "switch" in port.port_name.data:
+            switch_types.append(port.type)
+    return switch_types
+
+
+def _convert_pe_instance(
+    instance: phs.PEInstanceOp, rewriter: PatternRewriter, module: builtin.ModuleOp
+):
+    """Convert a phs.instance to hw.instance, casting switch types to match the PE module."""
     in_port_list: list[tuple[str, SSAValue]] = []
     out_port_list: list[tuple[str, TypeAttribute]] = []
 
     for i, data_opnd in enumerate(instance.data_operands):
         in_port_list.append((f"data_{i}", data_opnd))
 
+    # Look up the target PE module to get the correct switch port types
+    switch_port_types = _get_switch_port_types(module, instance.pe_ref.string_value())
+
     for i, switch in enumerate(instance.switches):
-        # Convert IndexType switch to IntegerType
-        # For now use i1 as default; the PE module's switch port width
-        # will be determined by the PE's ChooseOp/MuxOp structure
-        in_port_list.append((f"switch_{i}", switch))
+        if i < len(switch_port_types) and isinstance(switch.type, builtin.IndexType):
+            # Cast index -> correct integer type
+            cast_op, cast_res = builtin.UnrealizedConversionCastOp.cast_one(
+                switch, switch_port_types[i]
+            )
+            rewriter.insert_op(cast_op, InsertPoint.before(instance))
+            in_port_list.append((f"switch_{i}", cast_res))
+        else:
+            in_port_list.append((f"switch_{i}", switch))
 
     for i, res in enumerate(instance.res):
         out_port_list.append((f"out_{i}", cast(TypeAttribute, res.type)))
@@ -133,4 +156,4 @@ class ConvertPEToHWPass(ModulePass):
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         PatternRewriteWalker(ConvertPeOps(), apply_recursively=False).rewrite_module(op)
-        PatternRewriteWalker(ConvertPEArrayOps(), apply_recursively=False).rewrite_module(op)
+        PatternRewriteWalker(ConvertPEArrayOps(module=op), apply_recursively=False).rewrite_module(op)
