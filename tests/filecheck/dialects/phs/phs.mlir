@@ -45,6 +45,17 @@ phs.pe @myfirstswitchlessaccelerator (%0 : f32, %1 : f32) {
   phs.yield %2 : f32
 }
 
+phs.pe_array @myarray(%0 : !hw.array<2xi32>, %1 : index) -> (!hw.array<2xi32>) {
+  %2 = arith.constant 0 : i1
+  %3 = hw.array_get %0[%2] : !hw.array<2xi32>, i1
+  %4 = phs.instance "pe_0" @myfirstswitchlessaccelerator(%3, %3 : i32, i32) switches(%1 : index) -> i32
+  %5 = arith.constant 1 : i1
+  %6 = hw.array_get %0[%5] : !hw.array<2xi32>, i1
+  %7 = phs.instance "pe_1" @myfirstswitchlessaccelerator(%6, %6 : i32, i32) switches(%1 : index) -> i32
+  %8 = hw.array_create %7, %4 : i32
+  phs.yield %8 : !hw.array<2xi32>
+}
+
 // CHECK: builtin.module {
 // CHECK-NEXT:   phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6 : f32, %7 : f32) {
 // CHECK-NEXT:     %8 = phs.choose @_0 with %0 (%6 : f32, %7 : f32) -> f32
@@ -86,5 +97,15 @@ phs.pe @myfirstswitchlessaccelerator (%0 : f32, %1 : f32) {
 // CHECK-NEXT:   phs.pe @myfirstswitchlessaccelerator (%0 : f32, %1 : f32) {
 // CHECK-NEXT:     %2 = arith.mulf %0, %1 : f32
 // CHECK-NEXT:     phs.yield %2 : f32
+// CHECK-NEXT:   }
+// CHECK-NEXT:   phs.pe_array @myarray(%0 : !hw.array<2xi32>, %1 : index) -> (!hw.array<2xi32>) {
+// CHECK-NEXT:     %2 = arith.constant false
+// CHECK-NEXT:     %3 = hw.array_get %0[%2] : !hw.array<2xi32>, i1
+// CHECK-NEXT:     %4 = phs.instance "pe_0" @myfirstswitchlessaccelerator(%3, %3 : i32, i32) switches(%1 : index) -> i32
+// CHECK-NEXT:     %5 = arith.constant true
+// CHECK-NEXT:     %6 = hw.array_get %0[%5] : !hw.array<2xi32>, i1
+// CHECK-NEXT:     %7 = phs.instance "pe_1" @myfirstswitchlessaccelerator(%6, %6 : i32, i32) switches(%1 : index) -> i32
+// CHECK-NEXT:     %8 = hw.array_create %7, %4 : i32
+// CHECK-NEXT:     phs.yield %8 : !hw.array<2xi32>
 // CHECK-NEXT:   }
 // CHECK-NEXT: }

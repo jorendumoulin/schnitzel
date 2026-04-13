@@ -47,7 +47,7 @@ class YieldOp(AbstractYieldOperation[Attribute]):
     traits = lazy_traits_def(
         lambda: (
             IsTerminator(),
-            HasParent(PEOp, ChooseOp),
+            HasParent(PEOp, PEArrayOp, ChooseOp),
             Pure(),
         )
     )
@@ -574,6 +574,155 @@ class MuxOp(IRDLOperation):
 
 
 @irdl_op_definition
+class PEInstanceOp(IRDLOperation):
+    """
+    Instantiate a PEOp inside a PEArrayOp body.
+    References a PEOp by symbol and connects data operands and switches.
+    """
+
+    name = "phs.instance"
+
+    instance_name = prop_def(StringAttr)
+    pe_ref = prop_def(SymbolRefAttr)
+
+    data_operands = var_operand_def()
+    switches = var_operand_def(IndexType)
+    res = var_result_def()
+
+    irdl_options = [AttrSizedOperandSegments()]
+
+    assembly_format = (
+        "$instance_name $pe_ref"
+        " `(` $data_operands `:` type($data_operands) `)`"
+        " `switches` `(` $switches `:` type($switches) `)`"
+        " `->` type($res) attr-dict"
+    )
+
+    def __init__(
+        self,
+        instance_name: str,
+        pe_ref: str | SymbolRefAttr,
+        data_operands: Sequence[Operation | SSAValue],
+        switches: Sequence[Operation | SSAValue],
+        result_types: Sequence[Attribute],
+    ):
+        if isinstance(pe_ref, str):
+            pe_ref = SymbolRefAttr(pe_ref)
+        super().__init__(
+            properties={
+                "instance_name": StringAttr(instance_name),
+                "pe_ref": pe_ref,
+            },
+            operands=(data_operands, switches),
+            result_types=(result_types,),
+        )
+
+
+@irdl_op_definition
+class PEArrayOp(IRDLOperation):
+    """
+    PE Array operation - describes how to instantiate PEOps into
+    a parallel array of processing elements.
+
+    Contains a body region with explicit wiring: hw.array_get ops to
+    extract inputs, phs.instance ops to instantiate PEs, hw.array_create
+    to assemble outputs, and phs.yield to return results.
+    """
+
+    name = "phs.pe_array"
+
+    name_prop = prop_def(StringAttr, prop_name="sym_name")
+    function_type = prop_def(FunctionType)
+    body = region_def("single_block")
+
+    traits = traits_def(IsolatedFromAbove(), SymbolOpInterface())
+
+    def __init__(
+        self,
+        name: str,
+        function_type: FunctionType | tuple[Sequence[Attribute], Sequence[Attribute]],
+        region: Region | None = None,
+    ):
+        if isinstance(function_type, tuple):
+            inputs, outputs = function_type
+            function_type = FunctionType.from_lists(inputs, outputs)
+        if not isinstance(region, Region):
+            region = Region(Block(arg_types=function_type.inputs))
+        super().__init__(
+            properties={
+                "sym_name": StringAttr(name),
+                "function_type": function_type,
+            },
+            regions=[region],
+        )
+
+    def get_terminator(self) -> YieldOp:
+        yield_op = self.body.ops.last
+        assert isinstance(yield_op, YieldOp)
+        return yield_op
+
+    def print(self, printer: Printer):
+        printer.print_string(" @")
+        printer.print_string(self.name_prop.data)
+
+        # Print block args with types
+        printer.print_string("(")
+        block = self.body.block
+        for i, arg in enumerate(block.args):
+            if i > 0:
+                printer.print_string(", ")
+            printer.print_operand(arg)
+            printer.print_string(" : ")
+            printer.print_attribute(arg.type)
+        printer.print_string(") -> (")
+
+        # Print output types from yield
+        yield_op = self.get_terminator()
+        for i, opnd in enumerate(yield_op.operands):
+            if i > 0:
+                printer.print_string(", ")
+            printer.print_attribute(opnd.type)
+        printer.print_string(") {")
+
+        with printer.indented():
+            for op in block.ops:
+                printer.print_string("\n")
+                printer.print_op(op)
+        printer.print_string("\n}")
+
+    @classmethod
+    def parse(cls: type[PEArrayOp], parser: Parser) -> PEArrayOp:
+        name_prop = parser.parse_symbol_name()
+
+        # Parse arguments: (%name : type, ...)
+        block_args: list[Parser.Argument] = []
+        parser.parse_punctuation("(")
+        while True:
+            arg = parser.parse_optional_argument(expect_type=False)
+            if arg is None:
+                break
+            parser.parse_punctuation(":")
+            typ = parser.parse_type()
+            block_args.append(arg.resolve(typ))
+            parser.parse_optional_punctuation(",")
+        parser.parse_punctuation(")")
+
+        parser.parse_punctuation("->")
+
+        # Parse output types
+        out_types: list[Attribute] = parser.parse_comma_separated_list(Parser.Delimiter.PAREN, parser.parse_type)
+
+        region = parser.parse_region(arguments=block_args)
+
+        in_types = [arg.type for arg in block_args]
+        return cls(
+            name=name_prop.data,
+            function_type=(in_types, out_types),
+            region=region,
+        )
+
+
+@irdl_op_definition
 class CallOp(IRDLOperation):
     """
     Operation to call a named PEOp operation with data operands and switches.
@@ -615,6 +764,8 @@ Phs = Dialect(
     "phs",
     [
         CallOp,
+        PEArrayOp,
+        PEInstanceOp,
         PEOp,
         MuxOp,
         ChooseOp,
