@@ -66,19 +66,36 @@ class ConvertPEArrayOps(RewritePattern):
         ports: list[hw.ModulePort] = []
         block = array_op.body.block
 
-        # Track which block args are switch ports (IndexType args that feed instances)
+        # Build port name and type maps from the first PEInstanceOp
+        # Switch args are identified by direct BlockArgument usage in switches.
+        # All other args are data ports.
         switch_arg_type_map: dict[int, TypeAttribute] = {}
+        switch_arg_indices: set[int] = set()
         if first_instance is not None:
-            # Find which block args are used as switches by looking at the first instance
             for sw_idx, switch in enumerate(first_instance.switches):
-                if isinstance(switch, BlockArgument) and sw_idx < len(switch_port_types):
-                    switch_arg_type_map[switch.index] = switch_port_types[sw_idx]
+                if isinstance(switch, BlockArgument):
+                    switch_arg_indices.add(switch.index)
+                    if sw_idx < len(switch_port_types):
+                        switch_arg_type_map[switch.index] = switch_port_types[sw_idx]
+
+        # Name ports: data args get "data_N", switch args get "switch_N"
+        port_names: dict[int, str] = {}
+        data_count = 0
+        switch_count = 0
+        for i in range(len(block.args)):
+            if i in switch_arg_indices:
+                port_names[i] = f"switch_{switch_count}"
+                switch_count += 1
+            else:
+                port_names[i] = f"data_{data_count}"
+                data_count += 1
 
         for i, arg in enumerate(block.args):
             port_type = switch_arg_type_map.get(i, cast(TypeAttribute, arg.type))
+            port_name = port_names.get(i, f"in_{i}")
             ports.append(
                 hw.ModulePort(
-                    builtin.StringAttr(f"in_{i}"),
+                    builtin.StringAttr(port_name),
                     port_type,
                     hw.DirectionAttr(data=hw.Direction.INPUT),
                 )
