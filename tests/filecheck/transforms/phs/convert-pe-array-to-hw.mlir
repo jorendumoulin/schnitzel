@@ -35,7 +35,7 @@ phs.pe_array @myacc_array(%0 : !hw.array<4xi32>, %1 : !hw.array<4xi32>, %2 : ind
 // CHECK:   hw.output
 
 // The PE array module with hw.instance ops
-// CHECK: hw.module @myacc_array(in %0 in_0: !hw.array<4xi32>, in %1 in_1: !hw.array<4xi32>, in %2 in_2: index, out out_0: !hw.array<2xi32>) {
+// CHECK: hw.module @myacc_array(in %0 in_0: !hw.array<4xi32>, in %1 in_1: !hw.array<4xi32>, in %2 in_2: i1, out out_0: !hw.array<2xi32>) {
 // CHECK:   hw.instance "myacc_pe_0" @myacc
 // CHECK:   hw.instance "myacc_pe_1" @myacc
 // CHECK:   hw.array_create

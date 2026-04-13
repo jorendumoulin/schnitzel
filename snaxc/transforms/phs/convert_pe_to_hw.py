@@ -3,7 +3,7 @@ from typing import cast
 
 from xdsl.context import Context
 from xdsl.dialects import builtin, hw
-from xdsl.ir import SSAValue, TypeAttribute
+from xdsl.ir import BlockArgument, SSAValue, TypeAttribute
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import PatternRewriter, PatternRewriteWalker, RewritePattern, op_type_rewrite_pattern
 from xdsl.rewriter import InsertPoint
@@ -57,15 +57,34 @@ class ConvertPEArrayOps(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, array_op: phs.PEArrayOp, rewriter: PatternRewriter):
-        # Build hw port declaration from the PEArrayOp function type
+        # Find the first PEInstanceOp to determine switch types from the target PE module
+        first_instance = next(
+            (op for op in array_op.body.ops if isinstance(op, phs.PEInstanceOp)), None
+        )
+        switch_port_types: list[TypeAttribute] = []
+        if first_instance is not None:
+            switch_port_types = _get_switch_port_types(
+                self.module, first_instance.pe_ref.string_value()
+            )
+
+        # Build hw port declaration, converting switch ports from index to correct int type
         ports: list[hw.ModulePort] = []
         block = array_op.body.block
 
+        # Track which block args are switch ports (IndexType args that feed instances)
+        switch_arg_type_map: dict[int, TypeAttribute] = {}
+        if first_instance is not None:
+            # Find which block args are used as switches by looking at the first instance
+            for sw_idx, switch in enumerate(first_instance.switches):
+                if isinstance(switch, BlockArgument) and sw_idx < len(switch_port_types):
+                    switch_arg_type_map[switch.index] = switch_port_types[sw_idx]
+
         for i, arg in enumerate(block.args):
+            port_type = switch_arg_type_map.get(i, cast(TypeAttribute, arg.type))
             ports.append(
                 hw.ModulePort(
                     builtin.StringAttr(f"in_{i}"),
-                    cast(TypeAttribute, arg.type),
+                    port_type,
                     hw.DirectionAttr(data=hw.Direction.INPUT),
                 )
             )
@@ -88,9 +107,23 @@ class ConvertPEArrayOps(RewritePattern):
         )
         rewriter.replace_op(array_op, [hw_mod])
 
+        # Convert switch block args from IndexType to IntegerType
+        hw_block = hw_mod.regions[0].block
+        assert hw_block.ops.first is not None
+        ip = InsertPoint(block=hw_block, insert_before=hw_block.ops.first)
+
+        for arg_idx, int_type in switch_arg_type_map.items():
+            block_arg = hw_block.args[arg_idx]
+            new_arg = hw_block.insert_arg(int_type, arg_idx)
+            cast_op, cast_res = builtin.UnrealizedConversionCastOp.cast_one(
+                new_arg, builtin.IndexType()
+            )
+            rewriter.replace_all_uses_with(block_arg, cast_res)
+            rewriter.insert_op(cast_op, insertion_point=ip)
+            hw_block.erase_arg(block_arg)
+
         # Convert phs.instance -> hw.instance inside the body,
         # looking up the target PE hw.module to get correct switch types
-        hw_block = hw_mod.regions[0].block
         for op in list(hw_block.ops):
             if isinstance(op, phs.PEInstanceOp):
                 _convert_pe_instance(op, rewriter, self.module)
