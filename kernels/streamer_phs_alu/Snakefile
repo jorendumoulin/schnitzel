@@ -14,7 +14,6 @@ import os
 
 ROOT = os.path.abspath("../..")
 BUILD = "build"
-GENERATED = os.path.abspath(f"{BUILD}/generated")
 SIM_BUILD = f"{BUILD}/sim"
 DEVICE_BUILD = f"{BUILD}/device"
 
@@ -29,38 +28,84 @@ RUNTIME_INCLUDE = f"{ROOT}/sw/device/runtime"
 MLIR_INCLUDE = f"{ROOT}/sw/common/mlir"
 LINKER_SCRIPT = f"{RUNTIME_INCLUDE}/link.ld"
 
+# Array bounds to test
+ARRAY_BOUNDS = [1, 2, 4]
+
 
 rule all:
     input:
-        f"{BUILD}/test.log",
+        expand(f"{BUILD}/bounds_{{b}}/test.log", b=ARRAY_BOUNDS),
 
 
-rule alu_test:
-    """Run the hand-written ALU accelerator test (for debugging CSR values)"""
-    input:
-        f"{BUILD}/alu_test.log",
+# --- Generate per-bounds transform schedule ---
+
+
+rule generate_schedule:
+    output:
+        f"{BUILD}/bounds_{{b}}/transform_schedule.mlir",
+    params:
+        bounds=lambda wc: wc.b,
+    shell:
+        r"""
+        cat > {output} << 'MLIR_EOF'
+module @transforms attributes {{ transform.with_named_sequence }} {{
+  transform.named_sequence @__transform_main(
+      %root: !transform.any_op {{transform.readonly}}) {{
+    %matmul = transform.collect_matching @match_generic in %root
+      : (!transform.any_op) -> !transform.any_op
+    transform.include @annotate_generic failures(propagate)  (%matmul)
+      : (!transform.any_op) -> ()
+
+    transform.yield
+  }}
+
+  transform.named_sequence @match_generic(
+      %entry: !transform.any_op {{transform.readonly}}) -> !transform.any_op {{
+    transform.match.operation_name %entry ["linalg.generic"] : !transform.any_op
+    transform.match.structured %entry: !transform.any_op {{
+     ^bb0(%c: !transform.any_op):
+       %n_ins = transform.match.structured.num_inputs %c
+         : (!transform.any_op) -> !transform.param<i64>
+       %c2 = transform.param.constant 2 : i64 -> !transform.param<i64>
+       transform.match.param.cmpi eq %n_ins, %c2 : !transform.param<i64>
+    }}
+    transform.yield %entry : !transform.any_op
+  }}
+
+  transform.named_sequence @annotate_generic(
+     %matmul: !transform.any_op {{transform.readonly}}) {{
+       %attr_value = transform.param.constant @acc1 -> !transform.any_param
+       transform.annotate %matmul "phs_acc" = %attr_value : !transform.any_op, !transform.any_param
+       %bounds = transform.param.constant dense<[{params.bounds}]> : vector<1xi64> -> !transform.any_param
+       transform.annotate %matmul "phs_array_bounds" = %bounds : !transform.any_op, !transform.any_param
+       transform.yield
+  }}
+}}
+MLIR_EOF
+        """
 
 
 # --- Step 1: PHS compilation + schnitzel hardware generation ---
-# phsc compiles MLIR → BlackBox SV + SoC verilog + lowered software MLIR
 
 
 rule phsc:
     input:
         mlir="addition.mlir",
-        schedule="transform_schedule.mlir",
+        schedule=f"{BUILD}/bounds_{{b}}/transform_schedule.mlir",
         software="test_software.mlir",
     output:
-        sw=f"{BUILD}/sw.llvm.mlir",
-        top=f"{GENERATED}/Top.sv",
-        filelist=f"{GENERATED}/filelist.f",
+        sw=f"{BUILD}/bounds_{{b}}/sw.llvm.mlir",
+        top=f"{BUILD}/bounds_{{b}}/generated/Top.sv",
+        filelist=f"{BUILD}/bounds_{{b}}/generated/filelist.f",
+    params:
+        generated=lambda wc: os.path.abspath(f"{BUILD}/bounds_{wc.b}/generated"),
     shell:
         """
         phsc {input.mlir} {input.schedule} \
             --software-file {input.software} \
             -o {output.sw} \
-            --output-hardware {GENERATED}/acc1_array.sv \
-            --output-schnitzel-dir {GENERATED}
+            --output-hardware {params.generated}/acc1_array.sv \
+            --output-schnitzel-dir {params.generated}
         """
 
 
@@ -69,18 +114,18 @@ rule phsc:
 
 rule translate_mlir:
     input:
-        f"{BUILD}/sw.llvm.mlir",
+        f"{BUILD}/bounds_{{b}}/sw.llvm.mlir",
     output:
-        f"{BUILD}/sw.ll",
+        f"{BUILD}/bounds_{{b}}/sw.ll",
     shell:
         "mlir-translate --mlir-to-llvmir -o {output} {input}"
 
 
 rule compile_mlir_kernel:
     input:
-        f"{BUILD}/sw.ll",
+        f"{BUILD}/bounds_{{b}}/sw.ll",
     output:
-        f"{BUILD}/sw.o",
+        f"{BUILD}/bounds_{{b}}/sw.o",
     shell:
         "{CC} {CFLAGS} -x ir -c {input} -o {output} -Wno-override-module"
 
@@ -118,38 +163,13 @@ rule compile_main:
 
 rule link:
     input:
-        sw=f"{BUILD}/sw.o",
+        sw=f"{BUILD}/bounds_{{b}}/sw.o",
         main=f"{BUILD}/main.o",
         runtime=f"{DEVICE_BUILD}/runtime/libdevice_runtime.a",
     output:
-        f"{BUILD}/test.elf",
+        f"{BUILD}/bounds_{{b}}/test.elf",
     shell:
         "{CC} {LDFLAGS} -T{LINKER_SCRIPT} {input.sw} {input.main} {input.runtime} -o {output}"
-
-
-# --- Hand-written ALU test (for debugging) ---
-
-
-rule build_alu_test:
-    input:
-        ninja=f"{DEVICE_BUILD}/build.ninja",
-    output:
-        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
-    shell:
-        "cmake --build {DEVICE_BUILD} --target alu_accelerator_test.elf"
-
-
-rule simulate_alu_test:
-    input:
-        sim=f"{SIM_BUILD}/sim",
-        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
-    output:
-        log=f"{BUILD}/alu_test.log",
-    shell:
-        """
-        {input.sim} {input.elf} 2>&1 | tee {output.log}
-        grep -q "TEST PASSED" {output.log}
-        """
 
 
 # --- Step 5: Build simulator (Verilator) ---
@@ -157,22 +177,25 @@ rule simulate_alu_test:
 
 rule configure_sim:
     input:
-        filelist=f"{GENERATED}/filelist.f",
+        filelist=f"{BUILD}/bounds_{{b}}/generated/filelist.f",
     output:
-        ninja=f"{SIM_BUILD}/build.ninja",
+        ninja=f"{BUILD}/bounds_{{b}}/sim/build.ninja",
+    params:
+        generated=lambda wc: os.path.abspath(f"{BUILD}/bounds_{wc.b}/generated"),
+        sim_build=lambda wc: f"{BUILD}/bounds_{wc.b}/sim",
     shell:
-        "cmake -B {SIM_BUILD} -S {ROOT}/sim -G Ninja -DGENERATED_DIR={GENERATED}"
+        "cmake -B {params.sim_build} -S {ROOT}/sim -G Ninja -DGENERATED_DIR={params.generated}"
 
 
 rule build_sim:
     input:
-        ninja=f"{SIM_BUILD}/build.ninja",
-        top=f"{GENERATED}/Top.sv",
+        ninja=f"{BUILD}/bounds_{{b}}/sim/build.ninja",
+        top=f"{BUILD}/bounds_{{b}}/generated/Top.sv",
     output:
-        sim=f"{SIM_BUILD}/sim",
+        sim=f"{BUILD}/bounds_{{b}}/sim/sim",
     threads: workflow.cores
     shell:
-        "cmake --build {SIM_BUILD} -j{threads}"
+        "cmake --build {BUILD}/bounds_{wildcards.b}/sim -j{threads}"
 
 
 # --- Step 6: Simulate ---
@@ -180,10 +203,10 @@ rule build_sim:
 
 rule simulate:
     input:
-        sim=f"{SIM_BUILD}/sim",
-        elf=f"{BUILD}/test.elf",
+        sim=f"{BUILD}/bounds_{{b}}/sim/sim",
+        elf=f"{BUILD}/bounds_{{b}}/test.elf",
     output:
-        log=f"{BUILD}/test.log",
+        log=f"{BUILD}/bounds_{{b}}/test.log",
     shell:
         """
         {input.sim} {input.elf} --vltargs="+ibex_tracer_enable=0" 2>&1 | tee {output.log}
