@@ -120,6 +120,11 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return PhsRemovePhsPass
 
+    def get_instantiate_pe_array():
+        from snaxc.transforms.phs.instantiate_pe_array import InstantiatePEArrayPass
+
+        return InstantiatePEArrayPass
+
     def get_phs_convert_float_to_int():
         from snaxc.transforms.phs.convert_float_to_int import PhsConvertFloatToInt
 
@@ -357,6 +362,7 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "dispatch-regions": get_dispatch_regions,
         "frontend-static-inline": get_frontend_static_inline,
         "frontend-transform": get_frontend_transform,
+        "instantiate-pe-array": get_instantiate_pe_array,
         "insert-accfg-op": get_insert_accfg_op,
         "insert-sync-barrier": get_insert_sync_barrier,
         "memref-to-snax": get_memref_to_snax,
