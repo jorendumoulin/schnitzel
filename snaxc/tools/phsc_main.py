@@ -4,7 +4,6 @@ import subprocess
 import sys
 from collections.abc import Sequence
 from io import StringIO
-from typing import cast
 
 from xdsl.dialects import builtin
 from xdsl.dialects.builtin import ModuleOp
@@ -18,6 +17,7 @@ from snaxc.hw.acc_context import AccContext
 from snaxc.hw.config_parser import parse_config
 from snaxc.hw.phs_accelerator import PhsAccelerator
 from snaxc.phs.export_to_schnitzel import call_phs_driver
+from snaxc.phs.template_spec import TemplateSpec
 from snaxc.tools.snaxc_main import SNAXCMain
 from snaxc.transforms.hardfloat.convert_float_to_hardfloat import ConvertFloatToHardfloatPass
 from snaxc.transforms.hardfloat.convert_hardfloat_to_hw import ConvertHardfloatToHw
@@ -28,7 +28,7 @@ from snaxc.transforms.phs.encode import PhsEncodePass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
-from snaxc.transforms.phs.instantiate_pe_array import BOUNDS_ATTR_NAME, InstantiatePEArrayPass, derive_template_spec
+from snaxc.transforms.phs.instantiate_pe_array import BOUNDS_ATTR_NAME, InstantiatePEArrayPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
 
 
@@ -69,10 +69,10 @@ class PHSCMain(SNAXCMain):
                 if isinstance(bounds_attr, builtin.DenseArrayBase):
                     bounds = bounds_attr.get_values()
                 elif isinstance(bounds_attr, builtin.DenseIntOrFPElementsAttr):
-                    bounds = cast(tuple[int, ...], bounds_attr.get_values())
+                    bounds = bounds_attr.get_values()
                 else:
                     raise ValueError(f"Unexpected type for {BOUNDS_ATTR_NAME}: {type(bounds_attr)}")
-                template_spec = derive_template_spec(hw_op, bounds)
+                template_spec = TemplateSpec.derive_template_spec(hw_op, bounds)
                 # Use a clone to prevent downstream changes messing up accelerator registration
                 accelerator = PhsAccelerator(hw_op.clone(), template_spec)
                 accelerators.append(accelerator)

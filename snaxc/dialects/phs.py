@@ -591,13 +591,6 @@ class PEInstanceOp(IRDLOperation):
 
     irdl_options = [AttrSizedOperandSegments()]
 
-    assembly_format = (
-        "$instance_name $pe_ref"
-        " `(` $data_operands `:` type($data_operands) `)`"
-        " `switches` `(` $switches `:` type($switches) `)`"
-        " `->` type($res) attr-dict"
-    )
-
     def __init__(
         self,
         instance_name: str,
@@ -615,6 +608,62 @@ class PEInstanceOp(IRDLOperation):
             },
             operands=(data_operands, switches),
             result_types=(result_types,),
+        )
+
+    def print(self, printer: Printer):
+        printer.print_string(" ")
+        printer.print_attribute(self.instance_name)
+        printer.print_string(" ")
+        printer.print_attribute(self.pe_ref)
+        printer.print_string("(")
+        printer.print_list(self.data_operands, printer.print_operand)
+        printer.print_string(" : ")
+        printer.print_list(self.data_operands.types, printer.print_attribute)
+        printer.print_string(")")
+        if len(self.switches) > 0:
+            printer.print_string(" switches(")
+            printer.print_list(self.switches, printer.print_operand)
+            printer.print_string(" : ")
+            printer.print_list(self.switches.types, printer.print_attribute)
+            printer.print_string(")")
+        printer.print_string(" -> ")
+        printer.print_list(self.res.types, printer.print_attribute)
+
+    @classmethod
+    def parse(cls: type[PEInstanceOp], parser: Parser) -> PEInstanceOp:
+        instance_name = parser.parse_str_literal()
+        pe_ref = parser.parse_attribute()
+        assert isinstance(pe_ref, SymbolRefAttr)
+
+        def parse_typed_operands() -> tuple[list[SSAValue], list[Attribute]]:
+            operands = parser.parse_comma_separated_list(Parser.Delimiter.NONE, parser.parse_operand)
+            parser.parse_punctuation(":")
+            types = parser.parse_comma_separated_list(Parser.Delimiter.NONE, parser.parse_type)
+            return operands, types
+
+        parser.parse_punctuation("(")
+        data_operands, data_types = parse_typed_operands()
+        parser.parse_punctuation(")")
+
+        switches: list[SSAValue] = []
+        if parser.parse_optional_keyword("switches"):
+            parser.parse_punctuation("(")
+            switches, _ = parse_typed_operands()
+            parser.parse_punctuation(")")
+
+        parser.parse_punctuation("->")
+        result_types = parser.parse_comma_separated_list(Parser.Delimiter.NONE, parser.parse_type)
+
+        # Resolve operand types
+        for operand, expected_type in zip(data_operands, data_types, strict=True):
+            assert operand.type == expected_type
+
+        return cls(
+            instance_name=instance_name,
+            pe_ref=pe_ref,
+            data_operands=data_operands,
+            switches=switches,
+            result_types=result_types,
         )
 
 
@@ -635,6 +684,10 @@ class PEArrayOp(IRDLOperation):
     function_type = prop_def(FunctionType)
     body = region_def("single_block")
 
+    # Number of trailing block args that are array-level switches (wiring muxes).
+    # PE-level switches come before these.
+    array_switch_no = prop_def(IntegerAttr[I64])
+
     traits = traits_def(IsolatedFromAbove(), SymbolOpInterface())
 
     def __init__(
@@ -642,6 +695,7 @@ class PEArrayOp(IRDLOperation):
         name: str,
         function_type: FunctionType | tuple[Sequence[Attribute], Sequence[Attribute]],
         region: Region | None = None,
+        array_switch_no: int = 0,
     ):
         if isinstance(function_type, tuple):
             inputs, outputs = function_type
@@ -652,9 +706,31 @@ class PEArrayOp(IRDLOperation):
             properties={
                 "sym_name": StringAttr(name),
                 "function_type": function_type,
+                "array_switch_no": IntegerAttr(array_switch_no, 64),
             },
             regions=[region],
         )
+
+    def get_array_switches(self) -> list[BlockArgument[Attribute]]:
+        """Get block args that are array-level switches."""
+        n = self.array_switch_no.value.data
+        if n == 0:
+            return []
+        return list(self.body.block.args[-n:])
+
+    def add_array_switch(self) -> BlockArgument:
+        """Add a new array-level switch and return its block arg."""
+        block = self.body.block
+        self.array_switch_no = IntegerAttr(self.array_switch_no.value.data + 1, 64)
+        new_arg = block.insert_arg(IndexType(), len(block.args))
+        self.function_type = FunctionType.from_lists(
+            list(self.function_type.inputs) + [IndexType()], list(self.function_type.outputs)
+        )
+        return new_arg
+
+    def get_instances(self) -> list[PEInstanceOp]:
+        """Get all PEInstanceOp operations in the body."""
+        return [op for op in self.body.ops if isinstance(op, PEInstanceOp)]
 
     def get_terminator(self) -> YieldOp:
         yield_op = self.body.ops.last
@@ -665,10 +741,23 @@ class PEArrayOp(IRDLOperation):
         printer.print_string(" @")
         printer.print_string(self.name_prop.data)
 
-        # Print block args with types
-        printer.print_string("(")
+        # Print array switches if any
+        array_sw_count = self.array_switch_no.value.data
+        if array_sw_count > 0:
+            printer.print_string(" with ")
+            array_switches = self.get_array_switches()
+            for i, sw in enumerate(array_switches):
+                if i > 0:
+                    printer.print_string(", ")
+                printer.print_operand(sw)
+
+        # Print block args with types (excluding array switches)
         block = self.body.block
-        for i, arg in enumerate(block.args):
+        non_switch_args = (
+            list(block.args[: len(block.args) - array_sw_count]) if array_sw_count > 0 else list(block.args)
+        )
+        printer.print_string("(")
+        for i, arg in enumerate(non_switch_args):
             if i > 0:
                 printer.print_string(", ")
             printer.print_operand(arg)
@@ -694,6 +783,17 @@ class PEArrayOp(IRDLOperation):
     def parse(cls: type[PEArrayOp], parser: Parser) -> PEArrayOp:
         name_prop = parser.parse_symbol_name()
 
+        # Parse optional array switches: "with %sw0, %sw1"
+        array_switches: list[Parser.Argument] = []
+        if parser.parse_optional_keyword("with"):
+            while True:
+                arg = parser.parse_optional_argument(expect_type=False)
+                if arg is None:
+                    break
+                arg = arg.resolve(IndexType())
+                parser.parse_optional_punctuation(",")
+                array_switches.append(arg)
+
         # Parse arguments: (%name : type, ...)
         block_args: list[Parser.Argument] = []
         parser.parse_punctuation("(")
@@ -712,13 +812,15 @@ class PEArrayOp(IRDLOperation):
         # Parse output types
         out_types: list[Attribute] = parser.parse_comma_separated_list(Parser.Delimiter.PAREN, parser.parse_type)
 
-        region = parser.parse_region(arguments=block_args)
+        all_args = [*block_args, *array_switches]
+        region = parser.parse_region(arguments=all_args)
 
-        in_types = [arg.type for arg in block_args]
+        in_types = [arg.type for arg in all_args]
         return cls(
             name=name_prop.data,
             function_type=(in_types, out_types),
             region=region,
+            array_switch_no=len(array_switches),
         )
 
 

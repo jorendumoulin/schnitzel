@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import itertools
 from collections.abc import Iterable
 
 from xdsl.ir.affine import AffineMap
 
+from snaxc.dialects import phs
 from snaxc.ir.dart.access_pattern import Template, TemplatePattern
 
 
@@ -61,3 +64,13 @@ class TemplateSpec:
         template = [*self.input_maps, *self.output_maps]
         template_bounds = self.template_bounds
         return Template(TemplatePattern(template_bounds, tp) for tp in template)
+
+    @staticmethod
+    def derive_template_spec(pe: phs.PEOp, bounds: tuple[int, ...]) -> TemplateSpec:
+        """Derive a TemplateSpec from a PEOp and array bounds using identity maps."""
+        num_data = len(pe.data_operands())
+        num_outputs = len(pe.get_terminator().operands)
+        num_dims = len(bounds)
+        input_maps = tuple(AffineMap.identity(num_dims) for _ in range(num_data))
+        output_maps = tuple(AffineMap.identity(num_dims) for _ in range(num_outputs))
+        return TemplateSpec(input_maps=input_maps, output_maps=output_maps, template_bounds=bounds)
