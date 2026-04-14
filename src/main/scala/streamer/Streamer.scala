@@ -113,7 +113,15 @@ class Streamer(
   }.elsewhen(io.dir === StreamerDir.read) {
     agu.io.addrs.ready := allReadReqQueuesReady
   }.otherwise { // readWrite
-    agu.io.addrs.ready := allReadReqQueuesReady && allWriteReqQueuesReady && io.writeData.valid
+    // Per-iteration gating: only wait for the queues actually used this iter.
+    // writeData.valid keeps AGU paced with the ALU so every iteration produces
+    // one ALU beat (otherwise iter 0 would race ahead and we'd lose an
+    // accumulation in reductions).
+    val needsRead = agu.io.addrs.bits.isFirst
+    val needsWrite = agu.io.addrs.bits.isLast
+    agu.io.addrs.ready := io.writeData.valid &&
+      (!needsRead || allReadReqQueuesReady) &&
+      (!needsWrite || allWriteReqQueuesReady)
   }
 
   // writeData.ready depends on mode:
