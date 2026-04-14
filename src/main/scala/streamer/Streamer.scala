@@ -58,14 +58,6 @@ class Streamer(
   // This register prevents duplicate enqueues while the AGU is stalled.
   val firstReadIssued = RegInit(false.B)
 
-  // Read/write request arbiter per port
-  val reqArbiters = (0 until numPorts).map { i =>
-    val reqArbiter = Module(new RRArbiter(new BusReq(addrWidth, dataWidth), 2))
-    // Attach each arbiters output to the req part of a TCDM port
-    io.tcdmReqs(i).req <> reqArbiter.io.out
-    reqArbiter
-  }
-
   // Queue to request reads from TCDM
   // For the reads, no data is necessary, so we just make a queue of addresses instead
   val readReqQueues = (0 until numPorts).map { i =>
@@ -75,13 +67,6 @@ class Streamer(
       (io.dir === StreamerDir.read) ||
         (io.dir === StreamerDir.readWrite && !firstReadIssued)
     )
-    // port 0 on arbiter is for reads
-    readReqQueue.io.deq.ready := reqArbiters(i).io.in(0).ready
-    reqArbiters(i).io.in(0).valid := readReqQueue.io.deq.valid
-    reqArbiters(i).io.in(0).bits.addr := readReqQueue.io.deq.bits
-    reqArbiters(i).io.in(0).bits.wdata := DontCare
-    reqArbiters(i).io.in(0).bits.wen := false.B;
-    reqArbiters(i).io.in(0).bits.ben := VecInit(Seq.fill(dataWidth / 8)(true.B)).asUInt
     readReqQueue
   }
 
@@ -97,9 +82,24 @@ class Streamer(
     // Only queue if the streamer is writing and, when reducing if it is the last address
     // Also gate on writeData.valid to ensure we capture valid data (not garbage)
     writeReqQueue.io.enq.valid := agu.io.addrs.valid && io.writeData.valid && agu.io.addrs.bits.isLast && ((io.dir === StreamerDir.write) || (io.dir === StreamerDir.readWrite))
-    // port 1 on arbiter is for writes
-    reqArbiters(i).io.in(1) <> writeReqQueue.io.deq
     writeReqQueue
+  }
+
+  // Read/write request arbiter per port
+  val reqArbiters = (0 until numPorts).map { i =>
+    val reqArbiter = Module(new RRArbiter(new BusReq(addrWidth, dataWidth), 2))
+    // Attach each arbiters output to the req part of a TCDM port
+    io.tcdmReqs(i).req <> reqArbiter.io.out
+    // port 0 on arbiter is for reads, only connect address, rest is hardcoded anyways
+    readReqQueues(i).io.deq.ready := reqArbiter.io.in(0).ready
+    reqArbiter.io.in(0).valid := readReqQueues(i).io.deq.valid
+    reqArbiter.io.in(0).bits.addr := readReqQueues(i).io.deq.bits
+    reqArbiter.io.in(0).bits.wdata := DontCare
+    reqArbiter.io.in(0).bits.wen := false.B;
+    reqArbiter.io.in(0).bits.ben := VecInit(Seq.fill(dataWidth / 8)(true.B)).asUInt
+    // port 1 on arbiter is for writes
+    reqArbiter.io.in(1) <> writeReqQueues(i).io.deq
+    reqArbiter
   }
 
   // Combine many ready/valid into one:
