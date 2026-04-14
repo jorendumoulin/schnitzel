@@ -66,13 +66,8 @@ class PHSCMain(SNAXCMain):
                     f"PEOp @{hw_op.name_prop.data} missing {BOUNDS_ATTR_NAME} attribute"
                 )
                 bounds_attr = hw_op.attributes[BOUNDS_ATTR_NAME]
-                if isinstance(bounds_attr, builtin.DenseArrayBase):
-                    bounds = bounds_attr.get_values()
-                elif isinstance(bounds_attr, builtin.DenseIntOrFPElementsAttr):
-                    bounds = bounds_attr.get_values()
-                else:
-                    raise ValueError(f"Unexpected type for {BOUNDS_ATTR_NAME}: {type(bounds_attr)}")
-                template_spec = TemplateSpec.derive_template_spec(hw_op, bounds)
+                assert isinstance(bounds_attr, builtin.DenseArrayBase)
+                template_spec = TemplateSpec.derive_template_spec(hw_op, bounds_attr.get_values())
                 # Use a clone to prevent downstream changes messing up accelerator registration
                 accelerator = PhsAccelerator(hw_op.clone(), template_spec)
                 accelerators.append(accelerator)

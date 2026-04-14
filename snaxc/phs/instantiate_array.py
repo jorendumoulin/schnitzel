@@ -21,8 +21,9 @@ two patterns and Phase 3 to materialize new connections behind muxes.
 
 import itertools
 from dataclasses import dataclass
+from math import prod
 
-from xdsl.dialects import builtin, hw
+from xdsl.dialects import arith, builtin, hw
 from xdsl.ir import Attribute, Block, Region, SSAValue
 from xdsl.ir.affine import AffineMap
 from xdsl.utils.hints import isa
@@ -126,6 +127,7 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     for _ in switches:
         in_types.append(builtin.IndexType())
 
+    # Data outputs come first.
     out_types: list[Attribute] = []
     for j, out_size in enumerate(output_sizes):
         if len(out_size) == 0:
@@ -134,6 +136,12 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
             el_type = yield_op.operands[j].type
             assert isa(el_type, builtin.AnySignlessIntegerType)
             out_types.append(create_shaped_hw_array_type(el_type, out_size))
+
+    # Each output gets a corresponding "valid" mask, appended at the end.
+    # Mask width = number of meaningful output positions (1 for scalar, prod(shape) otherwise).
+    # The mask drives per-port enable signals on output streamers.
+    for out_size in output_sizes:
+        out_types.append(builtin.IntegerType(_mask_width_for_size(out_size)))
 
     return ArrayLayout(
         in_types=tuple(in_types),
@@ -145,6 +153,13 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
         reduced_outputs=reduced_outputs,
         parallel_outputs=parallel_outputs,
     )
+
+
+def _mask_width_for_size(out_size: tuple[int, ...]) -> int:
+    """The mask width for an output is the total number of positions it occupies."""
+    if len(out_size) == 0:
+        return 1
+    return prod(out_size)
 
 
 # =====================================================================
@@ -280,12 +295,13 @@ def build_pe_array_body(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
         block.add_op(instance)
         instances[iteration] = instance
 
-    # Assemble outputs from per-output PE references.
+    # Assemble data outputs from per-output PE references.
     yield_operands: list[SSAValue] = []
+    output_sizes = spec.get_output_sizes()
     for j in range(len(pe_result_types)):
         sources = resolve_output_assembly(spec, layout, j, all_iters)
         materialized = [materialize(s, block, instances) for s in sources]
-        out_size = spec.get_output_sizes()[j]
+        out_size = output_sizes[j]
         if len(out_size) == 0:
             # Scalar
             yield_operands.append(materialized[0])
@@ -293,6 +309,15 @@ def build_pe_array_body(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
             ops, array_val = create_shaped_hw_array(materialized, out_size)
             block.add_ops(ops)
             yield_operands.append(array_val)
+
+    # Append a per-output "valid" mask. For a fresh array (no merges yet), every
+    # output position is meaningful, so the mask is all-ones.
+    for out_size in output_sizes:
+        width = _mask_width_for_size(out_size)
+        all_ones = (1 << width) - 1
+        const = arith.ConstantOp.from_int_and_width(all_ones, width)
+        block.add_op(const)
+        yield_operands.append(const.result)
 
     block.add_op(phs.YieldOp(*yield_operands))
 

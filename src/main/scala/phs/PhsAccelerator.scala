@@ -13,6 +13,11 @@ import csr.CsrInterface
   *   - data_{readerIdx}_{elementIdx} : input [dataWidth-1:0]
   *   - switch_{idx} : input [bitwidth-1:0]
   *   - out_{writerIdx}_{elementIdx} : output [dataWidth-1:0]
+  *   - mask_{writerIdx} : output [maskBitwidth-1:0]
+  *
+  * The per-writer mask is a vector of valid bits — one bit per element/port of the write streamer, indicating which
+  * lanes carry meaningful data for the currently-selected accelerator mode. Not yet hooked up to anything functional;
+  * it's emitted by the compiler and passes through to be consumed by future per-port streamer enable logic.
   */
 class PhsDatapathBlackBox(config: PhsAcceleratorConfig, dataWidth: Int) extends BlackBox with HasBlackBoxPath {
 
@@ -45,6 +50,11 @@ class PhsDatapathBlackBox(config: PhsAcceleratorConfig, dataWidth: Int) extends 
         for (eIdx <- 0 until numElements) {
           ports += s"out_${wIdx}_${eIdx}" -> Output(UInt(dataWidth.W))
         }
+      }
+
+      // Per-writer mask outputs: mask_{writerIdx}
+      for (wIdx <- writeConfigs.indices) {
+        ports += s"mask_${wIdx}" -> Output(UInt(config.maskBitwidth(wIdx).W))
       }
 
       collection.immutable.SeqMap.from(ports)
@@ -148,6 +158,15 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
     }
     writeStreamers(wIdx).io.writeData.bits := outBits.asTypeOf(UInt((dataWidth * numElements).W))
     writeStreamers(wIdx).io.writeData.valid := readStreamers.map(_.io.readData.valid).reduce(_ && _)
+  }
+
+  // Per-writer valid masks: currently consumed into a scratch wire so Chisel
+  // elaboration is happy. Future work: drive per-port streamer enable signals.
+  for (wIdx <- writeConfigs.indices) {
+    val maskWire = Wire(UInt(config.maskBitwidth(wIdx).W))
+    maskWire := bb.io.elements(s"mask_${wIdx}")
+    // Silence unused-wire warnings.
+    dontTouch(maskWire)
   }
 
   // BlackBox is purely combinational — read streamers are ready when writes are ready

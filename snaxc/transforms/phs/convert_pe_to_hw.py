@@ -101,11 +101,21 @@ class ConvertPEArrayOps(RewritePattern):
                 )
             )
 
+        # Yield operands: first half are data outputs (out_N), second half are
+        # per-output valid masks (mask_N). The mask widths match the number of
+        # positions in each corresponding data output.
         yield_op = array_op.get_terminator()
+        num_yielded = len(yield_op.operands)
+        assert num_yielded % 2 == 0, f"Expected even number of yield operands (data + mask pairs), got {num_yielded}"
+        num_data_outputs = num_yielded // 2
         for i, opnd in enumerate(yield_op.operands):
+            if i < num_data_outputs:
+                port_name = f"out_{i}"
+            else:
+                port_name = f"mask_{i - num_data_outputs}"
             ports.append(
                 hw.ModulePort(
-                    builtin.StringAttr(f"out_{i}"),
+                    builtin.StringAttr(port_name),
                     cast(TypeAttribute, opnd.type),
                     hw.DirectionAttr(data=hw.Direction.OUTPUT),
                 )

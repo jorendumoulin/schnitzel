@@ -39,12 +39,15 @@ def build_schnitzel_config(
         Path to the generated BlackBox SystemVerilog file, relative to the
         schnitzel project root.
     """
+    from math import prod
+
     configs: list[dict[str, object]] = []
     for acc in accelerators:
         phs = acc.phs
 
         # Streamer configs from the Phs accelerator
         streamer_cfgs: list[dict[str, str | int | list[int]]] = []
+        mask_bitwidths: list[int] = []
         for streamer in phs.streamers.streamers:
             is_writer = streamer.name_base.startswith("out_")
             streamer_cfgs.append(
@@ -54,6 +57,10 @@ def build_schnitzel_config(
                     "spatialDimSizes": list(streamer.spatial_dims),
                 }
             )
+            if is_writer:
+                # Per-output mask: one bit per spatial port (i.e. per element).
+                width = prod(streamer.spatial_dims) if streamer.spatial_dims else 1
+                mask_bitwidths.append(width)
 
         # Module name: PEOp sym_name + "_array" (matches firtool output convention)
         module_name = acc.name + "_array"
@@ -63,6 +70,7 @@ def build_schnitzel_config(
                 "streamers": streamer_cfgs,
                 "numSwitches": phs.num_switches,
                 "switchBitwidths": phs.switch_bitwidths,
+                "maskBitwidths": mask_bitwidths,
                 "moduleName": module_name,
                 "svPath": sv_path,
             }
