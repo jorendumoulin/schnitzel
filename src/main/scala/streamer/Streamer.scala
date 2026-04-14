@@ -169,9 +169,8 @@ class Streamer(
   // --- Track pending read responses per port ---
   // In readWrite mode, both reads and writes share the TCDM port via the arbiter.
   // We must only accept responses for reads (not writes) into the rspQueue.
-  // Track outstanding reads: increment when a read request is sent to TCDM
-  // (readReqQueue dequeues via arbiter), decrement when a response is accepted.
-  val pendingReads = RegInit(VecInit(Seq.fill(numPorts)(0.U(log2Ceil(queueDepth + 2).W))))
+  // Track when the last request was a read request sent to TCDM
+  val readPending = RegInit(VecInit(Seq.fill(numPorts)(false.B)))
 
   // --- Response queues and readData muxing ---
   val rspQueues = (0 until numPorts).map { i =>
@@ -191,7 +190,7 @@ class Streamer(
     // - readWrite mode: only accept when we have pending read responses
     rspQueue.io.enq.valid := io.tcdmReqs(i).rsp.valid && (
       io.dir === StreamerDir.read ||
-        (inReadWrite && pendingReads(i) > 0.U)
+        (inReadWrite && readPending(i) > 0.U)
     )
 
     // Acknowledge TCDM responses:
@@ -200,7 +199,7 @@ class Streamer(
     // - otherwise: accept into rspQueue
     when(inReadWrite && bypassState === BypassState.bypass) {
       io.tcdmReqs(i).rsp.ready := true.B
-    }.elsewhen(inReadWrite && pendingReads(i) === 0.U) {
+    }.elsewhen(inReadWrite && readPending(i)) {
       io.tcdmReqs(i).rsp.ready := true.B // Discard write responses
     }.otherwise {
       io.tcdmReqs(i).rsp.ready := rspQueue.io.enq.ready
@@ -209,14 +208,12 @@ class Streamer(
     rspQueue
   }
 
-  // Update pending read counters (after rspQueues are defined so we can reference enq.fire)
+  // Update read pending (after rspQueues are defined so we can reference enq.fire)
   for (i <- 0 until numPorts) {
-    val readSent = readReqQueues(i).io.deq.fire
-    val readRspAccepted = rspQueues(i).io.enq.fire
-    when(readSent && !readRspAccepted) {
-      pendingReads(i) := pendingReads(i) + 1.U
-    }.elsewhen(!readSent && readRspAccepted) {
-      pendingReads(i) := pendingReads(i) - 1.U
+    when(readReqQueues(i).io.deq.fire && !rspQueues(i).io.enq.fire) {
+      readPending(i) := true.B
+    }.elsewhen(!readReqQueues(i).io.deq.fire && rspQueues(i).io.enq.fire) {
+      readPending(i) := false.B
     }
     // Both fire simultaneously: no change (one in, one out)
   }
