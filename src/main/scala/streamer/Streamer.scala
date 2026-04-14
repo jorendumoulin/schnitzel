@@ -59,29 +59,29 @@ class Streamer(
   val firstReadIssued = RegInit(false.B)
 
   // Read/write request arbiter per port
-  val readWriteArbiters = (0 until numPorts).map { i =>
-    val readWriteArbiter = Module(new RRArbiter(new BusReq(addrWidth, dataWidth), 2))
+  val reqArbiters = (0 until numPorts).map { i =>
+    val reqArbiter = Module(new RRArbiter(new BusReq(addrWidth, dataWidth), 2))
     // Attach each arbiters output to the req part of a TCDM port
-    io.tcdmReqs(i).req <> readWriteArbiter.io.out
-    readWriteArbiter
+    io.tcdmReqs(i).req <> reqArbiter.io.out
+    reqArbiter
   }
 
   // Queue to request reads from TCDM
+  // For the reads, no data is necessary, so we just make a queue of addresses instead
   val readReqQueues = (0 until numPorts).map { i =>
-    val readReqQueue = Module(new Queue(new BusReq(addrWidth, dataWidth), queueDepth))
-    // read addresses are queued per port indidvidually
-    readReqQueue.io.enq.bits.addr := agu.io.addrs.bits.addrs(i)
-    readReqQueue.io.enq.bits.wdata := DontCare
-    readReqQueue.io.enq.bits.wen := false.B;
-    readReqQueue.io.enq.bits.ben := VecInit(Seq.fill(dataWidth / 8)(true.B)).asUInt
-    // Only queue if the streamer is reading and, when reducing if it is the first address
-    // In readWrite mode, also guard with firstReadIssued to prevent duplicate enqueues
+    val readReqQueue = Module(new Queue(UInt(addrWidth.W), queueDepth))
+    readReqQueue.io.enq.bits := agu.io.addrs.bits.addrs(i)
     readReqQueue.io.enq.valid := agu.io.addrs.valid && agu.io.addrs.bits.isFirst && (
       (io.dir === StreamerDir.read) ||
-      (io.dir === StreamerDir.readWrite && !firstReadIssued)
+        (io.dir === StreamerDir.readWrite && !firstReadIssued)
     )
     // port 0 on arbiter is for reads
-    readWriteArbiters(i).io.in(0) <> readReqQueue.io.deq
+    readReqQueue.io.deq.ready := reqArbiters(i).io.in(0).ready
+    reqArbiters(i).io.in(0).valid := readReqQueue.io.deq.valid
+    reqArbiters(i).io.in(0).bits.addr := readReqQueue.io.deq.bits
+    reqArbiters(i).io.in(0).bits.wdata := DontCare
+    reqArbiters(i).io.in(0).bits.wen := false.B;
+    reqArbiters(i).io.in(0).bits.ben := VecInit(Seq.fill(dataWidth / 8)(true.B)).asUInt
     readReqQueue
   }
 
@@ -98,7 +98,7 @@ class Streamer(
     // Also gate on writeData.valid to ensure we capture valid data (not garbage)
     writeReqQueue.io.enq.valid := agu.io.addrs.valid && io.writeData.valid && agu.io.addrs.bits.isLast && ((io.dir === StreamerDir.write) || (io.dir === StreamerDir.readWrite))
     // port 1 on arbiter is for writes
-    readWriteArbiters(i).io.in(1) <> writeReqQueue.io.deq
+    reqArbiters(i).io.in(1) <> writeReqQueue.io.deq
     writeReqQueue
   }
 
@@ -191,7 +191,7 @@ class Streamer(
     // - readWrite mode: only accept when we have pending read responses
     rspQueue.io.enq.valid := io.tcdmReqs(i).rsp.valid && (
       io.dir === StreamerDir.read ||
-      (inReadWrite && pendingReads(i) > 0.U)
+        (inReadWrite && pendingReads(i) > 0.U)
     )
 
     // Acknowledge TCDM responses:

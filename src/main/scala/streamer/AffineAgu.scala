@@ -151,7 +151,6 @@ class AffineAgu(
 
   // Function to increment counters in nested loop fashion
   def incrementCounters(): Unit = {
-    // Use Wire for carry so propagation is decided at runtime, not elaboration time
     val carries = Wire(Vec(nTemporalDims + 1, Bool()))
     carries(0) := true.B
     for (i <- 0 until nTemporalDims) {
