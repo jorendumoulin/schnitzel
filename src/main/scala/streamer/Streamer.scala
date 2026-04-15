@@ -37,7 +37,19 @@ class Streamer(
   val agu = Module(new AffineAgu(nTemporalDims, spatialDimSizes, queueDepth));
   agu.io.start := io.start
   agu.io.config := io.config
-  agu.io.spatialDimMask := io.spatialDimMask
+
+  // A port is disabled if any masked-off dim has dimIndex != 0 for that port.
+  // The dimIndex==0 "representative" keeps the port live; duplicates are gated.
+  val laneEnabled = VecInit((0 until numPorts).map { outputIdx =>
+    var multiplier = 1
+    val checks = for (dim <- spatialDimSizes.indices) yield {
+      val dimSize = spatialDimSizes(dim)
+      val dimIndex = (outputIdx / multiplier) % dimSize
+      multiplier = multiplier * dimSize
+      if (dimIndex == 0) true.B else io.spatialDimMask(dim)
+    }
+    checks.foldLeft(true.B)(_ && _)
+  })
 
   // --- Bypass buffer state machine for readWrite (reduction) mode ---
   // TCDM:   first iteration, readData sourced from TCDM response queue
@@ -65,7 +77,7 @@ class Streamer(
   val readReqQueues = (0 until numPorts).map { i =>
     val readReqQueue = Module(new Queue(UInt(addrWidth.W), queueDepth))
     readReqQueue.io.enq.bits := agu.io.addrs.bits.addrs(i)
-    readReqQueue.io.enq.valid := agu.io.addrs.valid && agu.io.addrs.bits.isFirst && (
+    readReqQueue.io.enq.valid := agu.io.addrs.valid && agu.io.addrs.bits.isFirst && laneEnabled(i) && (
       (io.dir === StreamerDir.read) ||
         (io.dir === StreamerDir.readWrite && !firstReadIssued)
     )
@@ -83,7 +95,7 @@ class Streamer(
     writeReqQueue.io.enq.bits.ben := VecInit(Seq.fill(dataWidth / 8)(true.B)).asUInt
     // Only queue if the streamer is writing and, when reducing if it is the last address
     // Also gate on writeData.valid to ensure we capture valid data (not garbage)
-    writeReqQueue.io.enq.valid := agu.io.addrs.valid && io.writeData.valid && agu.io.addrs.bits.isLast && ((io.dir === StreamerDir.write) || (io.dir === StreamerDir.readWrite))
+    writeReqQueue.io.enq.valid := agu.io.addrs.valid && io.writeData.valid && agu.io.addrs.bits.isLast && laneEnabled(i) && ((io.dir === StreamerDir.write) || (io.dir === StreamerDir.readWrite))
     writeReqQueue
   }
 
@@ -142,7 +154,7 @@ class Streamer(
   // Prevent duplicate readReqQueue enqueues while AGU stalls on iter 0
   when(!inReadWrite || agu.io.addrs.fire) {
     firstReadIssued := false.B
-  }.elsewhen(readReqQueues.map(_.io.enq.fire).reduce(_ && _)) {
+  }.elsewhen(readReqQueues.zip(laneEnabled).map { case (q, en) => q.io.enq.fire || !en }.reduce(_ && _)) {
     firstReadIssued := true.B
   }
 
@@ -177,7 +189,9 @@ class Streamer(
     }
   }
 
-  val allRspValid = rspQueues.map(_.io.deq.valid).reduce(_ && _)
+  // Disabled lanes never issue requests, so their rspQueues stay empty.
+  // Treat them as "trivially valid" so they don't block readData.valid.
+  val allRspValid = rspQueues.zip(laneEnabled).map { case (q, en) => q.io.deq.valid || !en }.reduce(_ && _)
   io.readData.valid := Mux(inBypass, !bypassConsumed, allRspValid)
   rspQueues.foreach { q => q.io.deq.ready := !inBypass && io.readData.ready && allRspValid }
 
