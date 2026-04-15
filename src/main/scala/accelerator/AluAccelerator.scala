@@ -24,8 +24,9 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
     val cStreamerConfig = new AffineAguConfig(2, Seq(parallelUnroll)) // 2 temporal dims for reduction
     val select = UInt(32.W)
     val mode = UInt(32.W) // 0 = normal (C writes only), 1 = readWrite (reduction/in-place)
+    val spatialDimMask = UInt(32.W) // bit 0 enables spatial dim 0 on all three streamers
     def numRegs =
-      aStreamerConfig.numRegs + bStreamerConfig.numRegs + cStreamerConfig.numRegs + 2
+      aStreamerConfig.numRegs + bStreamerConfig.numRegs + cStreamerConfig.numRegs + 3
   }
 
   val io = IO(new Bundle {
@@ -52,7 +53,7 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   val aStreamer = Module(new Streamer(1, Seq(parallelUnroll), queueDepth, addrWidth, dataWidth));
   aStreamer.io.tcdmReqs <> io.aData
   aStreamer.io.config := csrVals.aStreamerConfig
-  aStreamer.io.spatialDimMask := VecInit(Seq.fill(1)(true.B))
+  aStreamer.io.spatialDimMask := VecInit(Seq(csrVals.spatialDimMask(0)))
   aStreamer.io.start := csrItf.io.start
   aStreamer.io.writeData := DontCare
   aStreamer.io.dir := StreamerDir.read
@@ -66,7 +67,7 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   bStreamer.io.config := csrVals.bStreamerConfig
   bStreamer.io.start := csrItf.io.start && !readWriteMode
   bStreamer.io.writeData := DontCare
-  bStreamer.io.spatialDimMask := VecInit(Seq.fill(1)(true.B))
+  bStreamer.io.spatialDimMask := VecInit(Seq(csrVals.spatialDimMask(0)))
   bStreamer.io.start := csrItf.io.start
   bStreamer.io.readData.valid <> aluArray.io.B_in.valid
   bStreamer.io.readData.ready <> aluArray.io.B_in.ready
@@ -77,7 +78,7 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   val cStreamer = Module(new Streamer(2, Seq(parallelUnroll), queueDepth, addrWidth, dataWidth));
   cStreamer.io.tcdmReqs <> io.cData
   cStreamer.io.config := csrVals.cStreamerConfig
-  cStreamer.io.spatialDimMask := VecInit(Seq.fill(1)(true.B))
+  cStreamer.io.spatialDimMask := VecInit(Seq(csrVals.spatialDimMask(0)))
   cStreamer.io.start := csrItf.io.start
 
   // C streamer direction depends on mode

@@ -136,10 +136,12 @@ int main() {
     write_csr(0x90E, 0);
     // Mode: 0 = normal (C = A + B)
     write_csr(0x90F, 0);
+    // Spatial dim mask: bit 0 enables dim 0 (all 4 lanes active)
+    write_csr(0x910, 0x1);
 
     // Start and wait
-    write_csr(0x910, 0x1);
-    read_csr(0x910);
+    write_csr(0x911, 0x1);
+    read_csr(0x911);
     verbose_printf("ALU: Done.\n");
   }
   cluster_sync();
