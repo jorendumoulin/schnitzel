@@ -24,6 +24,7 @@ class Streamer(
   val io = IO(new Bundle {
     val start = Input(Bool())
     val config = Input(new AffineAguConfig(nTemporalDims, spatialDimSizes))
+    val spatialDimMask = Input(Vec(spatialDimSizes.length, Bool()))
     val tcdmReqs = Vec(numPorts, new DecoupledBusIO(addrWidth, dataWidth))
     val dir = Input(StreamerDir())
     val readData = Decoupled(streamerDataType)
@@ -36,6 +37,7 @@ class Streamer(
   val agu = Module(new AffineAgu(nTemporalDims, spatialDimSizes, queueDepth));
   agu.io.start := io.start
   agu.io.config := io.config
+  agu.io.spatialDimMask := io.spatialDimMask
 
   // --- Bypass buffer state machine for readWrite (reduction) mode ---
   // TCDM:   first iteration, readData sourced from TCDM response queue

@@ -69,12 +69,19 @@ class AffineAgu(
     /** Runtime configuration for strides, bounds, and base address. */
     val config = Input(new AffineAguConfig(nTemporalDims, spatialDimSizes, addressWidth))
 
+    /** Enable mask for each spatial dimension. A disabled dimension contributes 0 to the output address. */
+    val spatialDimMask = Input(Vec(spatialDimSizes.length, Bool()))
+
     /** Vector of Decoupled interfaces providing calculated addresses. */
     val addrs = Decoupled(new AguOutput(addressWidth, numSpatialOutputs))
 
     /** High when the AGU is idle and has finished its current iteration bounds. */
     val done = Output(Bool())
   })
+
+  val effectiveStrides = io.config.spatialStrides.zip(io.spatialDimMask).map { case (stride, mask) =>
+    Mux(mask, stride, 0.U)
+  }
 
   // State definitions
   object State extends ChiselEnum { val idle, busy = Value; }
@@ -100,7 +107,7 @@ class AffineAgu(
       for (dim <- spatialDimSizes.indices) {
         val dimSize = spatialDimSizes(dim)
         val dimIndex = (outputIdx.U / multiplier) % dimSize.U
-        addrOffset = addrOffset + (dimIndex * io.config.spatialStrides(dim))
+        addrOffset = addrOffset + (dimIndex * effectiveStrides(dim))
         multiplier = multiplier * dimSize.U
       }
 

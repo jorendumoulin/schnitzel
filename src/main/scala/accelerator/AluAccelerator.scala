@@ -52,6 +52,7 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   val aStreamer = Module(new Streamer(1, Seq(parallelUnroll), queueDepth, addrWidth, dataWidth));
   aStreamer.io.tcdmReqs <> io.aData
   aStreamer.io.config := csrVals.aStreamerConfig
+  aStreamer.io.spatialDimMask := VecInit(Seq.fill(1)(true.B))
   aStreamer.io.start := csrItf.io.start
   aStreamer.io.writeData := DontCare
   aStreamer.io.dir := StreamerDir.read
@@ -65,12 +66,18 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   bStreamer.io.config := csrVals.bStreamerConfig
   bStreamer.io.start := csrItf.io.start && !readWriteMode
   bStreamer.io.writeData := DontCare
+  bStreamer.io.spatialDimMask := VecInit(Seq.fill(1)(true.B))
+  bStreamer.io.start := csrItf.io.start
+  bStreamer.io.readData.valid <> aluArray.io.B_in.valid
+  bStreamer.io.readData.ready <> aluArray.io.B_in.ready
+  bStreamer.io.writeData := DontCare
   bStreamer.io.dir := StreamerDir.read
 
   // C streamer: 2 temporal dims, supports write (normal) and readWrite (reduction)
   val cStreamer = Module(new Streamer(2, Seq(parallelUnroll), queueDepth, addrWidth, dataWidth));
   cStreamer.io.tcdmReqs <> io.cData
   cStreamer.io.config := csrVals.cStreamerConfig
+  cStreamer.io.spatialDimMask := VecInit(Seq.fill(1)(true.B))
   cStreamer.io.start := csrItf.io.start
 
   // C streamer direction depends on mode
