@@ -21,7 +21,6 @@ two patterns and Phase 3 to materialize new connections behind muxes.
 
 import itertools
 from dataclasses import dataclass
-from math import prod
 
 from xdsl.dialects import arith, builtin, hw
 from xdsl.ir import Attribute, Block, Region, SSAValue
@@ -137,9 +136,9 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
             assert isa(el_type, builtin.AnySignlessIntegerType)
             out_types.append(create_shaped_hw_array_type(el_type, out_size))
 
-    # Each output gets a corresponding "valid" mask, appended at the end.
-    # Mask width = number of meaningful output positions (1 for scalar, prod(shape) otherwise).
-    # The mask drives per-port enable signals on output streamers.
+    # Each output gets a corresponding per-spatial-dim enable mask, appended at the end.
+    # Mask width = number of spatial dimensions (min 1); bit k enables spatial dim k.
+    # Drives the write streamer's spatialDimMask input.
     for out_size in output_sizes:
         out_types.append(builtin.IntegerType(_mask_width_for_size(out_size)))
 
@@ -156,10 +155,12 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
 
 
 def _mask_width_for_size(out_size: tuple[int, ...]) -> int:
-    """The mask width for an output is the total number of positions it occupies."""
-    if len(out_size) == 0:
-        return 1
-    return prod(out_size)
+    """
+    Mask width is the number of spatial dimensions — one enable bit per dim.
+    A zero-dim (scalar) output still gets a single bit so the IR has a valid
+    ``IntegerType`` (bitwidth >= 1); its semantic is "always on."
+    """
+    return max(1, len(out_size))
 
 
 # =====================================================================

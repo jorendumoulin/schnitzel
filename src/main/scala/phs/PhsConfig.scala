@@ -31,11 +31,11 @@ case class PhsAcceleratorConfig(
   def switchBitwidth(i: Int): Int =
     if (i < switchBitwidths.length) switchBitwidths(i) else 32
 
-  /** Get mask bitwidth for write streamer i. Falls back to spatialDimSizes.product
-    * (one bit per spatial port) if not specified. */
+  /** Get mask bitwidth for write streamer i. Falls back to the streamer's
+    * number of spatial dimensions (min 1) — one enable bit per dim. */
   def maskBitwidth(i: Int): Int =
     if (i < maskBitwidths.length) maskBitwidths(i)
-    else writeStreamers(i).spatialDimSizes.product
+    else math.max(1, writeStreamers(i).spatialDimSizes.length)
 
   def readStreamers: Seq[PhsStreamerConfig] = streamers.filter(_.streamType == "read")
   def writeStreamers: Seq[PhsStreamerConfig] = streamers.filter(_.streamType == "write")
@@ -52,7 +52,7 @@ object PhsAcceleratorConfig {
     ),
     numSwitches = 1,
     switchBitwidths = Seq(2),
-    maskBitwidths = Seq(4),
+    maskBitwidths = Seq(1),
     moduleName = "acc1_array",
     svPath = "src/main/resources/phs/acc1_array.sv"
   )

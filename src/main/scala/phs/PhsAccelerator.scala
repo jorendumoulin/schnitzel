@@ -15,9 +15,9 @@ import csr.CsrInterface
   *   - out_{writerIdx}_{elementIdx} : output [dataWidth-1:0]
   *   - mask_{writerIdx} : output [maskBitwidth-1:0]
   *
-  * The per-writer mask is a vector of valid bits — one bit per element/port of the write streamer, indicating which
-  * lanes carry meaningful data for the currently-selected accelerator mode. Not yet hooked up to anything functional;
-  * it's emitted by the compiler and passes through to be consumed by future per-port streamer enable logic.
+  * The per-writer mask has one bit per spatial dimension of the write streamer (min 1 bit). Bit k enables spatial dim k;
+  * when cleared, that dim collapses to size 1 so the streamer only issues TCDM writes for its "dimIndex == 0"
+  * representative lane. The mask is driven into the write streamer's `spatialDimMask` input.
   */
 class PhsDatapathBlackBox(config: PhsAcceleratorConfig, dataWidth: Int) extends BlackBox with HasBlackBoxPath {
 
@@ -106,6 +106,8 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
     // as AffineAguConfig bundle. This matches the pattern in AluAccelerator.
     val regs = (0 until numRegs).map(j => csrItf.io.vals(csrOffset + j))
     s.io.config := VecInit(regs.reverse).asTypeOf(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes))
+    // spatialDimMask is wired below for write streamers (from the blackbox).
+    // Default to all-enabled here; read streamers keep this value.
     s.io.spatialDimMask := VecInit(Seq.fill(sc.spatialDimSizes.length)(true.B))
     csrOffset += numRegs
 
@@ -160,13 +162,18 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
     writeStreamers(wIdx).io.writeData.valid := readStreamers.map(_.io.readData.valid).reduce(_ && _)
   }
 
-  // Per-writer valid masks: currently consumed into a scratch wire so Chisel
-  // elaboration is happy. Future work: drive per-port streamer enable signals.
-  for (wIdx <- writeConfigs.indices) {
-    val maskWire = Wire(UInt(config.maskBitwidth(wIdx).W))
-    maskWire := bb.io.elements(s"mask_${wIdx}")
-    // Silence unused-wire warnings.
-    dontTouch(maskWire)
+  // Per-writer spatial dimension masks: bit k of the blackbox's mask_{wIdx}
+  // output enables spatial dim k of write streamer wIdx. When a bit is 0, that
+  // spatial dim collapses to size 1, suppressing the TCDM writes for the lanes
+  // that only differ along that dim.
+  for ((sc, wIdx) <- writeConfigs.zipWithIndex) {
+    val maskBits = bb.io.elements(s"mask_${wIdx}").asUInt
+    val numDims = sc.spatialDimSizes.length
+    // Truncate/pad to the streamer's per-dim Vec. For 0D write streamers
+    // (numDims == 0) this is an empty Vec and no bits are consumed — the
+    // blackbox still has at least an i1 mask that goes unused.
+    val dimMask = VecInit((0 until numDims).map(k => maskBits(k)))
+    writeStreamers(wIdx).io.spatialDimMask := dimMask
   }
 
   // BlackBox is purely combinational — read streamers are ready when writes are ready
