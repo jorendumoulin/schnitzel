@@ -18,5 +18,9 @@ add_executable(alu_reduction_test.elf alu_reduction_test.c)
 target_include_directories(alu_reduction_test.elf PRIVATE ${RUNTIME_PATH})
 target_link_libraries(alu_reduction_test.elf PRIVATE device_runtime)
 
+add_executable(alu_mask_test.elf alu_mask_test.c)
+target_include_directories(alu_mask_test.elf PRIVATE ${RUNTIME_PATH})
+target_link_libraries(alu_mask_test.elf PRIVATE device_runtime)
+
 add_executable(hang.elf hang.c)
 target_link_libraries(hang.elf PRIVATE device_runtime)

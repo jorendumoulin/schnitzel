@@ -46,6 +46,7 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
   val streamer = Module(new Streamer(4, Seq(2, 2, 2, 2), 3, addrWidth, dataWidth));
   streamer.io.tcdmReqs <> io.data
   streamer.io.config := csrVals.streamerConfig
+  streamer.io.spatialDimMask := VecInit(Seq.fill(4)(true.B))
   streamer.io.start := csrItf.io.start
 
   // Use affine agu for AXI address generation

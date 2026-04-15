@@ -110,11 +110,12 @@ int main() {
     write_csr(0x90C, 4); // C temporal bound 0 (inner, 4 reduction iterations)
     write_csr(0x90D, 4); // C spatial stride: 4 bytes
 
-    write_csr(0x90E, 0); // ALU select: addition
-    write_csr(0x90F, 1); // Mode: readWrite (reduction)
+    write_csr(0x90E, 0);   // ALU select: addition
+    write_csr(0x90F, 1);   // Mode: readWrite (reduction)
+    write_csr(0x910, 0x1); // Spatial dim mask: bit 0 enables dim 0
 
-    write_csr(0x910, 0x1); // Start
-    read_csr(0x910);       // Wait for completion
+    write_csr(0x911, 0x1); // Start
+    read_csr(0x911);       // Wait for completion
     verbose_printf("ALU reduction done.\n");
   }
   cluster_sync();
@@ -156,9 +157,10 @@ int main() {
 
     write_csr(0x90E, 0); // ALU select: addition
     write_csr(0x90F, 1); // Mode: readWrite (but no reduction since stride != 0)
+    write_csr(0x910, 0x1); // Spatial dim mask: bit 0 enables dim 0
 
-    write_csr(0x910, 0x1); // Start
-    read_csr(0x910);       // Wait for completion
+    write_csr(0x911, 0x1); // Start
+    read_csr(0x911);       // Wait for completion
     verbose_printf("ALU in-place readWrite done.\n");
   }
   cluster_sync();

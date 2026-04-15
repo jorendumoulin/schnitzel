@@ -96,6 +96,7 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
     // as AffineAguConfig bundle. This matches the pattern in AluAccelerator.
     val regs = (0 until numRegs).map(j => csrItf.io.vals(csrOffset + j))
     s.io.config := VecInit(regs.reverse).asTypeOf(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes))
+    s.io.spatialDimMask := VecInit(Seq.fill(sc.spatialDimSizes.length)(true.B))
     csrOffset += numRegs
 
     // Wire start and direction
