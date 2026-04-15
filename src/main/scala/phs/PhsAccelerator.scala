@@ -10,13 +10,11 @@ import csr.CsrInterface
 /** BlackBox wrapper for PHS-generated SystemVerilog datapath.
   *
   * Port naming matches the PHS compiler output convention:
-  *   - data_{readerIdx}_{elementIdx} : input  [dataWidth-1:0]
-  *   - switch_{idx}                  : input  [bitwidth-1:0]
-  *   - out_{writerIdx}_{elementIdx}  : output [dataWidth-1:0]
+  *   - data_{readerIdx}_{elementIdx} : input [dataWidth-1:0]
+  *   - switch_{idx} : input [bitwidth-1:0]
+  *   - out_{writerIdx}_{elementIdx} : output [dataWidth-1:0]
   */
-class PhsDatapathBlackBox(config: PhsAcceleratorConfig, dataWidth: Int)
-    extends BlackBox
-    with HasBlackBoxPath {
+class PhsDatapathBlackBox(config: PhsAcceleratorConfig, dataWidth: Int) extends BlackBox with HasBlackBoxPath {
 
   override val desiredName = config.moduleName
 
@@ -63,7 +61,8 @@ class PhsDatapathBlackBox(config: PhsAcceleratorConfig, dataWidth: Int)
   * CSR base address is 0 — PhsCsrDemux handles address routing and rebasing, so software still writes to the same
   * absolute addresses.
   */
-class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfig, csrBase: Int = 0x900) extends Module {
+class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfig, csrBase: Int = 0x900)
+    extends Module {
 
   val totalPorts = config.totalTcdmPorts
 
@@ -105,9 +104,9 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
 
     // Tie off unused data port
     if (sc.streamType == "read") {
-      s.io.write := DontCare
+      s.io.writeData := DontCare
     } else {
-      s.io.read := DontCare
+      s.io.readData := DontCare
     }
 
     s
@@ -128,7 +127,7 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
   // Wire read streamer data -> BlackBox data inputs
   for ((sc, rIdx) <- readConfigs.zipWithIndex) {
     val numElements = sc.spatialDimSizes.product
-    val bits = readStreamers(rIdx).io.read.bits.asTypeOf(Vec(numElements, UInt(dataWidth.W)))
+    val bits = readStreamers(rIdx).io.readData.bits.asTypeOf(Vec(numElements, UInt(dataWidth.W)))
     for (eIdx <- 0 until numElements) {
       bb.io.elements(s"data_${rIdx}_${eIdx}") := bits(eIdx)
     }
@@ -146,13 +145,13 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
     for (eIdx <- 0 until numElements) {
       outBits(eIdx) := bb.io.elements(s"out_${wIdx}_${eIdx}")
     }
-    writeStreamers(wIdx).io.write.bits := outBits.asTypeOf(UInt((dataWidth * numElements).W))
-    writeStreamers(wIdx).io.write.valid := readStreamers.map(_.io.read.valid).reduce(_ && _)
+    writeStreamers(wIdx).io.writeData.bits := outBits.asTypeOf(UInt((dataWidth * numElements).W))
+    writeStreamers(wIdx).io.writeData.valid := readStreamers.map(_.io.readData.valid).reduce(_ && _)
   }
 
   // BlackBox is purely combinational — read streamers are ready when writes are ready
   for (rIdx <- readStreamers.indices) {
-    readStreamers(rIdx).io.read.ready := writeStreamers.map(_.io.write.ready).reduce(_ && _)
+    readStreamers(rIdx).io.readData.ready := writeStreamers.map(_.io.writeData.ready).reduce(_ && _)
   }
 
   // Done when all write streamers complete
