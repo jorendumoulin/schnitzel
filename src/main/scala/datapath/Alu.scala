@@ -32,8 +32,9 @@ class AluArray(numPEs: Int = 4, dataWidth: Int = 32) extends Module {
     val sel = Input(UInt(2.W))
   })
   val canProcess = io.C_out.ready
-  io.A_in.ready := canProcess
-  io.B_in.ready := canProcess
+  // Only consume an input when the other is also valid, so both fire together
+  io.A_in.ready := canProcess && io.B_in.valid
+  io.B_in.ready := canProcess && io.A_in.valid
   io.C_out.valid := io.A_in.valid && io.B_in.valid
 
   val pes = Seq.fill(numPEs)(Module(new AluPE(dataWidth)))

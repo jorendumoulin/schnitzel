@@ -1,7 +1,7 @@
 package streamer
 
 import chisel3._
-import chisel3.util.{Decoupled, Queue}
+import chisel3.util.{Decoupled}
 
 /** Configuration parameters for the Affine Address Generation Unit (AGU). * Defines the iteration space and memory
   * layout for both temporal (time-multiplexed) and spatial (parallel) address calculations.
@@ -9,20 +9,23 @@ import chisel3.util.{Decoupled, Queue}
   *   Number of nested loops for temporal address generation.
   * @param spatialDimSizes
   *   A sequence representing the sizes of each spatial dimension.
+  * @param addressWidth
+  *   bitwidth of addresses.
   */
-class AffineAguConfig(val nTemporalDims: Int, val spatialDimSizes: Seq[Int]) extends Bundle {
+class AffineAguConfig(val nTemporalDims: Int, val spatialDimSizes: Seq[Int], val addressWidth: Int = 32)
+    extends Bundle {
 
   /** The starting memory address for the affine sequence. */
-  val baseAddr = UInt(32.W)
+  val baseAddr = UInt(addressWidth.W)
 
   /** The step size for each temporal dimension. */
-  val temporalStrides = Vec(nTemporalDims, UInt(32.W))
+  val temporalStrides = Vec(nTemporalDims, UInt(addressWidth.W))
 
   /** The loop bounds (maximum iterations) for each temporal dimension. */
-  val temporalBounds = Vec(nTemporalDims, UInt(32.W))
+  val temporalBounds = Vec(nTemporalDims, UInt(addressWidth.W))
 
   /** The step size for each spatial dimension in the output vector. */
-  val spatialStrides = Vec(spatialDimSizes.length, UInt(32.W))
+  val spatialStrides = Vec(spatialDimSizes.length, UInt(addressWidth.W))
 
   /** Calculates the total number of 32-bit words required for this config. Useful for memory-mapping and CSR offset
     * calculations.
@@ -30,6 +33,12 @@ class AffineAguConfig(val nTemporalDims: Int, val spatialDimSizes: Seq[Int]) ext
   def numRegs: Int = {
     1 + (nTemporalDims * 2) + spatialDimSizes.length
   }
+}
+
+class AguOutput(val addressWidth: Int, val numSpatialOutputs: Int) extends Bundle {
+  val addrs = Vec(numSpatialOutputs, UInt(addressWidth.W))
+  val isFirst = Bool()
+  val isLast = Bool()
 }
 
 /** Affine Address Generation Unit (AGU). This module generates a stream of addresses based on nested loop parameters.
@@ -45,7 +54,8 @@ class AffineAguConfig(val nTemporalDims: Int, val spatialDimSizes: Seq[Int]) ext
 class AffineAgu(
     nTemporalDims: Int,
     spatialDimSizes: Seq[Int],
-    queueDepth: Int = 2
+    queueDepth: Int = 2,
+    addressWidth: Int = 32
 ) extends Module {
 
   /** Total number of parallel address outputs calculated as the product of all spatial dimensions. */
@@ -57,10 +67,10 @@ class AffineAgu(
     val start = Input(Bool())
 
     /** Runtime configuration for strides, bounds, and base address. */
-    val config = Input(new AffineAguConfig(nTemporalDims, spatialDimSizes))
+    val config = Input(new AffineAguConfig(nTemporalDims, spatialDimSizes, addressWidth))
 
     /** Vector of Decoupled interfaces providing calculated addresses. */
-    val addrs = Vec(numSpatialOutputs, Decoupled(UInt(32.W)))
+    val addrs = Decoupled(new AguOutput(addressWidth, numSpatialOutputs))
 
     /** High when the AGU is idle and has finished its current iteration bounds. */
     val done = Output(Bool())
@@ -73,7 +83,7 @@ class AffineAgu(
   when(state === State.idle && io.start) { state := State.busy; }
 
   // Counter registers for each temporal dimension
-  val temporalCounters = RegInit(VecInit(Seq.fill(nTemporalDims)(0.U(32.W))))
+  val temporalCounters = RegInit(VecInit(Seq.fill(nTemporalDims)(0.U(addressWidth.W))))
 
   // Calculate the result of the temporal address
   val temporalAddress = io.config.baseAddr + temporalCounters
@@ -84,8 +94,8 @@ class AffineAgu(
   // Calculate final addresses by applying spatial strides
   val addresses = VecInit(
     for (outputIdx <- 0 until numSpatialOutputs) yield {
-      var addrOffset = 0.U(32.W)
-      var multiplier = 1.U(32.W)
+      var addrOffset = 0.U(addressWidth.W)
+      var multiplier = 1.U(addressWidth.W)
 
       for (dim <- spatialDimSizes.indices) {
         val dimSize = spatialDimSizes(dim)
@@ -98,38 +108,65 @@ class AffineAgu(
     }
   )
 
-  // Pass outputs to queues for fine-grained prefetching
-  val queues = Seq.fill(numSpatialOutputs)(Module(new Queue(UInt(32.W), queueDepth)))
-  queues.zip(addresses).foreach { case (queue, address) => queue.io.enq.bits := address }
-  queues.zip(io.addrs).foreach { case (queue, output) => queue.io.deq <> output }
-  // Push new address to address queues if all queues can accept new data:
-  val queues_ready = queues.map(_.io.enq.ready).reduce(_ && _)
-  val enqueue = queues_ready && state === State.busy
-  queues.foreach(_.io.enq.valid := enqueue)
+  // Advance when all consumers are ready
+  val advance = io.addrs.ready && state === State.busy
 
-  // Remaining control logic:
+  // Address generation is done when all bounds have hit their limit
   val allDone = io.config.temporalBounds
     .zip(temporalCounters)
-    .map { case (bound, counter) => counter === (bound - 1.U) }
-    .reduce(_ | _);
+    .map { case (bound, counter) =>
+      (bound <= 1.U) || counter === (bound - 1.U)
+    }
+    .reduce(_ && _);
 
-  when(enqueue && allDone) { state := State.idle; }
-  when(enqueue) { incrementCounters(); }
+  // High when not performing a reduction: All strides are larger than 0
+  // When performing a temporal reduction, only high for first element
+  // Not affected by dimensions with bound <= 1
+  val globalIsFirst = io.config.temporalStrides
+    .zip(io.config.temporalBounds)
+    .zip(temporalCounters)
+    .map { case ((stride, bound), count) =>
+      (bound <= 1.U) || (stride =/= 0.U) || (count === 0.U)
+    }
+    .reduce(_ && _)
+
+  // High when not performing a reduction: All strides are larger than 0
+  // When performing a temporal reduction, only high for last element
+  // Not affected by dimensions with bound <= 1
+  val globalIsLast = io.config.temporalStrides
+    .zip(io.config.temporalBounds)
+    .zip(temporalCounters)
+    .map { case ((stride, bound), count) =>
+      (bound <= 1.U) || (stride =/= 0.U) || (count === bound - 1.U)
+    }
+    .reduce(_ && _)
+
+  io.addrs.valid := state === State.busy
+  io.addrs.bits.addrs := addresses
+  io.addrs.bits.isFirst := globalIsFirst
+  io.addrs.bits.isLast := globalIsLast
+
+  when(advance && allDone) { state := State.idle; }
+  when(advance) { incrementCounters(); }
 
   // Function to increment counters in nested loop fashion
   def incrementCounters(): Unit = {
-    // Carry propagation: start with innermost dimension (index 0)
-    var carry = true.B
+    val carries = Wire(Vec(nTemporalDims + 1, Bool()))
+    carries(0) := true.B
     for (i <- 0 until nTemporalDims) {
-      when(carry) {
-        when(temporalCounters(i) === io.config.temporalBounds(i) - 1.U) {
+      val wraps = io.config.temporalBounds(i) <= 1.U || temporalCounters(i) === io.config.temporalBounds(i) - 1.U
+      when(carries(i)) {
+        when(io.config.temporalBounds(i) <= 1.U) {
+          // Unused dimension (bound 0 or 1): skip, carry propagates
           temporalCounters(i) := 0.U
-          // Carry continues to next dimension
+        }.elsewhen(temporalCounters(i) === io.config.temporalBounds(i) - 1.U) {
+          temporalCounters(i) := 0.U
         }.otherwise {
           temporalCounters(i) := temporalCounters(i) + 1.U
-          carry = false.B
         }
       }
+      // Carry propagates when this dimension wraps (or is unused)
+      carries(i + 1) := carries(i) && wraps
     }
   }
 

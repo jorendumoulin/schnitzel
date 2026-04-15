@@ -58,33 +58,33 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
   // streamer -> axi
   //
   memToAxi.io.bus.req.bits.ben := VecInit(Seq.fill(axiConfig.strbWidth)(true.B)).asUInt
-  memToAxi.io.bus.req.bits.addr := axiAgu.io.addrs(0).bits
+  memToAxi.io.bus.req.bits.addr := axiAgu.io.addrs.bits.addrs(0)
   memToAxi.io.bus.req.bits.wen := dir === DmaDir.writeAxi
   when(dir === DmaDir.writeAxi) { // writeAxi, readTcdm
     memToAxi.io.bus.req.bits.wen := true.B
-    memToAxi.io.bus.req.valid := axiAgu.io.addrs(0).valid && streamer.io.read.valid
-    memToAxi.io.bus.req.bits.wdata := streamer.io.read.bits
-    axiAgu.io.addrs(0).ready := memToAxi.io.bus.req.ready
-    streamer.io.read.ready := true.B;
+    memToAxi.io.bus.req.valid := axiAgu.io.addrs.valid && streamer.io.readData.valid
+    memToAxi.io.bus.req.bits.wdata := streamer.io.readData.bits
+    axiAgu.io.addrs.ready := memToAxi.io.bus.req.ready
+    streamer.io.readData.ready := true.B;
   }.otherwise { // readAxi, writeTcdm
     memToAxi.io.bus.req.bits.wen := false.B
-    memToAxi.io.bus.req.valid := axiAgu.io.addrs(0).valid
+    memToAxi.io.bus.req.valid := axiAgu.io.addrs.valid
     memToAxi.io.bus.req.bits.wdata := DontCare
-    axiAgu.io.addrs(0).ready := memToAxi.io.bus.req.ready
-    streamer.io.read.ready := false.B;
+    axiAgu.io.addrs.ready := memToAxi.io.bus.req.ready
+    streamer.io.readData.ready := false.B;
     // streamer.io.read.ready := memToAxi.io.bus.req.fire
   }
 
   // axi -> streamer
   when(dir === DmaDir.writeAxi) {
     memToAxi.io.bus.rsp.ready := true.B;
-    streamer.io.write.valid := false.B;
-    streamer.io.write.bits := DontCare
+    streamer.io.writeData.valid := false.B;
+    streamer.io.writeData.bits := DontCare
     streamer.io.dir := StreamerDir.read
   }.otherwise {
-    memToAxi.io.bus.rsp.ready := streamer.io.write.ready
-    streamer.io.write.valid := memToAxi.io.bus.rsp.valid
-    streamer.io.write.bits := memToAxi.io.bus.rsp.bits.data
+    memToAxi.io.bus.rsp.ready := streamer.io.writeData.ready
+    streamer.io.writeData.valid := memToAxi.io.bus.rsp.valid
+    streamer.io.writeData.bits := memToAxi.io.bus.rsp.bits.data
     streamer.io.dir := StreamerDir.write
   }
 
