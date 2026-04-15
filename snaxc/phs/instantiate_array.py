@@ -136,11 +136,14 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
             assert isa(el_type, builtin.AnySignlessIntegerType)
             out_types.append(create_shaped_hw_array_type(el_type, out_size))
 
-    # Each output gets a corresponding per-spatial-dim enable mask, appended at the end.
+    # Each data output gets a corresponding per-spatial-dim enable mask.
     # Mask width = number of spatial dimensions (min 1); bit k enables spatial dim k.
-    # Drives the write streamer's spatialDimMask input.
+    # Drives the corresponding streamer's spatialDimMask input.
+    # Output masks come first (feed write streamers), then input masks (feed read streamers).
     for out_size in output_sizes:
         out_types.append(builtin.IntegerType(_mask_width_for_size(out_size)))
+    for in_size in input_sizes:
+        out_types.append(builtin.IntegerType(_mask_width_for_size(in_size)))
 
     return ArrayLayout(
         in_types=tuple(in_types),
@@ -311,10 +314,12 @@ def build_pe_array_body(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
             block.add_ops(ops)
             yield_operands.append(array_val)
 
-    # Append a per-output "valid" mask. For a fresh array (no merges yet), every
-    # output position is meaningful, so the mask is all-ones.
-    for out_size in output_sizes:
-        width = _mask_width_for_size(out_size)
+    # Append per-spatial-dim enable masks. For a fresh array (no merges yet),
+    # all dims are active so the masks are all-ones constants. Output masks
+    # first (feed write streamers), then input masks (feed read streamers).
+    input_sizes = spec.get_input_sizes()
+    for size in list(output_sizes) + list(input_sizes):
+        width = _mask_width_for_size(size)
         all_ones = (1 << width) - 1
         const = arith.ConstantOp.from_int_and_width(all_ones, width)
         block.add_op(const)

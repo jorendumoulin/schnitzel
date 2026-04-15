@@ -21,6 +21,7 @@ case class PhsAcceleratorConfig(
     numSwitches: Int,
     switchBitwidths: Seq[Int] = Seq(),
     maskBitwidths: Seq[Int] = Seq(),
+    readMaskBitwidths: Seq[Int] = Seq(),
     moduleName: String = "",
     svPath: String = ""
 ) {
@@ -31,11 +32,16 @@ case class PhsAcceleratorConfig(
   def switchBitwidth(i: Int): Int =
     if (i < switchBitwidths.length) switchBitwidths(i) else 32
 
-  /** Get mask bitwidth for write streamer i. Falls back to the streamer's
+  /** Mask bitwidth for write streamer i. Falls back to the streamer's
     * number of spatial dimensions (min 1) — one enable bit per dim. */
   def maskBitwidth(i: Int): Int =
     if (i < maskBitwidths.length) maskBitwidths(i)
     else math.max(1, writeStreamers(i).spatialDimSizes.length)
+
+  /** Mask bitwidth for read streamer i. Same semantics as maskBitwidth but for reads. */
+  def readMaskBitwidth(i: Int): Int =
+    if (i < readMaskBitwidths.length) readMaskBitwidths(i)
+    else math.max(1, readStreamers(i).spatialDimSizes.length)
 
   def readStreamers: Seq[PhsStreamerConfig] = streamers.filter(_.streamType == "read")
   def writeStreamers: Seq[PhsStreamerConfig] = streamers.filter(_.streamType == "write")
@@ -53,6 +59,7 @@ object PhsAcceleratorConfig {
     numSwitches = 1,
     switchBitwidths = Seq(2),
     maskBitwidths = Seq(1),
+    readMaskBitwidths = Seq(1, 1),
     moduleName = "acc1_array",
     svPath = "src/main/resources/phs/acc1_array.sv"
   )
@@ -73,6 +80,7 @@ case class PhsAccelPhsEntry(
     numSwitches: Int,
     switchBitwidths: Seq[Int],
     maskBitwidths: Seq[Int],
+    readMaskBitwidths: Seq[Int],
     moduleName: String,
     svPath: String
 ) extends PhsAccelEntry

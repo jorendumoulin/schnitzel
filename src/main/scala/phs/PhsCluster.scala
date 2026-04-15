@@ -122,7 +122,7 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
     PhsMemoryConfig("L1", 0x1000_0000L, 0x1_0000L),
     List(
       PhsCoreConfig(1, phsConfigs(1).map(cfg =>
-        PhsAccelPhsEntry("phs", cfg.streamers, cfg.numSwitches, cfg.switchBitwidths, cfg.maskBitwidths, cfg.moduleName, cfg.svPath)
+        PhsAccelPhsEntry("phs", cfg.streamers, cfg.numSwitches, cfg.switchBitwidths, cfg.maskBitwidths, cfg.readMaskBitwidths, cfg.moduleName, cfg.svPath)
       ).toList),
       PhsCoreConfig(2, List(PhsAccelDmaEntry("dma")))
     )

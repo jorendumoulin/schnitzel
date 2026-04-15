@@ -10,14 +10,15 @@ import csr.CsrInterface
 /** BlackBox wrapper for PHS-generated SystemVerilog datapath.
   *
   * Port naming matches the PHS compiler output convention:
-  *   - data_{readerIdx}_{elementIdx} : input [dataWidth-1:0]
-  *   - switch_{idx} : input [bitwidth-1:0]
-  *   - out_{writerIdx}_{elementIdx} : output [dataWidth-1:0]
-  *   - mask_{writerIdx} : output [maskBitwidth-1:0]
+  *   - data_{readerIdx}_{elementIdx} : input  [dataWidth-1:0]
+  *   - switch_{idx}                  : input  [bitwidth-1:0]
+  *   - out_{writerIdx}_{elementIdx}  : output [dataWidth-1:0]
+  *   - out_mask_{writerIdx}          : output [maskBitwidth-1:0]
+  *   - in_mask_{readerIdx}           : output [readMaskBitwidth-1:0]
   *
-  * The per-writer mask has one bit per spatial dimension of the write streamer (min 1 bit). Bit k enables spatial dim k;
-  * when cleared, that dim collapses to size 1 so the streamer only issues TCDM writes for its "dimIndex == 0"
-  * representative lane. The mask is driven into the write streamer's `spatialDimMask` input.
+  * Each per-streamer mask has one bit per spatial dimension (min 1 bit). Bit k enables spatial dim k; when cleared,
+  * that dim collapses to size 1 so the streamer only issues TCDM requests for its "dimIndex == 0" representative lane.
+  * out_mask drives write streamers' `spatialDimMask`; in_mask drives read streamers' `spatialDimMask`.
   */
 class PhsDatapathBlackBox(config: PhsAcceleratorConfig, dataWidth: Int) extends BlackBox with HasBlackBoxPath {
 
@@ -52,9 +53,14 @@ class PhsDatapathBlackBox(config: PhsAcceleratorConfig, dataWidth: Int) extends 
         }
       }
 
-      // Per-writer mask outputs: mask_{writerIdx}
+      // Per-writer mask outputs: out_mask_{writerIdx}
       for (wIdx <- writeConfigs.indices) {
-        ports += s"mask_${wIdx}" -> Output(UInt(config.maskBitwidth(wIdx).W))
+        ports += s"out_mask_${wIdx}" -> Output(UInt(config.maskBitwidth(wIdx).W))
+      }
+
+      // Per-reader mask outputs: in_mask_{readerIdx}
+      for (rIdx <- readConfigs.indices) {
+        ports += s"in_mask_${rIdx}" -> Output(UInt(config.readMaskBitwidth(rIdx).W))
       }
 
       collection.immutable.SeqMap.from(ports)
@@ -162,18 +168,21 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
     writeStreamers(wIdx).io.writeData.valid := readStreamers.map(_.io.readData.valid).reduce(_ && _)
   }
 
-  // Per-writer spatial dimension masks: bit k of the blackbox's mask_{wIdx}
-  // output enables spatial dim k of write streamer wIdx. When a bit is 0, that
-  // spatial dim collapses to size 1, suppressing the TCDM writes for the lanes
-  // that only differ along that dim.
+  // Per-streamer spatial dimension masks: bit k of the blackbox's mask output
+  // enables spatial dim k of the corresponding streamer. When a bit is 0, that
+  // spatial dim collapses to size 1, suppressing TCDM requests for lanes that
+  // only differ along that dim.
   for ((sc, wIdx) <- writeConfigs.zipWithIndex) {
-    val maskBits = bb.io.elements(s"mask_${wIdx}").asUInt
+    val maskBits = bb.io.elements(s"out_mask_${wIdx}").asUInt
     val numDims = sc.spatialDimSizes.length
-    // Truncate/pad to the streamer's per-dim Vec. For 0D write streamers
-    // (numDims == 0) this is an empty Vec and no bits are consumed — the
-    // blackbox still has at least an i1 mask that goes unused.
     val dimMask = VecInit((0 until numDims).map(k => maskBits(k)))
     writeStreamers(wIdx).io.spatialDimMask := dimMask
+  }
+  for ((sc, rIdx) <- readConfigs.zipWithIndex) {
+    val maskBits = bb.io.elements(s"in_mask_${rIdx}").asUInt
+    val numDims = sc.spatialDimSizes.length
+    val dimMask = VecInit((0 until numDims).map(k => maskBits(k)))
+    readStreamers(rIdx).io.spatialDimMask := dimMask
   }
 
   // BlackBox is purely combinational — read streamers are ready when writes are ready

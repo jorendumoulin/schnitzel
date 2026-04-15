@@ -101,18 +101,28 @@ class ConvertPEArrayOps(RewritePattern):
                 )
             )
 
-        # Yield operands: first half are data outputs (out_N), second half are
-        # per-output valid masks (mask_N). The mask widths match the number of
-        # positions in each corresponding data output.
+        # Yield operands are laid out as three consecutive groups:
+        #   [0 .. num_out)            data outputs           -> out_N
+        #   [num_out .. 2*num_out)    per-output masks       -> out_mask_N
+        #   [2*num_out .. end)        per-input masks        -> in_mask_N
+        #
+        # num_in = number of non-switch block args (data inputs).
+        # num_out = (num_yielded - num_in) / 2.
         yield_op = array_op.get_terminator()
         num_yielded = len(yield_op.operands)
-        assert num_yielded % 2 == 0, f"Expected even number of yield operands (data + mask pairs), got {num_yielded}"
-        num_data_outputs = num_yielded // 2
+        num_in = len(block.args) - len(switch_arg_indices)
+        assert (num_yielded - num_in) % 2 == 0, (
+            f"Expected yield = num_out data + num_out out_masks + num_in in_masks, "
+            f"got {num_yielded} yields with {num_in} data inputs"
+        )
+        num_out = (num_yielded - num_in) // 2
         for i, opnd in enumerate(yield_op.operands):
-            if i < num_data_outputs:
+            if i < num_out:
                 port_name = f"out_{i}"
+            elif i < 2 * num_out:
+                port_name = f"out_mask_{i - num_out}"
             else:
-                port_name = f"mask_{i - num_data_outputs}"
+                port_name = f"in_mask_{i - 2 * num_out}"
             ports.append(
                 hw.ModulePort(
                     builtin.StringAttr(port_name),

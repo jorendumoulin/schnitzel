@@ -43,9 +43,13 @@ def build_schnitzel_config(
     for acc in accelerators:
         phs = acc.phs
 
-        # Streamer configs from the Phs accelerator
+        # Streamer configs from the Phs accelerator.
+        # Per-streamer mask: one bit per spatial dimension, min 1 bit.
+        # Bit k enables spatial dim k. Read and write masks are tracked
+        # separately so the blackbox can drive each streamer's spatialDimMask.
         streamer_cfgs: list[dict[str, str | int | list[int]]] = []
-        mask_bitwidths: list[int] = []
+        write_mask_bitwidths: list[int] = []
+        read_mask_bitwidths: list[int] = []
         for streamer in phs.streamers.streamers:
             is_writer = streamer.name_base.startswith("out_")
             streamer_cfgs.append(
@@ -55,11 +59,11 @@ def build_schnitzel_config(
                     "spatialDimSizes": list(streamer.spatial_dims),
                 }
             )
+            width = max(1, len(streamer.spatial_dims))
             if is_writer:
-                # Per-output mask: one bit per spatial dimension, min 1 bit.
-                # Bit k enables spatial dim k of the write streamer.
-                width = max(1, len(streamer.spatial_dims))
-                mask_bitwidths.append(width)
+                write_mask_bitwidths.append(width)
+            else:
+                read_mask_bitwidths.append(width)
 
         # Module name: PEOp sym_name + "_array" (matches firtool output convention)
         module_name = acc.name + "_array"
@@ -69,7 +73,8 @@ def build_schnitzel_config(
                 "streamers": streamer_cfgs,
                 "numSwitches": phs.num_switches,
                 "switchBitwidths": phs.switch_bitwidths,
-                "maskBitwidths": mask_bitwidths,
+                "maskBitwidths": write_mask_bitwidths,
+                "readMaskBitwidths": read_mask_bitwidths,
                 "moduleName": module_name,
                 "svPath": sv_path,
             }
