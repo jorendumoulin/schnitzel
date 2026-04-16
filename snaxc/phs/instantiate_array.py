@@ -85,8 +85,14 @@ class ArrayLayout:
     # Mapping: PE data input index -> block arg index
     parallel_arg_idx: dict[int, int]
     chained_arg_idx: dict[int, int]
-    # Mapping: chained input index -> reduced output index it pairs with
+    # Mapping: chained input index -> reduced output index it pairs with.
+    # Used for SPATIAL-chain wiring only (FromScalarBlockArg / FromPEOutput).
     input_to_output_chain: dict[int, int]
+    # Mapping: PE input index -> PE output index that share a logical streamer.
+    # Used for streamer/mask accounting (read+write coalesce into readWrite).
+    # Superset of input_to_output_chain — also includes positional readWrite
+    # pairs from the encode-pass convention (last K inputs paired with K outputs).
+    streamer_pairs: dict[int, int]
     # Classification (purely derived from spec, kept for convenience)
     chained_inputs: tuple[int, ...]
     reduced_outputs: tuple[int, ...]
@@ -108,7 +114,13 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     reduced_outputs = tuple(j for j, m in enumerate(spec.output_maps) if m.eval(bounds, ()) != bounds)
     parallel_outputs = tuple(j for j in range(len(pe_result_types)) if j not in reduced_outputs)
 
+    # Spatial chain pairs: for spatial-chain input wiring (scalar carry init feeding a
+    # chain of PE outputs). Drives FromScalarBlockArg / FromPEOutput materialization.
     input_to_output_chain: dict[int, int] = dict(zip(chained_inputs, reduced_outputs, strict=False))
+    # Streamer-level pairs: union with positional readWrite pairs from the spec
+    # (encode-pass convention). Drives streamer/mask accounting only — temporal
+    # readWrite inputs are still wired as parallel array reads, not chains.
+    streamer_pairs: dict[int, int] = {**input_to_output_chain, **spec.readwrite_pairs}
 
     in_types: list[Attribute] = []
     parallel_arg_idx: dict[int, int] = {}
@@ -144,16 +156,16 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     # then iterate PE outputs in order skipping ones already counted as chain targets
     # (emitting write masks). This ordering matches `config.streamers` on the Chisel
     # side and the `mask_{streamerIdx}` port naming.
-    chained_output_set = set(input_to_output_chain.values())
+    paired_output_set = set(streamer_pairs.values())
     for i in range(len(data_operands)):
-        if i in input_to_output_chain:
+        if i in streamer_pairs:
             # readWrite streamer: spatial dims come from the paired output.
-            paired_j = input_to_output_chain[i]
+            paired_j = streamer_pairs[i]
             out_types.append(builtin.IntegerType(_mask_width_for_size(output_sizes[paired_j])))
         else:
             out_types.append(builtin.IntegerType(_mask_width_for_size(input_sizes[i])))
     for j in range(len(pe_result_types)):
-        if j in chained_output_set:
+        if j in paired_output_set:
             continue  # already counted as the readWrite partner of some input
         out_types.append(builtin.IntegerType(_mask_width_for_size(output_sizes[j])))
 
@@ -163,6 +175,7 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
         parallel_arg_idx=parallel_arg_idx,
         chained_arg_idx=chained_arg_idx,
         input_to_output_chain=input_to_output_chain,
+        streamer_pairs=streamer_pairs,
         chained_inputs=chained_inputs,
         reduced_outputs=reduced_outputs,
         parallel_outputs=parallel_outputs,
@@ -328,19 +341,20 @@ def build_pe_array_body(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
 
     # Append per-spatial-dim enable masks, one per logical streamer. Ordering
     # matches compute_layout: PE inputs first (read or readWrite), then
-    # non-chain-target PE outputs (write). For a fresh array all dims are
-    # active so masks are all-ones constants.
+    # outputs that aren't paired with an input. For a fresh array all dims are
+    # active so masks are all-ones constants. Uses streamer_pairs (= union of
+    # spatial chains and positional readWrite pairs).
     input_sizes = spec.get_input_sizes()
     streamer_mask_sizes: list[tuple[int, ...]] = []
     for i in range(len(pe.data_operands())):
-        if i in layout.input_to_output_chain:
-            paired_j = layout.input_to_output_chain[i]
+        if i in layout.streamer_pairs:
+            paired_j = layout.streamer_pairs[i]
             streamer_mask_sizes.append(output_sizes[paired_j])
         else:
             streamer_mask_sizes.append(input_sizes[i])
-    chained_output_set = set(layout.input_to_output_chain.values())
+    paired_output_set = set(layout.streamer_pairs.values())
     for j in range(len(pe_result_types)):
-        if j in chained_output_set:
+        if j in paired_output_set:
             continue
         streamer_mask_sizes.append(output_sizes[j])
 

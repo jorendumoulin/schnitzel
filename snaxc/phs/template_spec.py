@@ -10,6 +10,18 @@ from snaxc.ir.dart.access_pattern import Template, TemplatePattern
 
 
 class TemplateSpec:
+    """
+    Description of one PE's input/output access pattern over the spatial PE-array bounds.
+
+    Convention (set by the encode pass): every linalg `outs` operand becomes a
+    PE data-input AND a PE output, paired by position. The trailing
+    ``len(output_maps)`` entries of ``input_maps`` are the carry-in side of those
+    pairs and share a logical (readWrite) streamer with the corresponding
+    output. ``input_maps`` therefore has ``num_pure_inputs + len(output_maps)``
+    entries; the carry-in maps coincide by construction with the matching output
+    maps.
+    """
+
     input_maps: tuple[AffineMap, ...]
     output_maps: tuple[AffineMap, ...]
     template_bounds: tuple[int, ...]
@@ -22,9 +34,29 @@ class TemplateSpec:
         self.template_bounds = template_bounds
         assert len(self.input_maps) > 0, "Expect input_maps to be non-empty"
         assert len(self.output_maps) > 0, "Expect output_maps to be non-empty"
+        assert len(self.input_maps) >= len(self.output_maps), (
+            "Each output must be paired with a carry input — "
+            f"got {len(self.input_maps)} inputs and {len(self.output_maps)} outputs"
+        )
         assert self._no_symbols(), "No symbols expected in any affine map of template_spec"
         assert self._same_dims(), "Expect all AffineMaps to have equal number of dims"
         assert len(template_bounds) == self.input_maps[0].num_dims, "Expect number of iterators and bounds to be equal"
+
+    @property
+    def num_outputs(self) -> int:
+        return len(self.output_maps)
+
+    @property
+    def num_pure_inputs(self) -> int:
+        return len(self.input_maps) - self.num_outputs
+
+    @property
+    def readwrite_pairs(self) -> dict[int, int]:
+        """
+        Positional pairing of PE inputs to PE outputs, derived from the encode-pass
+        convention (last K data inputs are carries paired with the K outputs).
+        """
+        return {self.num_pure_inputs + k: k for k in range(self.num_outputs)}
 
     def __str__(self) -> str:
         _str: str = ""
@@ -61,7 +93,12 @@ class TemplateSpec:
         return itertools.product(*[range(bound) for bound in self.template_bounds])
 
     def get_dart_template(self) -> Template:
-        template = [*self.input_maps, *self.output_maps]
+        # The carry-input of each readWrite pair shares its streamer (and its
+        # access pattern) with the matching output, so the dart-side template
+        # only describes one logical operand per pair: pure read inputs first,
+        # then outputs. This matches the operand count of the dart op produced
+        # from the original linalg (len(ins) + len(outs)).
+        template = [*self.input_maps[: self.num_pure_inputs], *self.output_maps]
         template_bounds = self.template_bounds
         return Template(TemplatePattern(template_bounds, tp) for tp in template)
 
