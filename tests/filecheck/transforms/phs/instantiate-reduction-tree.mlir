@@ -37,8 +37,8 @@ phs.pe_array @acc1_array(%0 : !hw.array<4xi32>, %1 : index) -> (i32) {
 // Single PE module
 // CHECK: hw.module private @acc1(in %0 data_0: i32, in %1 data_1: i32, in %2 switch_0: i1, out out_0: i32)
 
-// Reduction tree array: scalar output + per-output mask + per-input mask, inter-PE wiring
-// CHECK: hw.module @acc1_array(in %0 data_0: !hw.array<4xi32>, in %1 switch_0: i1, out out_0: i32, out out_mask_0: i1, out in_mask_0: i1) {
+// Reduction tree array: scalar output + per-streamer masks (one per logical streamer), inter-PE wiring
+// CHECK: hw.module @acc1_array(in %0 data_0: !hw.array<4xi32>, in %1 switch_0: i1, out out_0: i32, out mask_0: i1, out mask_1: i1) {
 // CHECK:   hw.instance "acc1_pe_0" @acc1
 // CHECK:   hw.instance "acc1_pe_1" @acc1
 // CHECK:   hw.instance "acc1_pe_2" @acc1

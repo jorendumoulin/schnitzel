@@ -51,8 +51,8 @@ class Phs(Accelerator):
         access_width:
             Element access width in bytes.
         """
-        readers = [Streamer(access_width, len(dims), dims, f"in_{i}") for i, dims in enumerate(input_sizes)]
-        writers = [Streamer(access_width, len(dims), dims, f"out_{i}") for i, dims in enumerate(output_sizes)]
+        readers = [Streamer(access_width, len(dims), dims, f"in_{i}", "read") for i, dims in enumerate(input_sizes)]
+        writers = [Streamer(access_width, len(dims), dims, f"out_{i}", "write") for i, dims in enumerate(output_sizes)]
         return Phs(
             name=name,
             access_width=access_width,

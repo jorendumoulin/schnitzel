@@ -136,14 +136,26 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
             assert isa(el_type, builtin.AnySignlessIntegerType)
             out_types.append(create_shaped_hw_array_type(el_type, out_size))
 
-    # Each data output gets a corresponding per-spatial-dim enable mask.
-    # Mask width = number of spatial dimensions (min 1); bit k enables spatial dim k.
-    # Drives the corresponding streamer's spatialDimMask input.
-    # Output masks come first (feed write streamers), then input masks (feed read streamers).
-    for out_size in output_sizes:
-        out_types.append(builtin.IntegerType(_mask_width_for_size(out_size)))
-    for in_size in input_sizes:
-        out_types.append(builtin.IntegerType(_mask_width_for_size(in_size)))
+    # One per-spatial-dim enable mask per *logical streamer*. A streamer is:
+    #   - a pure read:      one PE input that is NOT chained to an output
+    #   - a readWrite:      a PE input that IS chained to an output (counted once)
+    #   - a pure write:     one PE output that is NOT a chain target
+    # Ordering: iterate PE inputs in order first (emitting read or readWrite masks),
+    # then iterate PE outputs in order skipping ones already counted as chain targets
+    # (emitting write masks). This ordering matches `config.streamers` on the Chisel
+    # side and the `mask_{streamerIdx}` port naming.
+    chained_output_set = set(input_to_output_chain.values())
+    for i in range(len(data_operands)):
+        if i in input_to_output_chain:
+            # readWrite streamer: spatial dims come from the paired output.
+            paired_j = input_to_output_chain[i]
+            out_types.append(builtin.IntegerType(_mask_width_for_size(output_sizes[paired_j])))
+        else:
+            out_types.append(builtin.IntegerType(_mask_width_for_size(input_sizes[i])))
+    for j in range(len(pe_result_types)):
+        if j in chained_output_set:
+            continue  # already counted as the readWrite partner of some input
+        out_types.append(builtin.IntegerType(_mask_width_for_size(output_sizes[j])))
 
     return ArrayLayout(
         in_types=tuple(in_types),
@@ -314,11 +326,25 @@ def build_pe_array_body(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
             block.add_ops(ops)
             yield_operands.append(array_val)
 
-    # Append per-spatial-dim enable masks. For a fresh array (no merges yet),
-    # all dims are active so the masks are all-ones constants. Output masks
-    # first (feed write streamers), then input masks (feed read streamers).
+    # Append per-spatial-dim enable masks, one per logical streamer. Ordering
+    # matches compute_layout: PE inputs first (read or readWrite), then
+    # non-chain-target PE outputs (write). For a fresh array all dims are
+    # active so masks are all-ones constants.
     input_sizes = spec.get_input_sizes()
-    for size in list(output_sizes) + list(input_sizes):
+    streamer_mask_sizes: list[tuple[int, ...]] = []
+    for i in range(len(pe.data_operands())):
+        if i in layout.input_to_output_chain:
+            paired_j = layout.input_to_output_chain[i]
+            streamer_mask_sizes.append(output_sizes[paired_j])
+        else:
+            streamer_mask_sizes.append(input_sizes[i])
+    chained_output_set = set(layout.input_to_output_chain.values())
+    for j in range(len(pe_result_types)):
+        if j in chained_output_set:
+            continue
+        streamer_mask_sizes.append(output_sizes[j])
+
+    for size in streamer_mask_sizes:
         width = _mask_width_for_size(size)
         all_ones = (1 << width) - 1
         const = arith.ConstantOp.from_int_and_width(all_ones, width)

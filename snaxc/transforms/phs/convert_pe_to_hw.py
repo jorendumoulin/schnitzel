@@ -101,28 +101,15 @@ class ConvertPEArrayOps(RewritePattern):
                 )
             )
 
-        # Yield operands are laid out as three consecutive groups:
-        #   [0 .. num_out)            data outputs           -> out_N
-        #   [num_out .. 2*num_out)    per-output masks       -> out_mask_N
-        #   [2*num_out .. end)        per-input masks        -> in_mask_N
-        #
-        # num_in = number of non-switch block args (data inputs).
-        # num_out = (num_yielded - num_in) / 2.
+        # Yield operands split into two groups:
+        #   [0 .. num_out)        data outputs       -> out_N
+        #   [num_out .. end)      per-streamer masks -> mask_N (in logical-streamer order)
+        # num_out equals the PE's output count, which we read off any PEInstanceOp.
         yield_op = array_op.get_terminator()
-        num_yielded = len(yield_op.operands)
-        num_in = len(block.args) - len(switch_arg_indices)
-        assert (num_yielded - num_in) % 2 == 0, (
-            f"Expected yield = num_out data + num_out out_masks + num_in in_masks, "
-            f"got {num_yielded} yields with {num_in} data inputs"
-        )
-        num_out = (num_yielded - num_in) // 2
+        assert first_instance is not None, "PEArrayOp must contain at least one phs.instance"
+        num_out = len(first_instance.res)
         for i, opnd in enumerate(yield_op.operands):
-            if i < num_out:
-                port_name = f"out_{i}"
-            elif i < 2 * num_out:
-                port_name = f"out_mask_{i - num_out}"
-            else:
-                port_name = f"in_mask_{i - 2 * num_out}"
+            port_name = f"out_{i}" if i < num_out else f"mask_{i - num_out}"
             ports.append(
                 hw.ModulePort(
                     builtin.StringAttr(port_name),

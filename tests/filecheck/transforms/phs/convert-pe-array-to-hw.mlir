@@ -37,8 +37,8 @@ phs.pe_array @myacc_array(%0 : !hw.array<4xi32>, %1 : !hw.array<4xi32>, %2 : ind
 // CHECK: hw.module private @myacc(in %0 data_0: i32, in %1 data_1: i32, in %2 switch_0: i1, out out_0: i32) {
 // CHECK:   hw.output
 
-// The PE array module with data output, per-output mask, and per-input masks
-// CHECK: hw.module @myacc_array(in %0 data_0: !hw.array<4xi32>, in %1 data_1: !hw.array<4xi32>, in %2 switch_0: i1, out out_0: !hw.array<2xi32>, out out_mask_0: i1, out in_mask_0: i1, out in_mask_1: i1) {
+// The PE array module with data output and per-streamer masks (one per logical streamer)
+// CHECK: hw.module @myacc_array(in %0 data_0: !hw.array<4xi32>, in %1 data_1: !hw.array<4xi32>, in %2 switch_0: i1, out out_0: !hw.array<2xi32>, out mask_0: i1, out mask_1: i1, out mask_2: i1) {
 // CHECK:   hw.instance "myacc_pe_0" @myacc
 // CHECK:   hw.instance "myacc_pe_1" @myacc
 // CHECK:   hw.array_create
