@@ -217,6 +217,11 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return PhsEncodePass
 
+    def get_phs_prune_unused_carries():
+        from snaxc.transforms.phs.prune_unused_carries import PrunePEUnusedCarriesPass
+
+        return PrunePEUnusedCarriesPass
+
     def get_phs_export_phs():
         from snaxc.transforms.phs.export_phs import PhsExportPhsPass
 
@@ -368,6 +373,7 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "memref-to-snax": get_memref_to_snax,
         "phs-encode": get_phs_encode,
         "phs-export-phs": get_phs_export_phs,
+        "phs-prune-unused-carries": get_phs_prune_unused_carries,
         "phs-remove-one-option-switches": get_phs_remove_one_option_switches,
         "pipeline-canonicalize-for": get_pipeline_canonicalize_for,
         "pipeline-duplicate-buffers": get_pipeline_duplicate_buffers,

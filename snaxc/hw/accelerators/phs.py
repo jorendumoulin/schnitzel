@@ -32,15 +32,16 @@ class Phs(Accelerator):
         num_switches: int = 0,
         switch_bitwidths: list[int] | None = None,
         access_width: int = 4,
+        carry_no: int | None = None,
     ) -> "Phs":
         """
         Create a PHS accelerator from template input/output sizes.
 
-        PE-array convention: every PE output is paired by position with a carry
-        input at PE-input index ``len(input_sizes) - len(output_sizes) + k``.
-        Each (carry, output) pair becomes a single ``readWrite`` streamer; any
-        remaining inputs become ``read`` streamers. There are no pure ``write``
-        streamers under this convention.
+        PE-array convention: the trailing ``carry_no`` PE inputs are paired by
+        position with the leading ``carry_no`` outputs as readWrite streamers.
+        Inputs before that are pure ``read`` streamers; outputs after that are
+        pure ``write`` streamers. ``carry_no`` defaults to ``len(output_sizes)``
+        (every output paired) for back-compat.
 
         Parameters
         ----------
@@ -48,32 +49,38 @@ class Phs(Accelerator):
             Accelerator name (from PEOp sym_name).
         input_sizes:
             Spatial dim tuples for every PE data-input port (pure reads
-            followed by carries — the trailing ``len(output_sizes)`` entries
-            are the carry side of readWrite pairs).
+            followed by carries — the trailing ``carry_no`` entries are the
+            carry side of readWrite pairs).
         output_sizes:
-            Spatial dim tuples for every PE output port. ``len(output_sizes)``
-            equals the number of readWrite pairs.
+            Spatial dim tuples for every PE output port.
         num_switches:
             Number of PHS switches (mux controls).
         switch_bitwidths:
             Bitwidth of each switch. Defaults to 32 for each.
         access_width:
             Element access width in bytes.
+        carry_no:
+            Number of (carry-input, output) readWrite pairs. Defaults to
+            ``len(output_sizes)``. Lowered by the prune-unused-carries pass
+            for outputs whose carry-input is dead.
         """
         num_outputs = len(output_sizes)
-        num_pure_inputs = len(input_sizes) - num_outputs
-        assert num_pure_inputs >= 0, (
-            "Expect each PE output to be paired with a carry input — "
-            f"got {len(input_sizes)} inputs and {num_outputs} outputs"
-        )
+        if carry_no is None:
+            carry_no = num_outputs
+        assert 0 <= carry_no <= num_outputs, f"carry_no={carry_no} must be in [0, {num_outputs}]"
+        num_pure_inputs = len(input_sizes) - carry_no
+        assert num_pure_inputs >= 0, f"Need at least {carry_no} inputs to host carry-ins — got {len(input_sizes)}"
 
         streamers: list[Streamer] = []
         for i in range(num_pure_inputs):
             dims = input_sizes[i]
             streamers.append(Streamer(access_width, len(dims), dims, f"in_{i}", "read"))
-        for k in range(num_outputs):
+        for k in range(carry_no):
             dims = output_sizes[k]
             streamers.append(Streamer(access_width, len(dims), dims, f"rw_{k}", "readWrite"))
+        for k in range(carry_no, num_outputs):
+            dims = output_sizes[k]
+            streamers.append(Streamer(access_width, len(dims), dims, f"out_{k}", "write"))
 
         return Phs(
             name=name,

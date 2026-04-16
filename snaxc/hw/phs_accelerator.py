@@ -14,6 +14,7 @@ from snaxc.phs.decode import decode_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs
 from snaxc.phs.hw_conversion import get_switch_bitwidth
 from snaxc.phs.template_spec import TemplateSpec
+from snaxc.transforms.phs.prune_unused_carries import prune_unused_carries
 
 
 class PhsAccelerator(Accelerator, StreamerAccelerator):
@@ -45,6 +46,7 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
             output_sizes=template_spec.get_output_sizes(),
             num_switches=true_switches,
             switch_bitwidths=switch_bitwidths,
+            carry_no=template_spec.carry_no,
         )
 
         # Initialize StreamerAccelerator with the PHS streamer configuration
@@ -61,6 +63,10 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
     ) -> Sequence[tuple[Sequence[Operation], SSAValue]]:
         """Decode the PEOp graph to determine switch values for the given operation."""
         candidate_pe = convert_generic_body_to_phs(op, self.name, PatternRewriter(op))
+        # Align carry-input shape with the abstract PE (which the prune pass
+        # may have shrunk after merging). Without this the candidate looks
+        # wider than the abstract for parallel-only kernels.
+        prune_unused_carries(candidate_pe)
         switch_values = decode_abstract_graph(self.pe, candidate_pe)
         ops = [arith.ConstantOp.from_int_and_width(value, 32) for value in switch_values]
         return [([op], op.results[0]) for op in ops]

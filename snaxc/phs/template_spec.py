@@ -3,40 +3,52 @@ from __future__ import annotations
 import itertools
 from collections.abc import Iterable
 
+from xdsl.dialects.builtin import IntegerAttr
 from xdsl.ir.affine import AffineMap
 
 from snaxc.dialects import phs
 from snaxc.ir.dart.access_pattern import Template, TemplatePattern
+
+CARRY_NO_ATTR_NAME = "phs.carry_no"
 
 
 class TemplateSpec:
     """
     Description of one PE's input/output access pattern over the spatial PE-array bounds.
 
-    Convention (set by the encode pass): every linalg `outs` operand becomes a
-    PE data-input AND a PE output, paired by position. The trailing
-    ``len(output_maps)`` entries of ``input_maps`` are the carry-in side of those
-    pairs and share a logical (readWrite) streamer with the corresponding
-    output. ``input_maps`` therefore has ``num_pure_inputs + len(output_maps)``
-    entries; the carry-in maps coincide by construction with the matching output
-    maps.
+    Convention (set by the encode pass + adjusted by the prune-unused-carries
+    pass): the trailing ``carry_no`` entries of ``input_maps`` are carry-input
+    sides of readWrite streamers, paired by position with the leading
+    ``carry_no`` entries of ``output_maps``. Outputs after the first
+    ``carry_no`` are pure write-only streamers. ``carry_no`` defaults to
+    ``len(output_maps)`` (every output paired) for back-compat with callers
+    that don't go through the encode pass.
     """
 
     input_maps: tuple[AffineMap, ...]
     output_maps: tuple[AffineMap, ...]
     template_bounds: tuple[int, ...]
+    carry_no: int
 
     def __init__(
-        self, input_maps: tuple[AffineMap, ...], output_maps: tuple[AffineMap, ...], template_bounds: tuple[int, ...]
+        self,
+        input_maps: tuple[AffineMap, ...],
+        output_maps: tuple[AffineMap, ...],
+        template_bounds: tuple[int, ...],
+        carry_no: int | None = None,
     ):
         self.input_maps = input_maps
         self.output_maps = output_maps
         self.template_bounds = template_bounds
+        self.carry_no = len(output_maps) if carry_no is None else carry_no
         assert len(self.input_maps) > 0, "Expect input_maps to be non-empty"
         assert len(self.output_maps) > 0, "Expect output_maps to be non-empty"
-        assert len(self.input_maps) >= len(self.output_maps), (
-            "Each output must be paired with a carry input — "
-            f"got {len(self.input_maps)} inputs and {len(self.output_maps)} outputs"
+        assert 0 <= self.carry_no <= len(self.output_maps), (
+            f"carry_no={self.carry_no} must be in [0, {len(self.output_maps)}]"
+        )
+        assert len(self.input_maps) >= self.carry_no, (
+            "Each carry input must have a matching block-arg — "
+            f"got {len(self.input_maps)} inputs and carry_no={self.carry_no}"
         )
         assert self._no_symbols(), "No symbols expected in any affine map of template_spec"
         assert self._same_dims(), "Expect all AffineMaps to have equal number of dims"
@@ -48,15 +60,15 @@ class TemplateSpec:
 
     @property
     def num_pure_inputs(self) -> int:
-        return len(self.input_maps) - self.num_outputs
+        return len(self.input_maps) - self.carry_no
 
     @property
     def readwrite_pairs(self) -> dict[int, int]:
         """
-        Positional pairing of PE inputs to PE outputs, derived from the encode-pass
-        convention (last K data inputs are carries paired with the K outputs).
+        Positional pairing of PE inputs to PE outputs: the trailing ``carry_no``
+        inputs pair with the leading ``carry_no`` outputs as readWrite streamers.
         """
-        return {self.num_pure_inputs + k: k for k in range(self.num_outputs)}
+        return {self.num_pure_inputs + k: k for k in range(self.carry_no)}
 
     def __str__(self) -> str:
         _str: str = ""
@@ -108,6 +120,22 @@ class TemplateSpec:
         num_data = len(pe.data_operands())
         num_outputs = len(pe.get_terminator().operands)
         num_dims = len(bounds)
+        # carry_no comes from the encode pass (= initial number of linalg outs)
+        # and may have been lowered by the prune-unused-carries pass.
+        carry_attr = pe.attributes.get(CARRY_NO_ATTR_NAME)
+        if carry_attr is None:
+            # Legacy fallback for tests that build a PEOp directly without going
+            # through the encode pass: assume every output is paired (= today's
+            # default after encode).
+            carry_no = min(num_outputs, num_data)
+        else:
+            assert isinstance(carry_attr, IntegerAttr)
+            carry_no = carry_attr.value.data
         input_maps = tuple(AffineMap.identity(num_dims) for _ in range(num_data))
         output_maps = tuple(AffineMap.identity(num_dims) for _ in range(num_outputs))
-        return TemplateSpec(input_maps=input_maps, output_maps=output_maps, template_bounds=bounds)
+        return TemplateSpec(
+            input_maps=input_maps,
+            output_maps=output_maps,
+            template_bounds=bounds,
+            carry_no=carry_no,
+        )

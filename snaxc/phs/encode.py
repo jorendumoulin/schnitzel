@@ -1,9 +1,11 @@
 from xdsl.dialects import linalg
-from xdsl.dialects.builtin import FunctionType
+from xdsl.dialects.builtin import FunctionType, IntegerAttr
 from xdsl.ir import Operation
 from xdsl.pattern_rewriter import PatternRewriter
 
 from snaxc.dialects import dart, phs
+
+CARRY_NO_ATTR_NAME = "phs.carry_no"
 
 
 def get_id(op: Operation, count: dict[str, int]):
@@ -56,6 +58,9 @@ def convert_generic_body_to_phs(
         switch_no=0,
         region=body_copy,
     )
+    # Number of trailing data inputs that originated from linalg `outs`. Used
+    # downstream to identify readWrite-carry pairs by position.
+    pe.attributes[CARRY_NO_ATTR_NAME] = IntegerAttr(len(generic_op.outputs), 64)
     for op in pe.body.ops:
         if isinstance(op, linalg.YieldOp) or isinstance(op, dart.YieldOp):
             yield_op = phs.YieldOp(op.operands[0])

@@ -1,6 +1,6 @@
 from xdsl.context import Context
 from xdsl.dialects import builtin, linalg
-from xdsl.dialects.builtin import ModuleOp
+from xdsl.dialects.builtin import IntegerAttr, ModuleOp
 from xdsl.parser import SymbolRefAttr
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import PatternRewriter, PatternRewriteWalker, RewritePattern, op_type_rewrite_pattern
@@ -13,6 +13,7 @@ from snaxc.phs.encode import convert_generic_body_to_phs
 
 MAGIC_ATTR_NAME = "phs_acc"
 BOUNDS_ATTR_NAME = "phs_array_bounds"
+CARRY_NO_ATTR_NAME = "phs.carry_no"
 
 
 class EncodeLinalgGeneric(RewritePattern):
@@ -29,6 +30,13 @@ class EncodeLinalgGeneric(RewritePattern):
 
         # Convert the linalg body to a phs body in a pe operation
         pe = convert_generic_body_to_phs(linalg_op, acc_symbol_ref.string_value(), rewriter)
+
+        # Number of trailing data inputs that originated from linalg `outs`
+        # operands. By the encode-pass convention these are paired (positionally)
+        # with the PE outputs as readWrite carries; a later cleanup pass may
+        # lower this count if some carries turn out to be unused across all
+        # merged modes.
+        pe.attributes[CARRY_NO_ATTR_NAME] = IntegerAttr(len(linalg_op.outputs), 64)
 
         # Pick up optional array bounds annotation
         if BOUNDS_ATTR_NAME in linalg_op.attributes:

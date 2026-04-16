@@ -29,6 +29,7 @@ from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
 from snaxc.transforms.phs.instantiate_pe_array import BOUNDS_ATTR_NAME, InstantiatePEArrayPass
+from snaxc.transforms.phs.prune_unused_carries import PrunePEUnusedCarriesPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
 
 
@@ -247,6 +248,9 @@ class PHSCMain(SNAXCMain):
             )
         )
         input_pass_pipeline.append(PhsEncodePass())
+        # Runs after all merges complete: any carry-input that's unused across
+        # every merged mode is dead and can be demoted from readWrite to write.
+        input_pass_pipeline.append(PrunePEUnusedCarriesPass())
         self.input_pipeline = PassPipeline(tuple(input_pass_pipeline), self.pipeline_callback)
 
     def setup_hardware_pipeline(self):
