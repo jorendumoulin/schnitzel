@@ -638,7 +638,7 @@ class PEInstanceOp(IRDLOperation):
         def parse_typed_operands() -> tuple[list[SSAValue], list[Attribute]]:
             operands = parser.parse_comma_separated_list(Parser.Delimiter.NONE, parser.parse_operand)
             parser.parse_punctuation(":")
-            types = parser.parse_comma_separated_list(Parser.Delimiter.NONE, parser.parse_type)
+            types: list[Attribute] = list(parser.parse_comma_separated_list(Parser.Delimiter.NONE, parser.parse_type))
             return operands, types
 
         parser.parse_punctuation("(")
