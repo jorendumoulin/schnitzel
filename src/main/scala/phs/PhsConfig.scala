@@ -5,7 +5,7 @@ import upickle.default.{ReadWriter => RW, macroRW}
 // --- PHS Streamer Config ---
 
 case class PhsStreamerConfig(
-    streamType: String, // "read" or "write"
+    streamType: String, // "read", "write", or "readWrite"
     nTemporalDims: Int,
     spatialDimSizes: Seq[Int]
 ) {
@@ -20,6 +20,7 @@ case class PhsAcceleratorConfig(
     streamers: Seq[PhsStreamerConfig],
     numSwitches: Int,
     switchBitwidths: Seq[Int] = Seq(),
+    maskBitwidths: Seq[Int] = Seq(),
     moduleName: String = "",
     svPath: String = ""
 ) {
@@ -30,8 +31,18 @@ case class PhsAcceleratorConfig(
   def switchBitwidth(i: Int): Int =
     if (i < switchBitwidths.length) switchBitwidths(i) else 32
 
-  def readStreamers: Seq[PhsStreamerConfig] = streamers.filter(_.streamType == "read")
-  def writeStreamers: Seq[PhsStreamerConfig] = streamers.filter(_.streamType == "write")
+  /** Per-streamer enable mask bitwidth. Indexed by position in `streamers`.
+    * Falls back to the streamer's number of spatial dimensions (min 1) —
+    * one enable bit per dim. */
+  def maskBitwidth(i: Int): Int =
+    if (i < maskBitwidths.length) maskBitwidths(i)
+    else math.max(1, streamers(i).spatialDimSizes.length)
+
+  // A readWrite streamer participates as both a reader and a writer.
+  def readStreamers: Seq[PhsStreamerConfig] =
+    streamers.filter(s => s.streamType == "read" || s.streamType == "readWrite")
+  def writeStreamers: Seq[PhsStreamerConfig] =
+    streamers.filter(s => s.streamType == "write" || s.streamType == "readWrite")
 }
 object PhsAcceleratorConfig {
   implicit val rw: RW[PhsAcceleratorConfig] = macroRW
@@ -45,6 +56,7 @@ object PhsAcceleratorConfig {
     ),
     numSwitches = 1,
     switchBitwidths = Seq(2),
+    maskBitwidths = Seq(1, 1, 1),
     moduleName = "acc1_array",
     svPath = "src/main/resources/phs/acc1_array.sv"
   )
@@ -64,6 +76,7 @@ case class PhsAccelPhsEntry(
     streamers: Seq[PhsStreamerConfig],
     numSwitches: Int,
     switchBitwidths: Seq[Int],
+    maskBitwidths: Seq[Int],
     moduleName: String,
     svPath: String
 ) extends PhsAccelEntry

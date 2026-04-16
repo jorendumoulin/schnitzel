@@ -15,6 +15,8 @@ class Streamer:
     temporal_dims: int
     spatial_dims: tuple[int, ...]
     name_base: str
+    stream_type: str = "read"
+    """One of "read", "write", or "readWrite". Determines the streamer's TCDM direction."""
 
     def addr_params(self) -> str:
         return f"{self.name_base}_addr"

@@ -89,6 +89,46 @@ def get_from_shaped_hw_array(
     return get_from_shaped_hw_array_inner(input_val, index)
 
 
+def trace_hw_array_get_chain(operand: SSAValue) -> tuple[SSAValue, tuple[int, ...]]:
+    """
+    Inverse of `get_from_shaped_hw_array`: given a value that is either an
+    SSAValue directly or the result of a chain of hw.array_get ops with
+    arith.constant indices, trace back to the root value and collect the
+    indices along the way (outermost first).
+
+    For example, if `operand` is the result of:
+        %root = ...
+        %c1 = arith.constant 1 : i1
+        %t0 = hw.array_get %root[%c1]
+        %c2 = arith.constant 2 : i2
+        %t1 = hw.array_get %t0[%c2]
+    then this returns `(%root, (1, 2))`.
+
+    If `operand` is not the result of an hw.array_get, returns
+    `(operand, ())` — i.e., no indices were needed to produce it.
+    """
+    indices: list[int] = []
+    current: SSAValue = operand
+    while True:
+        owner = current.owner
+        if not isinstance(owner, hw.ArrayGetOp):
+            break
+        index_op = owner.index.owner
+        assert isinstance(index_op, arith.ConstantOp), (
+            f"Expected arith.constant index in hw.array_get chain, got {index_op}"
+        )
+        assert isinstance(index_op.value, builtin.IntegerAttr)
+        # IntegerAttr stores values in signed form; mask to bitwidth to get
+        # the unsigned index (e.g. true=1, not -1; 3 in i2 = 3, not -1).
+        raw = index_op.value.value.data
+        assert isinstance(index_op.value.type, builtin.IntegerType)
+        bitwidth = index_op.value.type.width.data
+        unsigned = raw & ((1 << bitwidth) - 1)
+        indices.insert(0, unsigned)
+        current = owner.input
+    return current, tuple(indices)
+
+
 def create_shaped_hw_array(
     values: list[SSAValue[Attribute]], shape: tuple[int, ...]
 ) -> tuple[list[Operation], SSAValue]:

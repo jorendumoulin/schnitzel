@@ -101,11 +101,18 @@ class ConvertPEArrayOps(RewritePattern):
                 )
             )
 
+        # Yield operands split into two groups:
+        #   [0 .. num_out)        data outputs       -> out_N
+        #   [num_out .. end)      per-streamer masks -> mask_N (in logical-streamer order)
+        # num_out equals the PE's output count, which we read off any PEInstanceOp.
         yield_op = array_op.get_terminator()
+        assert first_instance is not None, "PEArrayOp must contain at least one phs.instance"
+        num_out = len(first_instance.res)
         for i, opnd in enumerate(yield_op.operands):
+            port_name = f"out_{i}" if i < num_out else f"mask_{i - num_out}"
             ports.append(
                 hw.ModulePort(
-                    builtin.StringAttr(f"out_{i}"),
+                    builtin.StringAttr(port_name),
                     cast(TypeAttribute, opnd.type),
                     hw.DirectionAttr(data=hw.Direction.OUTPUT),
                 )

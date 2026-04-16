@@ -29,6 +29,8 @@ module @transforms attributes { transform.with_named_sequence } {
      %matmul: !transform.any_op {transform.readonly}) {
        %attr_value = transform.param.constant @acc1 -> !transform.any_param
        transform.annotate %matmul "phs_acc" = %attr_value : !transform.any_op, !transform.any_param
+       %bounds = transform.param.constant array<i64: 4> -> !transform.any_param
+       transform.annotate %matmul "phs_array_bounds" = %bounds : !transform.any_op, !transform.any_param
        transform.yield
   }
 }
