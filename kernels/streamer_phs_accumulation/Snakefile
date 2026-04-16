@@ -1,0 +1,137 @@
+"""
+End-to-end PHS build flow for the streamer_phs_accumulation kernel.
+
+Exercises a readWrite streamer via temporal reduction: c[i] += a[t, i].
+"""
+
+import os
+
+ROOT = os.path.abspath("../..")
+BUILD = "build"
+SIM_BUILD = f"{BUILD}/sim"
+DEVICE_BUILD = f"{BUILD}/device"
+
+CXX = "clang++"
+CC = "clang"
+CFLAGS = (
+    "-O2 --target=riscv32-unkown-elf -march=rv32imc -mabi=ilp32 -fno-builtin-printf"
+)
+LDFLAGS = f"{CFLAGS} -fuse-ld=lld -nostartfiles -nostdlib"
+RUNTIME_INCLUDE = f"{ROOT}/sw/device/runtime"
+MLIR_INCLUDE = f"{ROOT}/sw/common/mlir"
+LINKER_SCRIPT = f"{RUNTIME_INCLUDE}/link.ld"
+
+
+rule all:
+    input:
+        f"{BUILD}/test.log",
+
+
+rule phsc:
+    input:
+        mlir="accumulation.mlir",
+        schedule="schedule.mlir",
+        software="test_software.mlir",
+    output:
+        sw=f"{BUILD}/sw.llvm.mlir",
+        top=f"{BUILD}/generated/Top.sv",
+        filelist=f"{BUILD}/generated/filelist.f",
+    params:
+        generated=lambda wc: os.path.abspath(f"{BUILD}/generated"),
+    shell:
+        """
+        phsc {input.mlir} {input.schedule} \
+            --software-file {input.software} \
+            -o {output.sw} \
+            --output-hardware {params.generated}/acc1_array.sv \
+            --output-schnitzel-dir {params.generated}
+        """
+
+
+rule translate_mlir:
+    input:
+        f"{BUILD}/sw.llvm.mlir",
+    output:
+        f"{BUILD}/sw.ll",
+    shell:
+        "mlir-translate --mlir-to-llvmir -o {output} {input}"
+
+
+rule compile_mlir_kernel:
+    input:
+        f"{BUILD}/sw.ll",
+    output:
+        f"{BUILD}/sw.o",
+    shell:
+        "{CC} {CFLAGS} -x ir -c {input} -o {output} -Wno-override-module"
+
+
+rule configure_device:
+    output:
+        ninja=f"{DEVICE_BUILD}/build.ninja",
+    shell:
+        "cmake -B {DEVICE_BUILD} -S {ROOT}/sw/device -G Ninja"
+
+
+rule build_device_runtime:
+    input:
+        ninja=f"{DEVICE_BUILD}/build.ninja",
+    output:
+        runtime=f"{DEVICE_BUILD}/runtime/libdevice_runtime.a",
+    shell:
+        "cmake --build {DEVICE_BUILD} --target device_runtime"
+
+
+rule compile_main:
+    input:
+        "main.cpp",
+    output:
+        f"{BUILD}/main.o",
+    shell:
+        "{CXX} {CFLAGS} -I{RUNTIME_INCLUDE} -I{MLIR_INCLUDE} -c {input} -o {output}"
+
+
+rule link:
+    input:
+        sw=f"{BUILD}/sw.o",
+        main=f"{BUILD}/main.o",
+        runtime=f"{DEVICE_BUILD}/runtime/libdevice_runtime.a",
+    output:
+        f"{BUILD}/test.elf",
+    shell:
+        "{CC} {LDFLAGS} -T{LINKER_SCRIPT} {input.sw} {input.main} {input.runtime} -o {output}"
+
+
+rule configure_sim:
+    input:
+        filelist=f"{BUILD}/generated/filelist.f",
+    output:
+        ninja=f"{SIM_BUILD}/build.ninja",
+    params:
+        generated=lambda wc: os.path.abspath(f"{BUILD}/generated"),
+    shell:
+        "cmake -B {SIM_BUILD} -S {ROOT}/sim -G Ninja -DGENERATED_DIR={params.generated}"
+
+
+rule build_sim:
+    input:
+        ninja=f"{SIM_BUILD}/build.ninja",
+        top=f"{BUILD}/generated/Top.sv",
+    output:
+        sim=f"{SIM_BUILD}/sim",
+    threads: workflow.cores
+    shell:
+        "cmake --build {SIM_BUILD} -j{threads}"
+
+
+rule simulate:
+    input:
+        sim=f"{SIM_BUILD}/sim",
+        elf=f"{BUILD}/test.elf",
+    output:
+        log=f"{BUILD}/test.log",
+    shell:
+        """
+        {input.sim} {input.elf} --vltargs="+ibex_tracer_enable=0" 2>&1 | tee {output.log}
+        grep -q "TEST PASSED" {output.log}
+        """
