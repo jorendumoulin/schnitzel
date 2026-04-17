@@ -8,66 +8,77 @@ PE-array structure: a mode that doesn't need accumulation just leaves its carry
 unused. Once all modes have been merged into the abstract PE, a carry that is
 unused everywhere in the body is genuinely dead — keeping it would force an
 extra readWrite TCDM read per cycle whose data nobody consumes. This pass drops
-those carries from the PE block-args (and the corresponding `phs.carry_no`
-count), so downstream lowerings emit a plain ``write`` streamer for that
-output instead of a ``readWrite``.
+those carries from the PE block-args and shrinks the ``phs.paired_outputs``
+list to record which outputs still own a carry, so downstream lowerings emit a
+plain ``write`` streamer for the demoted output instead of a ``readWrite``.
+
+The paired_outputs list (one i64 per remaining carry, listing the output index
+that carry feeds back into) supports pruning ANY carry — not just trailing
+ones. This is what guarantees an optimal lowering: every unused carry is
+dropped regardless of position.
 """
 
 from dataclasses import dataclass
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
-from xdsl.dialects.builtin import FunctionType, IntegerAttr
+from xdsl.dialects.builtin import DenseArrayBase, FunctionType, i64
 from xdsl.passes import ModulePass
 
 from snaxc.dialects import phs
 
-CARRY_NO_ATTR_NAME = "phs.carry_no"
+PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
 
 
-def _get_carry_no(pe: phs.PEOp) -> int:
-    attr = pe.attributes.get(CARRY_NO_ATTR_NAME)
+def get_paired_outputs(pe: phs.PEOp) -> tuple[int, ...]:
+    """List of output indices that have a corresponding carry-input slot.
+
+    Empty (or absent attr) means "no carries" — every output is write-only.
+    """
+    attr = pe.attributes.get(PAIRED_OUTPUTS_ATTR_NAME)
     if attr is None:
-        return 0
-    assert isinstance(attr, IntegerAttr)
-    return attr.value.data
+        return ()
+    assert isinstance(attr, DenseArrayBase)
+    return tuple(int(v) for v in attr.get_values())
 
 
-def _set_carry_no(pe: phs.PEOp, value: int) -> None:
-    pe.attributes[CARRY_NO_ATTR_NAME] = IntegerAttr(value, 64)
+def set_paired_outputs(pe: phs.PEOp, value: tuple[int, ...]) -> None:
+    pe.attributes[PAIRED_OUTPUTS_ATTR_NAME] = DenseArrayBase.from_list(i64, list(value))
 
 
 def prune_unused_carries(pe: phs.PEOp) -> None:
     """
-    Drop trailing carry-input block-args whose use-count is zero, decrementing
-    ``phs.carry_no`` accordingly. Stops at the first used carry from the
-    trailing end so the positional pairing convention stays consistent.
+    Remove every carry-input block-arg whose use-count is zero, regardless of
+    its position in the trailing carry run. Updates ``phs.paired_outputs`` so
+    the remaining carries are still paired with the right outputs by position.
     """
-    carry_no = _get_carry_no(pe)
-    if carry_no == 0:
+    paired = get_paired_outputs(pe)
+    if not paired:
         return
 
     data_operands = pe.data_operands()
     num_data = len(data_operands)
-    # Carries occupy the trailing carry_no positions of data operands.
-    # Walk them in reverse to keep block-arg indices stable while erasing.
-    pruned = 0
-    for k in reversed(range(carry_no)):
-        carry_idx = num_data - carry_no + k
-        block_arg = pe.body.block.args[carry_idx]
-        if block_arg.uses.get_length() != 0:
-            # Cannot prune from the middle of the trailing run without breaking
-            # the positional pairing convention. Stop at the first used carry.
-            break
-        pe.body.block.erase_arg(block_arg)
-        pruned += 1
+    num_carries = len(paired)
+    num_pure_inputs = num_data - num_carries
+    assert num_pure_inputs >= 0, f"PE has {num_data} data inputs and {num_carries} carries — invariant violated"
 
-    if pruned == 0:
+    # Walk carry positions in reverse so block-arg indices stay stable while
+    # erasing.
+    new_paired = list(paired)
+    pruned = False
+    for k in reversed(range(num_carries)):
+        carry_block_arg = pe.body.block.args[num_pure_inputs + k]
+        if carry_block_arg.uses.get_length() == 0:
+            pe.body.block.erase_arg(carry_block_arg)
+            del new_paired[k]
+            pruned = True
+
+    if not pruned:
         return
 
     new_input_types = list(pe.body.block.arg_types)
     pe.function_type = FunctionType.from_lists(new_input_types, list(pe.function_type.outputs))
-    _set_carry_no(pe, carry_no - pruned)
+    set_paired_outputs(pe, tuple(new_paired))
 
 
 @dataclass(frozen=True)

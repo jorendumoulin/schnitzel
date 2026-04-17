@@ -248,8 +248,13 @@ class PHSCMain(SNAXCMain):
             )
         )
         input_pass_pipeline.append(PhsEncodePass())
-        # Runs after all merges complete: any carry-input that's unused across
-        # every merged mode is dead and can be demoted from readWrite to write.
+        # Drops carry-input slots whose data is unused in the merged PE body
+        # (lowering them from `readWrite` to plain `write`). Defense-in-depth:
+        # the Scala accelerator separately handles unused carries via its
+        # per-streamer `carryUsed` gating, but pruning is still preferred —
+        # it saves an extra TCDM read per dead carry per cycle. The new
+        # paired_outputs representation lets us drop carries at any output
+        # position, not just trailing ones.
         input_pass_pipeline.append(PrunePEUnusedCarriesPass())
         self.input_pipeline = PassPipeline(tuple(input_pass_pipeline), self.pipeline_callback)
 

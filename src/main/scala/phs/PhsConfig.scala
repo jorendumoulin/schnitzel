@@ -7,7 +7,14 @@ import upickle.default.{ReadWriter => RW, macroRW}
 case class PhsStreamerConfig(
     streamType: String, // "read", "write", or "readWrite"
     nTemporalDims: Int,
-    spatialDimSizes: Seq[Int]
+    spatialDimSizes: Seq[Int],
+    // Only meaningful for `readWrite`. true (default) when the BlackBox actually
+    // consumes the carry-input data (data_K_*). When false the streamer still
+    // performs both reads and writes (e.g., to keep address pacing) but its
+    // readData.valid does NOT gate other writers' writeData.valid in the
+    // accelerator wiring — preventing a deadlock when the BB doesn't depend
+    // on the carry value. Pure `read`/`write` streamers ignore this field.
+    carryUsed: Boolean = true
 ) {
   def numTcdmPorts: Int = spatialDimSizes.product
   def numCsrRegs: Int = 1 + nTemporalDims * 2 + spatialDimSizes.length

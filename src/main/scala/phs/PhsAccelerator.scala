@@ -139,6 +139,8 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
   // data_{rIdx}_* to the blackbox, its write path consumes out_{wIdx}_*.
   val readStreamers =
     streamers.zip(config.streamers).filter { case (_, c) => c.streamType == "read" || c.streamType == "readWrite" }.map(_._1)
+  val readStreamerConfigs =
+    config.streamers.filter(c => c.streamType == "read" || c.streamType == "readWrite")
   val writeStreamers =
     streamers.zip(config.streamers).filter { case (_, c) => c.streamType == "write" || c.streamType == "readWrite" }.map(_._1)
 
@@ -161,6 +163,19 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
     bb.io.elements(s"switch_${i}") := switches(i)(config.switchBitwidth(i) - 1, 0)
   }
 
+  // For each reader, gate its `readData.valid` contribution to the AND that
+  // drives writers' `writeData.valid`. Pure readers always contribute. A
+  // readWrite streamer contributes only when its `carryUsed` flag is true:
+  // when the BlackBox doesn't actually consume `data_K_*`, requiring its
+  // valid would deadlock the handshake (the write would never fire because
+  // the carry-side read never advances).
+  val readDataValidContrib = readStreamers.zip(readStreamerConfigs).map { case (s, c) =>
+    if (c.streamType == "readWrite" && !c.carryUsed) true.B
+    else s.io.readData.valid
+  }
+  val combinedReadDataValid =
+    if (readDataValidContrib.isEmpty) true.B else readDataValidContrib.reduce(_ && _)
+
   // Wire BlackBox outputs -> write streamer data
   for ((sc, wIdx) <- writeConfigs.zipWithIndex) {
     val numElements = sc.spatialDimSizes.product
@@ -169,7 +184,7 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
       outBits(eIdx) := bb.io.elements(s"out_${wIdx}_${eIdx}")
     }
     writeStreamers(wIdx).io.writeData.bits := outBits.asTypeOf(UInt((dataWidth * numElements).W))
-    writeStreamers(wIdx).io.writeData.valid := readStreamers.map(_.io.readData.valid).reduce(_ && _)
+    writeStreamers(wIdx).io.writeData.valid := combinedReadDataValid
   }
 
   // Per-streamer spatial dimension masks: bit k of the blackbox's mask output

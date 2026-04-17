@@ -40,13 +40,24 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
             :true_switches
         ]
 
+        # For each readWrite carry slot, check whether the corresponding PE
+        # block-arg is actually used in the body. If not, mark carry_used=False
+        # so the Scala accelerator omits it from the writeData.valid AND.
+        num_data = len(pe.data_operands())
+        num_pure_inputs = num_data - template_spec.carry_no
+        carry_used: list[bool] = []
+        for k in range(template_spec.carry_no):
+            carry_block_arg = pe.body.block.args[num_pure_inputs + k]
+            carry_used.append(carry_block_arg.uses.get_length() > 0)
+
         self.phs = Phs.from_template(
             name=self.name,
             input_sizes=template_spec.get_input_sizes(),
             output_sizes=template_spec.get_output_sizes(),
             num_switches=true_switches,
             switch_bitwidths=switch_bitwidths,
-            carry_no=template_spec.carry_no,
+            paired_outputs=template_spec.paired_outputs,
+            carry_used=carry_used,
         )
 
         # Initialize StreamerAccelerator with the PHS streamer configuration

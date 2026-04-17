@@ -1,11 +1,11 @@
 from xdsl.dialects import linalg
-from xdsl.dialects.builtin import FunctionType, IntegerAttr
+from xdsl.dialects.builtin import DenseArrayBase, FunctionType, i64
 from xdsl.ir import Operation
 from xdsl.pattern_rewriter import PatternRewriter
 
 from snaxc.dialects import dart, phs
 
-CARRY_NO_ATTR_NAME = "phs.carry_no"
+PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
 
 
 def get_id(op: Operation, count: dict[str, int]):
@@ -58,9 +58,11 @@ def convert_generic_body_to_phs(
         switch_no=0,
         region=body_copy,
     )
-    # Number of trailing data inputs that originated from linalg `outs`. Used
-    # downstream to identify readWrite-carry pairs by position.
-    pe.attributes[CARRY_NO_ATTR_NAME] = IntegerAttr(len(generic_op.outputs), 64)
+    # List of output indices that have a corresponding carry-input slot
+    # (= came from a linalg `outs` operand). Initially every output is paired;
+    # a later cleanup pass may shrink this list (and erase the matching
+    # block-arg) for outputs whose carry is never read in the body.
+    pe.attributes[PAIRED_OUTPUTS_ATTR_NAME] = DenseArrayBase.from_list(i64, list(range(len(generic_op.outputs))))
     for op in pe.body.ops:
         if isinstance(op, linalg.YieldOp) or isinstance(op, dart.YieldOp):
             yield_op = phs.YieldOp(op.operands[0])

@@ -47,7 +47,7 @@ def build_schnitzel_config(
         # Per-streamer mask: one bit per spatial dimension, min 1 bit.
         # Bit k enables spatial dim k. Read and write masks are tracked
         # separately so the blackbox can drive each streamer's spatialDimMask.
-        streamer_cfgs: list[dict[str, str | int | list[int]]] = []
+        streamer_cfgs: list[dict[str, object]] = []
         mask_bitwidths: list[int] = []
         for streamer in phs.streamers.streamers:
             streamer_cfgs.append(
@@ -55,6 +55,8 @@ def build_schnitzel_config(
                     "streamType": streamer.stream_type,
                     "nTemporalDims": streamer.temporal_dims,
                     "spatialDimSizes": list(streamer.spatial_dims),
+                    # Only meaningful for readWrite — pure read/write ignore it.
+                    "carryUsed": streamer.carry_used,
                 }
             )
             # One mask per physical streamer — one bit per spatial dim, min 1 bit.
