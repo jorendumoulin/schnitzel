@@ -31,6 +31,8 @@ jobs:
         run: git submodule update --init --recursive --depth 1 submodules/cva6 submodules/ibex submodules/printf
       - name: Generate Verilog
         run: just generate-verilog
+      - name: Configure Simulator with Portable Arch
+        run: cmake -B build/sim -S sim -G Ninja -DSIM_OPT_FAST="-O3 -march=x86-64-v3"
       - name: Configure All Build Systems
         run: just configure
       - name: Build Everything
@@ -99,5 +101,10 @@ jobs:
           path: build
       - name: Grant Execute Permissions
         run: chmod +x ./build/sim/sim
+      - name: Inspect Simulator Binary
+        run: |
+          file ./build/sim/sim
+          ldd ./build/sim/sim || true
+          ./build/sim/sim --help || echo "sim exited with $?"
       - name: Run App Tests
         run: lit tests/apps -v

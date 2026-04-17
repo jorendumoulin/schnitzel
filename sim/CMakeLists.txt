@@ -8,6 +8,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_COMPILER clang)
 set(CMAKE_CXX_COMPILER clang++)
 
+set(SIM_OPT_FAST "-O3 -march=native" CACHE STRING
+    "Optimization flags for Verilator OPT_FAST. Override to a portable -march for CI.")
+
 find_package(elfio REQUIRED)
 find_package(argparse REQUIRED)
 find_package(verilator REQUIRED)
@@ -49,7 +52,7 @@ verilate(sim
     PREFIX VTopWrapper
     TRACE_VCD
     THREADS ${CMAKE_HOST_SYSTEM_PROCESSOR_COUNT}
-    OPT_FAST "-O3 -march=native"
+    OPT_FAST "${SIM_OPT_FAST}"
     OPT_SLOW "-O0"
     VERILATOR_ARGS
         -Wno-UNOPTFLAT -Wno-MULTIDRIVEN -Wno-LATCH
