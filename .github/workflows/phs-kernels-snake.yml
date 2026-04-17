@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        kernel: [streamer_phs_alu, streamer_phs_aluf]
+        kernel: [streamer_phs_alu, streamer_phs_aluf, streamer_phs_accumulation]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

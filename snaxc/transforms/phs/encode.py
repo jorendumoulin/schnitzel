@@ -1,6 +1,6 @@
 from xdsl.context import Context
 from xdsl.dialects import builtin, linalg
-from xdsl.dialects.builtin import ModuleOp
+from xdsl.dialects.builtin import DenseArrayBase, ModuleOp, i64
 from xdsl.parser import SymbolRefAttr
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import PatternRewriter, PatternRewriteWalker, RewritePattern, op_type_rewrite_pattern
@@ -13,6 +13,7 @@ from snaxc.phs.encode import convert_generic_body_to_phs
 
 MAGIC_ATTR_NAME = "phs_acc"
 BOUNDS_ATTR_NAME = "phs_array_bounds"
+PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
 
 
 class EncodeLinalgGeneric(RewritePattern):
@@ -29,6 +30,11 @@ class EncodeLinalgGeneric(RewritePattern):
 
         # Convert the linalg body to a phs body in a pe operation
         pe = convert_generic_body_to_phs(linalg_op, acc_symbol_ref.string_value(), rewriter)
+
+        # List of output indices with a carry-input slot. Initially all outputs
+        # are paired; the prune pass may shrink this list for outputs whose
+        # carry is unread in the merged PE body.
+        pe.attributes[PAIRED_OUTPUTS_ATTR_NAME] = DenseArrayBase.from_list(i64, list(range(len(linalg_op.outputs))))
 
         # Pick up optional array bounds annotation
         if BOUNDS_ATTR_NAME in linalg_op.attributes:

@@ -15,6 +15,7 @@ from snaxc.hw import AccContext
 from snaxc.hw.phs_accelerator import PhsAccelerator
 from snaxc.phs.decode import MappingNotFoundError, decode_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs
+from snaxc.transforms.phs.prune_unused_carries import prune_unused_carries
 
 
 class DispatchLinalgPhsPattern(RewritePattern):
@@ -35,6 +36,11 @@ class DispatchLinalgPhsPattern(RewritePattern):
             return
 
         to_map_pe = convert_generic_body_to_phs(linalg_op, "candidate", rewriter)
+        # The candidate is a single-mode encoding of one linalg op; align its
+        # carry shape with the abstract PE (which has been pruned by the
+        # phs-prune-unused-carries pass after merging) so decode_abstract_graph
+        # sees matching operand counts.
+        prune_unused_carries(to_map_pe)
         for accelerator in self.accelerators:
             try:
                 # Don't use the values, just see if it works

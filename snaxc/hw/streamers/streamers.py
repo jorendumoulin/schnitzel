@@ -17,6 +17,14 @@ class Streamer:
     name_base: str
     stream_type: str = "read"
     """One of "read", "write", or "readWrite". Determines the streamer's TCDM direction."""
+    carry_used: bool = True
+    """
+    Only meaningful for ``readWrite``. When False, the BlackBox doesn't actually
+    consume the carry-input data on this streamer; the Scala accelerator must
+    still drive both sides for handshake/address pacing but should NOT gate
+    other writers' writeData.valid on this streamer's readData.valid (otherwise
+    the handshake deadlocks because the carry data never gets "consumed").
+    """
 
     def addr_params(self) -> str:
         return f"{self.name_base}_addr"

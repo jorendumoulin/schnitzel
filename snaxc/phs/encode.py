@@ -1,9 +1,11 @@
 from xdsl.dialects import linalg
-from xdsl.dialects.builtin import FunctionType
+from xdsl.dialects.builtin import DenseArrayBase, FunctionType, i64
 from xdsl.ir import Operation
 from xdsl.pattern_rewriter import PatternRewriter
 
 from snaxc.dialects import dart, phs
+
+PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
 
 
 def get_id(op: Operation, count: dict[str, int]):
@@ -43,15 +45,12 @@ def convert_generic_body_to_phs(
     body_copy = generic_op.body.clone()
     generic_yield = body_copy.block.ops.last
     assert isinstance(generic_yield, linalg.YieldOp) or isinstance(generic_yield, dart.YieldOp)
-    """
-    Linalg-on-tensors provides an output argument in the block,
-    even when there's no reduction iterator, i.e.
-    when no input is really passed (it is still necessary/used for e.g. shape information).
-    For PHS, this unused block argument creates an extra hardware port, which is unnecessary/unwanted.
-    """
-    for block_arg in body_copy.block.args:
-        if block_arg.uses.get_length() == 0:
-            body_copy.block.erase_arg(block_arg)
+    # Keep every block arg, including the linalg `outs` block args even when the
+    # body never reads them. The PHS array convention is "every output is paired
+    # with a readWrite carry input at position len(ins)+k", so the outs args must
+    # stay in the PE's data ports for the pairing to be derivable structurally.
+    # An optional cleanup pass can later collapse pairs whose carry is unused
+    # back to a write-only streamer.
 
     pe = phs.PEOp(
         name,
@@ -59,6 +58,11 @@ def convert_generic_body_to_phs(
         switch_no=0,
         region=body_copy,
     )
+    # List of output indices that have a corresponding carry-input slot
+    # (= came from a linalg `outs` operand). Initially every output is paired;
+    # a later cleanup pass may shrink this list (and erase the matching
+    # block-arg) for outputs whose carry is never read in the body.
+    pe.attributes[PAIRED_OUTPUTS_ATTR_NAME] = DenseArrayBase.from_list(i64, list(range(len(generic_op.outputs))))
     for op in pe.body.ops:
         if isinstance(op, linalg.YieldOp) or isinstance(op, dart.YieldOp):
             yield_op = phs.YieldOp(op.operands[0])
