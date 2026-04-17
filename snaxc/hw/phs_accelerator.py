@@ -10,6 +10,7 @@ from snaxc.hw.accelerators.phs import Phs
 from snaxc.hw.streamer_accelerator import StreamerAccelerator
 from snaxc.hw.system import Accelerator
 from snaxc.ir.dart.access_pattern import Template
+from snaxc.phs.combine import align_schemas
 from snaxc.phs.decode import decode_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs
 from snaxc.phs.hw_conversion import get_switch_bitwidth
@@ -34,11 +35,26 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
 
         self.template_spec = template_spec
 
-        # Build Phs accelerator from template
-        true_switches = pe.get_true_switches()
-        switch_bitwidths = [get_switch_bitwidth(arg) for arg in pe.get_switches() if arg.get_unique_use() is not None][
-            :true_switches
-        ]
+        # Build Phs accelerator from template. "True" switches are those that
+        # actually drive a MuxOp or a ChooseOp with >1 operations; dead
+        # switches (ChooseOp with a single option) get cleaned up by the
+        # remove-one-option-switches hardware pass. Here we mirror that
+        # filter per-switch so bitwidths line up with ``true_switches`` — the
+        # old code took the first N bitwidths, which broke whenever a dead
+        # switch preceded a live one (common after merge's MuxOp inserts).
+        true_switch_bitwidths: list[int] = []
+        for sw_arg in pe.get_switches():
+            if sw_arg.get_unique_use() is None:
+                continue
+            user = sw_arg.get_user_of_unique_use()
+            assert user is not None
+            if isinstance(user, phs.ChooseOp):
+                if len(list(user.operations())) > 1:
+                    true_switch_bitwidths.append(get_switch_bitwidth(sw_arg))
+            elif isinstance(user, phs.MuxOp):
+                true_switch_bitwidths.append(get_switch_bitwidth(sw_arg))
+        true_switches = len(true_switch_bitwidths)
+        switch_bitwidths = true_switch_bitwidths
 
         # For each readWrite carry slot, check whether the corresponding PE
         # block-arg is actually used in the body. If not, mark carry_used=False
@@ -74,10 +90,13 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
     ) -> Sequence[tuple[Sequence[Operation], SSAValue]]:
         """Decode the PEOp graph to determine switch values for the given operation."""
         candidate_pe = convert_generic_body_to_phs(op, self.name, PatternRewriter(op))
-        # Align carry-input shape with the abstract PE (which the prune pass
-        # may have shrunk after merging). Without this the candidate looks
-        # wider than the abstract for parallel-only kernels.
+        # Align the candidate's schema with the abstract PE so decode_abstract_graph
+        # sees matching shapes: first drop any carry this mode doesn't use
+        # (mirrors prune on the abstract), then widen to the abstract's
+        # pure-input/paired-output schema (inserting dead slots for inputs the
+        # abstract has for other modes).
         prune_unused_carries(candidate_pe)
+        align_schemas(candidate_pe, self.pe)
         switch_values = decode_abstract_graph(self.pe, candidate_pe)
         ops = [arith.ConstantOp.from_int_and_width(value, 32) for value in switch_values]
         return [([op], op.results[0]) for op in ops]
