@@ -13,6 +13,7 @@ from xdsl.pattern_rewriter import (
 
 from snaxc.hw import AccContext
 from snaxc.hw.phs_accelerator import PhsAccelerator
+from snaxc.phs.combine import align_schemas
 from snaxc.phs.decode import MappingNotFoundError, decode_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs
 from snaxc.transforms.phs.prune_unused_carries import prune_unused_carries
@@ -36,13 +37,18 @@ class DispatchLinalgPhsPattern(RewritePattern):
             return
 
         to_map_pe = convert_generic_body_to_phs(linalg_op, "candidate", rewriter)
-        # The candidate is a single-mode encoding of one linalg op; align its
-        # carry shape with the abstract PE (which has been pruned by the
-        # phs-prune-unused-carries pass after merging) so decode_abstract_graph
-        # sees matching operand counts.
+        # The candidate is a single-mode encoding of one linalg op. Two alignments
+        # are needed before decode_abstract_graph can pattern-match it against a
+        # merged (multi-mode) abstract PE:
+        #   1. Prune unused carries so single-mode parallel kernels match an
+        #      abstract that also has the carry pruned.
+        #   2. Widen the candidate to the abstract's schema (max pure inputs,
+        #      union of paired outputs) so dead slots the abstract owns but
+        #      this mode doesn't use line up by index.
         prune_unused_carries(to_map_pe)
         for accelerator in self.accelerators:
             try:
+                align_schemas(to_map_pe, accelerator.pe)
                 # Don't use the values, just see if it works
                 decode_abstract_graph(accelerator.pe, to_map_pe)
                 # set linalg op library call
