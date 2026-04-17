@@ -1,9 +1,104 @@
 from collections.abc import Sequence
 
+from xdsl.dialects.builtin import DenseArrayBase, FunctionType, i64
 from xdsl.ir import BlockArgument
 from xdsl.irdl import Operand
 
 from snaxc.dialects import phs
+
+PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
+
+
+def _paired_outputs(pe: phs.PEOp) -> tuple[int, ...]:
+    attr = pe.attributes.get(PAIRED_OUTPUTS_ATTR_NAME)
+    if attr is None:
+        return ()
+    assert isinstance(attr, DenseArrayBase)
+    return tuple(int(v) for v in attr.get_values())
+
+
+def _set_paired_outputs(pe: phs.PEOp, value: tuple[int, ...]) -> None:
+    pe.attributes[PAIRED_OUTPUTS_ATTR_NAME] = DenseArrayBase.from_list(i64, list(value))
+
+
+def _num_pure_inputs(pe: phs.PEOp) -> int:
+    return len(pe.data_operands()) - len(_paired_outputs(pe))
+
+
+def _widen_pure_inputs(pe: phs.PEOp, target_num_pure: int, type_donor: phs.PEOp) -> None:
+    """Insert dead block args at trailing pure-input positions so the PE has
+    ``target_num_pure`` pure-input slots. Carries (and switches) shift right
+    but keep their role: the new args slide in BEFORE the existing carries.
+    Types for the new slots come from ``type_donor``'s matching positions.
+    """
+    current = _num_pure_inputs(pe)
+    if current >= target_num_pure:
+        return
+    donor_pure = _num_pure_inputs(type_donor)
+    assert donor_pure >= target_num_pure, (
+        f"type_donor has {donor_pure} pure inputs but need types for up to {target_num_pure}"
+    )
+    for pos in range(current, target_num_pure):
+        arg_type = type_donor.body.block.args[pos].type
+        pe.body.block.insert_arg(arg_type, pos)
+    pe.function_type = FunctionType.from_lists(list(pe.body.block.arg_types), list(pe.function_type.outputs))
+
+
+def _widen_paired_outputs(pe: phs.PEOp, target_paired: tuple[int, ...], type_donor: phs.PEOp) -> None:
+    """Insert dead carry block args so the PE's ``paired_outputs`` equals
+    ``target_paired``. New carries are inserted in positional order, with
+    types drawn from ``type_donor``. The trailing-carries convention
+    (carry ``k`` at position ``num_pure_inputs + k``) is preserved.
+    """
+    current = _paired_outputs(pe)
+    if current == target_paired:
+        return
+    current_set = set(current)
+    for k in current:
+        assert k in target_paired, (
+            f"widen_paired_outputs only grows the set — current {current} not a subset of target {target_paired}"
+        )
+    num_pure = _num_pure_inputs(pe)
+    donor_pure = _num_pure_inputs(type_donor)
+    donor_paired = _paired_outputs(type_donor)
+    # Insert dead carries at the positions that target wants but current
+    # doesn't have. We walk target in order; position for target[k] is
+    # num_pure + k once we've inserted enough.
+    inserted = 0
+    for k, output_idx in enumerate(target_paired):
+        if output_idx in current_set:
+            continue
+        # Find the same output_idx in donor to borrow a type from.
+        assert output_idx in donor_paired, (
+            f"output {output_idx} missing from both current ({current}) and donor ({donor_paired})"
+        )
+        donor_k = donor_paired.index(output_idx)
+        arg_type = type_donor.body.block.args[donor_pure + donor_k].type
+        pe.body.block.insert_arg(arg_type, num_pure + k)
+        inserted += 1
+    pe.function_type = FunctionType.from_lists(list(pe.body.block.arg_types), list(pe.function_type.outputs))
+    _set_paired_outputs(pe, target_paired)
+
+
+def align_schemas(graph: phs.PEOp, abstract_graph: phs.PEOp) -> None:
+    """Before merging ``graph`` into ``abstract_graph``, widen both so they
+    share a common schema: ``num_pure_inputs`` becomes the max of the two,
+    and ``paired_outputs`` becomes the sorted union. Dead block args are
+    inserted for slots a side doesn't already have.
+
+    This preserves the positional convention used by ``get_equivalent_owner``
+    (block-arg index lookup in ``abstract_graph``), so downstream
+    ``uncollide_inputs`` naturally inserts a MuxOp on any position whose
+    graph operand and abstract operand disagree — and the result maps to
+    one shared hardware op plus minimal muxes.
+    """
+    target_num_pure = max(_num_pure_inputs(graph), _num_pure_inputs(abstract_graph))
+    target_paired = tuple(sorted(set(_paired_outputs(graph)) | set(_paired_outputs(abstract_graph))))
+
+    _widen_pure_inputs(graph, target_num_pure, type_donor=abstract_graph)
+    _widen_pure_inputs(abstract_graph, target_num_pure, type_donor=graph)
+    _widen_paired_outputs(graph, target_paired, type_donor=abstract_graph)
+    _widen_paired_outputs(abstract_graph, target_paired, type_donor=graph)
 
 
 def get_equivalent_owner(operand: Operand, abstract_graph: phs.PEOp) -> BlockArgument | phs.ChooseOp:
@@ -92,6 +187,11 @@ def append_to_abstract_graph(
     MuxOps are inserted automatically to prevent colliding inputs.
     Addition of such a MuxOp adds an extra switch to the abstract_graph's PEOp
     """
+    # Align the two PEs onto a common schema first. After this both sides have
+    # the same pure-input count and the same paired-outputs set (dead block
+    # args filled in where a side had nothing); `get_equivalent_owner`'s
+    # index-based lookup is then well-defined.
+    align_schemas(graph, abstract_graph)
     for op in graph.body.ops:
         if isinstance(op, phs.ChooseOp):
             choose_op = op
