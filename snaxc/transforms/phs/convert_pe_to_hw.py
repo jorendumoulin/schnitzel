@@ -101,15 +101,28 @@ class ConvertPEArrayOps(RewritePattern):
                 )
             )
 
-        # Yield operands split into two groups:
-        #   [0 .. num_out)        data outputs       -> out_N
-        #   [num_out .. end)      per-streamer masks -> mask_N (in logical-streamer order)
-        # num_out equals the PE's output count, which we read off any PEInstanceOp.
+        # Yield operands split into three groups:
+        #   [0 .. num_out)                    data outputs        -> out_N
+        #   [num_out .. num_out+num_mask)     per-streamer masks  -> mask_N
+        #   [last num_rw entries)             per-pair carry_used -> carry_used_N
+        # where num_rw is recorded on the PEArrayOp by the instantiator.
         yield_op = array_op.get_terminator()
         assert first_instance is not None, "PEArrayOp must contain at least one phs.instance"
         num_out = len(first_instance.res)
+        rw_attr = array_op.attributes.get("phs.readwrite_count")
+        if isinstance(rw_attr, builtin.IntegerAttr):
+            num_rw = rw_attr.value.data
+        else:
+            num_rw = 0
+        total_yields = len(yield_op.operands)
+        num_mask = total_yields - num_out - num_rw
         for i, opnd in enumerate(yield_op.operands):
-            port_name = f"out_{i}" if i < num_out else f"mask_{i - num_out}"
+            if i < num_out:
+                port_name = f"out_{i}"
+            elif i < num_out + num_mask:
+                port_name = f"mask_{i - num_out}"
+            else:
+                port_name = f"carry_used_{i - num_out - num_mask}"
             ports.append(
                 hw.ModulePort(
                     builtin.StringAttr(port_name),
@@ -162,6 +175,18 @@ def _get_switch_port_types(module: builtin.ModuleOp, pe_ref: str) -> list[TypeAt
         if port.dir.data == hw.Direction.INPUT and "switch" in port.port_name.data:
             switch_types.append(port.type)
     return switch_types
+
+
+def _get_readwrite_count(module: builtin.ModuleOp, pe_ref: str) -> int:
+    """Count readWrite pairs on the referenced PE via its ``phs.paired_outputs``
+    attribute (set by the encode pass, adjusted by prune-unused-carries)."""
+    pe_op = SymbolTable.lookup_symbol(module, pe_ref)
+    if pe_op is None:
+        return 0
+    attr = pe_op.attributes.get("phs.paired_outputs")
+    if attr is None or not isinstance(attr, builtin.DenseArrayBase):
+        return 0
+    return len(list(attr.get_values()))
 
 
 def _convert_pe_instance(instance: phs.PEInstanceOp, rewriter: PatternRewriter, module: builtin.ModuleOp):

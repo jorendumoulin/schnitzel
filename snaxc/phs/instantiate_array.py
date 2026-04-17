@@ -23,7 +23,7 @@ import itertools
 from dataclasses import dataclass
 
 from xdsl.dialects import arith, builtin, hw
-from xdsl.ir import Attribute, Block, Region, SSAValue
+from xdsl.ir import Attribute, Block, BlockArgument, Region, SSAValue
 from xdsl.ir.affine import AffineMap
 from xdsl.utils.hints import isa
 
@@ -169,6 +169,12 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
             continue  # already counted as the readWrite partner of some input
         out_types.append(builtin.IntegerType(_mask_width_for_size(output_sizes[j])))
 
+    # One `carry_used_K` i1 output per readWrite pair. Scala uses these to
+    # gate `writeData.valid` at runtime so merged PEs whose carry is used in
+    # some modes but not others don't deadlock in the "no carry needed" modes.
+    for _ in streamer_pairs:
+        out_types.append(builtin.IntegerType(1))
+
     return ArrayLayout(
         in_types=tuple(in_types),
         out_types=tuple(out_types),
@@ -290,6 +296,127 @@ def materialize(
 
 
 # =====================================================================
+# Dynamic carry-used expression
+# =====================================================================
+#
+# For each readWrite streamer, the Scala accelerator wants to know at runtime
+# whether the BlackBox's output actually depends on that streamer's carry-input
+# this cycle. It's a boolean function of the PE's switches. We build it by
+# walking the PE body backwards from the yielded value for the paired output,
+# tracking "does this value depend on the carry block-arg under the current
+# switch values?" and materializing the resulting i1 expression in the array
+# body using array-level switches.
+
+
+def _compute_carry_used_expr(
+    val: SSAValue,
+    carry_arg: BlockArgument,
+    pe_sw_to_array_sw: dict[SSAValue, SSAValue],
+    array_block: Block,
+    subst: dict[SSAValue, SSAValue],
+    cache: dict[SSAValue, SSAValue],
+) -> SSAValue:
+    """Build an i1 SSA value (inserted into ``array_block``) that evaluates true
+    when ``val`` (a PE-body value) transitively depends on ``carry_arg`` (a PE
+    block arg) given the current runtime switch values."""
+
+    # Apply block-arg substitution (used when recursing into a choose case:
+    # the case's block args map positionally to the ChooseOp's data_operands).
+    if val in subst:
+        val = subst[val]
+
+    if val in cache:
+        return cache[val]
+
+    def _const_i1(v: int) -> SSAValue:
+        op = arith.ConstantOp.from_int_and_width(v, 1)
+        array_block.add_op(op)
+        return op.result
+
+    def _or(vals: list[SSAValue]) -> SSAValue:
+        if not vals:
+            return _const_i1(0)
+        acc = vals[0]
+        for v2 in vals[1:]:
+            op = arith.OrIOp(acc, v2)
+            array_block.add_op(op)
+            acc = op.result
+        return acc
+
+    def _and(a: SSAValue, b: SSAValue) -> SSAValue:
+        op = arith.AndIOp(a, b)
+        array_block.add_op(op)
+        return op.result
+
+    def _not(a: SSAValue) -> SSAValue:
+        one = _const_i1(1)
+        op = arith.XOrIOp(a, one)
+        array_block.add_op(op)
+        return op.result
+
+    def _switch_as_i1(pe_switch: SSAValue) -> SSAValue:
+        """Produce an i1 that is 1 when the switch evaluates to 1 (i.e. the
+        mux selects its RHS). For now we only support 1-bit switches (muxes);
+        wider switches driving multi-case phs.choose would need per-case
+        comparisons and aren't reachable via this helper yet.
+
+        At PEArrayOp-build time the switch block arg is IndexType. After
+        convert-pe-to-hw it becomes IntegerType(bitwidth) with an
+        UnrealizedConversionCastOp back to IndexType for existing uses. We
+        emit the inverse cast here (IndexType → IntegerType(1)); the chain
+        IntegerType(1) → IndexType → IntegerType(1) collapses via
+        reconcile_unrealized_casts so nothing survives the lowering.
+        """
+        arr_sw = pe_sw_to_array_sw[pe_switch]
+        cast_op, cast_res = builtin.UnrealizedConversionCastOp.cast_one(arr_sw, builtin.IntegerType(1))
+        array_block.add_op(cast_op)
+        return cast_res
+
+    if isinstance(val, BlockArgument):
+        result = _const_i1(1 if val is carry_arg else 0)
+    else:
+        owner = val.owner
+        if isinstance(owner, phs.MuxOp):
+            lhs_uses = _compute_carry_used_expr(owner.lhs, carry_arg, pe_sw_to_array_sw, array_block, subst, cache)
+            rhs_uses = _compute_carry_used_expr(owner.rhs, carry_arg, pe_sw_to_array_sw, array_block, subst, cache)
+            sw = _switch_as_i1(owner.switch)
+            not_sw = _not(sw)
+            result = _or([_and(not_sw, lhs_uses), _and(sw, rhs_uses)])
+        elif isinstance(owner, phs.ChooseOp):
+            choose_op = owner
+            regions = list(choose_op.regions)
+            if len(regions) == 1:
+                # Single-case choose: the result is the case's yielded value.
+                case = regions[0].block
+                case_yield = case.ops.last
+                assert isinstance(case_yield, phs.YieldOp)
+                # Map the case's block args to the choose's data_operands so
+                # recursion produces expressions in terms of values already
+                # accessible from the PE body.
+                new_subst = dict(subst)
+                for k, barg in enumerate(case.args):
+                    new_subst[barg] = choose_op.data_operands[k]
+                result = _compute_carry_used_expr(
+                    case_yield.operands[0], carry_arg, pe_sw_to_array_sw, array_block, new_subst, cache
+                )
+            else:
+                raise NotImplementedError(
+                    "Multi-case phs.choose isn't supported yet for carry-used expression; "
+                    "need to disjoin across cases gated by the choose switch."
+                )
+        else:
+            # Generic op — result depends on the OR of its operands' carry-usage.
+            operand_exprs = [
+                _compute_carry_used_expr(o, carry_arg, pe_sw_to_array_sw, array_block, subst, cache)
+                for o in owner.operands
+            ]
+            result = _or(operand_exprs)
+
+    cache[val] = result
+    return result
+
+
+# =====================================================================
 # Top-level: build a PEArrayOp from a PE + spec using the three phases
 # =====================================================================
 
@@ -365,11 +492,37 @@ def build_pe_array_body(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
         block.add_op(const)
         yield_operands.append(const.result)
 
+    # Build per-pair dynamic carry_used i1 signals. For each pair (input i,
+    # output j) we trace the PE body from the yielded value for output j and
+    # ask "does this value depend on the carry block-arg at PE-input position
+    # i under the current switch values?" The resulting i1 expression uses
+    # array-level switches (mapped from PE switches via `pe_sw_to_array_sw`).
+    num_data = len(pe.data_operands())
+    pe_switches = pe.get_switches()
+    pe_sw_to_array_sw: dict[SSAValue, SSAValue] = {
+        pe_sw: block.args[num_data + idx] for idx, pe_sw in enumerate(pe_switches)
+    }
+    pe_yield = pe.get_terminator()
+    cache: dict[SSAValue, SSAValue] = {}
+    for in_idx, out_idx in sorted(layout.streamer_pairs.items()):
+        carry_arg = pe.body.block.args[in_idx]
+        assert isinstance(carry_arg, BlockArgument)
+        yielded_val = pe_yield.operands[out_idx]
+        carry_used_val = _compute_carry_used_expr(
+            yielded_val, carry_arg, pe_sw_to_array_sw, block, subst={}, cache=cache
+        )
+        yield_operands.append(carry_used_val)
+
     block.add_op(phs.YieldOp(*yield_operands))
 
     function_type = builtin.FunctionType.from_lists(layout.in_types, layout.out_types)
-    return phs.PEArrayOp(
+    array_op = phs.PEArrayOp(
         name=f"{pe.name_prop.data}_array",
         function_type=function_type,
         region=Region(block),
     )
+    # Record the number of readWrite pairs so downstream (convert-pe-array-to-hw)
+    # can name the trailing carry_used yields correctly without re-walking the
+    # referenced PE.
+    array_op.attributes["phs.readwrite_count"] = builtin.IntegerAttr(len(layout.streamer_pairs), 64)
+    return array_op
