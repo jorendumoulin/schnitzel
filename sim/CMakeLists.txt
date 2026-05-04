@@ -50,7 +50,7 @@ verilate(sim
     SOURCES ${RTL_SOURCES}
     TOP_MODULE TopWrapper
     PREFIX VTopWrapper
-    TRACE_VCD
+    TRACE
     THREADS ${CMAKE_HOST_SYSTEM_PROCESSOR_COUNT}
     OPT_FAST "${SIM_OPT_FAST}"
     OPT_SLOW "-O0"

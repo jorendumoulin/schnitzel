@@ -26,7 +26,6 @@ target_include_directories(device_runtime PRIVATE
 target_link_options(device_runtime INTERFACE
     # Supply a custom startup and linker script:
     -T${CMAKE_CURRENT_SOURCE_DIR}/link.ld
-    -nostartfiles
     -nostdlib
     -fuse-ld=lld
 )
