@@ -27,11 +27,8 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   io.axi.aw.bits.user := 0.U;
   io.axi.aw.valid := io.bus.req.valid && io.bus.req.bits.wen;
 
-  // val wIndex = Reg(UInt(log2Ceil(axiConfig.dataWidth / dataWidth).W))
-  // when(io.axi.aw.fire) {
-  //  wIndex := io.bus.req.bits.addr(5, 2)
-  // }
-  val wIndex = io.bus.req.bits.addr(5, 2)
+  val wIndex = Wire(UInt(log2Ceil(axiConfig.dataWidth / dataWidth).W))
+  wIndex := io.bus.req.bits.addr(5, 2)
 
   // Data queue:& ~((axiConfig.dataWidth / 8 - 1).U);
   class DataQueue extends Bundle {
