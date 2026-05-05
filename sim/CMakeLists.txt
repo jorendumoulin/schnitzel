@@ -15,14 +15,15 @@ find_package(elfio REQUIRED)
 find_package(argparse REQUIRED)
 find_package(verilator REQUIRED)
 
-add_executable(sim
-    src/main.cpp
-    src/sim.cpp
-    src/dpi_memory.cpp
-    src/dpi_host.cpp
-    src/loader.cpp
-    src/dynamic_memory.cpp
+add_library(sim SHARED
+  src/main.cpp
+  src/sim.cpp
+  src/dpi_memory.cpp
+  src/dpi_host.cpp
+  src/loader.cpp
+  src/dynamic_memory.cpp
 )
+
 target_include_directories(sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(sim PRIVATE argparse::argparse elfio::elfio)
 
@@ -62,3 +63,16 @@ verilate(sim
         -I${GENERATED_DIR}/
         -I${RTL_DIR}/
 )
+
+
+# C simulator
+add_executable(csim src/main.cpp)
+target_link_libraries(csim PRIVATE sim argparse::argparse)
+target_include_directories(csim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set_target_properties(csim  PROPERTIES OUTPUT_NAME sim)
+
+# Python lib
+find_package(pybind11 REQUIRED)
+pybind11_add_module(my_module src/python_bindings.cpp)
+target_link_libraries(my_module PRIVATE sim)
+target_include_directories(my_module PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

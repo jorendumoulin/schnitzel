@@ -2,9 +2,11 @@
 #define __DPI_MEMORY_H
 
 #include "dynamic_memory.h"
+#include "loader.h"
 #include <cstdint>
 
 extern DynamicMemory g_dpi_memory;
+extern Loader g_loader;
 
 #ifdef __cplusplus
 extern "C" {

@@ -7,7 +7,7 @@
 #include <sys/types.h>
 
 DynamicMemory g_dpi_memory(4096);
-static Loader g_loader;
+Loader g_loader;
 static uint32_t g_tohost_addr = 0;
 static uint32_t g_fromhost_addr = 0;
 static bool g_exit_requested = false;

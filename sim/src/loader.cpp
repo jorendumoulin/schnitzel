@@ -64,7 +64,7 @@ void Loader::load_program(std::string program, DynamicMemory &memory) {
         // Read symbol properties
         symbols.get_symbol(j, name, value, size, bind, type, section_index,
                            other);
-
+        symbols_map[name] = value;
         if (name == "_start") {
           entry_point = value;
         } else if (name == "tohost") {

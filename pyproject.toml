@@ -68,4 +68,4 @@ reportMissingModuleSource = false
 enableTypeIgnoreComments = false
 enableExperimentalFeatures = true
 typeCheckingMode = "strict"
-include = ["snaxc", "tests"]
+include = ["snaxc", "tests", "sim"]

@@ -18,6 +18,7 @@ public:
   void enable_trace(const char *filename);
   void set_verbose(bool v) { verbose = v; }
   void set_max_cycles(uint64_t cycles) { max_cycles = cycles; }
+  uint64_t get_cycle_count() const { return cycle_count; }
 
 protected:
   void reset();
