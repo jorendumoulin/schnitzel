@@ -1,3 +1,4 @@
+include(CMakePackageConfigHelpers)
 
 add_library(device_runtime STATIC
   # start files
@@ -31,3 +32,38 @@ target_link_options(device_runtime INTERFACE
 )
 
 add_subdirectory(dma)
+
+# Install the runtime to link with external cmake projects:
+
+install(TARGETS device_runtime
+        EXPORT RuntimeTargets
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+        INCLUDES DESTINATION include)
+
+install(
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+    DESTINATION include
+)
+
+install(
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../common/mlir/
+    DESTINATION include
+)
+
+install(EXPORT RuntimeTargets
+        FILE RuntimeTargets.cmake
+        NAMESPACE Runtime::
+        DESTINATION lib/cmake/Runtime)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/RuntimeConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/RuntimeConfig.cmake
+    INSTALL_DESTINATION lib/cmake/Runtime
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/RuntimeConfig.cmake
+    DESTINATION lib/cmake/Runtime
+)
