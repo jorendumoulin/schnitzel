@@ -12,7 +12,7 @@ endif()
 
 project(device ASM C CXX)
 
-include(${CMAKE_SOURCE_DIR}/../cmake/mlir_source.cmake)
+include(${ROOT}/cmake/mlir_source.cmake)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common/mlir)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime)
