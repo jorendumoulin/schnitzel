@@ -14,12 +14,16 @@ sealed trait Accelerator {}
 case class AluConfig(`type`: String, width: Int) extends Accelerator
 object AluConfig { implicit val rw: RW[AluConfig] = macroRW }
 
+case class TensorCoreConfig(`type`: String, width: Int) extends Accelerator
+object TensorCoreConfig { implicit val rw: RW[TensorCoreConfig] = macroRW }
+
 case class DmaConfig(`type`: String) extends Accelerator
 object DmaConfig { implicit val rw: RW[DmaConfig] = macroRW }
 
 object Accelerator {
   implicit val rw: RW[Accelerator] = RW.merge(
     macroRW[AluConfig],
+    macroRW[TensorCoreConfig],
     macroRW[DmaConfig]
   )
 }
