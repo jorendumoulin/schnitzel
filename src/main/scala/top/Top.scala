@@ -5,7 +5,7 @@ import chisel3._
 import core.Core
 import core.{DecoupledBusIO, CoreConfig}
 import axi.{AXIBundle, AXIConfig, AXIDemux}
-import cluster.Cluster
+import cluster.TensorCluster
 import core.CVA6
 import axi.AxiToMem
 import config.{SystemConfig, MemoryConfig}
@@ -17,7 +17,7 @@ class Top extends Module {
     val narrow_mem = new DecoupledBusIO(addrWidth = 32, dataWidth = 64)
   })
 
-  val cluster = Module(new Cluster())
+  val cluster = Module(new TensorCluster())
   val toMem = Module(new AxiToMem(addrWidth = 32, dataWidth = 512, axiConfig = AXIConfig(dataWidth = 512, idWidth = 6)))
   toMem.io.axi <> cluster.io.axi
   io.mem <> toMem.io.mem
