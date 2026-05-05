@@ -10,26 +10,10 @@ _start:
   la gp, __global_pointer
   .option pop
 
-  /* 2. Copy data from flash to ram */
-  la a0, __data_start
-  la a1, __data_source
-  la a2, __data_size
-  beqz a2, 1f                    # Skip if size is 0
-  call memcpy
-1:
-
   /* 4. Enable FPU */
   li t0, 0x00006000
   csrs mstatus, t0
   fscsr x0
-
-  /* 5. Clear bss */
-  la a0, __bss_start
-  li a1, 0                       # Value (0) goes in a1
-  la a2, __bss_size              # Size goes in a2
-  beqz a2, 2f                    # Skip if size is 0
-  call memset
-2:
 
   /* 6. C/C++ inits */
   la   a0, __libc_fini_array

@@ -28,16 +28,11 @@ void Loader::load_program(std::string program, DynamicMemory &memory) {
     const char *data = seg->get_data();
 
     // 1. Load the actual data into the LOAD address (LMA)
-    // This populates the "Flash" so Picolibc's memcpy has a source.
     if (fsize > 0) {
-      memory.write_chunk(laddr, fsize, data);
-      // printf("  Segment %d: Loaded 0x%lx bytes to LMA 0x%lx (VMA 0x%lx)\n",
-      // i, fsize, laddr, vaddr);
+      memory.write_chunk(vaddr, fsize, data);
     }
 
-    // 2. Zero-fill the BSS at the VIRTUAL address
-    // We keep this because in simulation, we want RAM ready immediately.
-    // In FPGA, the crt0.s will do this again, which is safe.
+    // 2. Zero-fill the BSS
     if (msize > fsize) {
       uint64_t bss_start = vaddr + fsize;
       uint64_t bss_size = msize - fsize;
