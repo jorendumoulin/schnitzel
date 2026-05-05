@@ -38,17 +38,9 @@ SECTIONS
         __fini_array_end = .;
     } > RAM
 
-    /* Flash copy of .data */
-    .data_load : {
-        __data_source = .;
-        KEEP(*(.data*))   /* initial values stored in flash */
-    } > RAM
-
-    .data : AT(__data_source) {
-        __data_start = .;
+    .data :  {
         *(.data*)
     } > RAM
-    __data_size = SIZEOF(.data);
 
     .sdata : {
         __global_pointer = . + 0x800;

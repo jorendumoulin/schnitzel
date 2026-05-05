@@ -30,7 +30,7 @@ void Loader::load_program(std::string program, DynamicMemory &memory) {
     // 1. Load the actual data into the LOAD address (LMA)
     // This populates the "Flash" so Picolibc's memcpy has a source.
     if (fsize > 0) {
-      memory.write_chunk(laddr, fsize, data);
+      memory.write_chunk(vaddr, fsize, data);
       // printf("  Segment %d: Loaded 0x%lx bytes to LMA 0x%lx (VMA 0x%lx)\n",
       // i, fsize, laddr, vaddr);
     }
