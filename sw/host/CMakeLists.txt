@@ -6,7 +6,7 @@ set(ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../")
 
 if(NOT CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE
-    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/cva6-toolchain.cmake"
+    "${ROOT}/cmake/cva6-toolchain.cmake"
     CACHE FILEPATH "Toolchain file")
 endif()
 
