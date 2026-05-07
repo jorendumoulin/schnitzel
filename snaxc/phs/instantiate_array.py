@@ -110,13 +110,21 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     yield_op = pe.get_terminator()
     pe_result_types = list(yield_op.operand_types)
 
-    chained_inputs = tuple(i for i, m in enumerate(spec.input_maps) if _is_scalar_map(m, bounds))
     reduced_outputs = tuple(j for j, m in enumerate(spec.output_maps) if m.eval(bounds, ()) != bounds)
     parallel_outputs = tuple(j for j in range(len(pe_result_types)) if j not in reduced_outputs)
 
-    # Spatial chain pairs: for spatial-chain input wiring (scalar carry init feeding a
-    # chain of PE outputs). Drives FromScalarBlockArg / FromPEOutput materialization.
-    input_to_output_chain: dict[int, int] = dict(zip(chained_inputs, reduced_outputs, strict=False))
+    # Spatial chain pairs. A paired carry whose paired output is reduced (the
+    # output map drops at least one bounds dim) becomes a spatial chain along
+    # the dropped dim(s). Each PE in the same output-group reads its carry
+    # from the previous PE in iteration order; the first PE in the group
+    # reads the carry init from the block arg. This subsumes the fully-reduced
+    # case (output map → ()) where the chain init is a scalar; for partial
+    # reduction (output map keeps some bounds dims) the carry init is an
+    # array indexed by the group's output position.
+    input_to_output_chain: dict[int, int] = {
+        in_idx: out_idx for in_idx, out_idx in spec.readwrite_pairs.items() if out_idx in reduced_outputs
+    }
+    chained_inputs = tuple(sorted(input_to_output_chain))
     # Streamer-level pairs: union with positional readWrite pairs from the spec
     # (encode-pass convention). Drives streamer/mask accounting only — temporal
     # readWrite inputs are still wired as parallel array reads, not chains.
@@ -129,8 +137,12 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     for i, data_opnd in enumerate(data_operands):
         assert isa(data_opnd.type, builtin.AnySignlessIntegerType)
         if i in input_to_output_chain:
+            # Carry init port: shape follows the carry input's own access map
+            # (= the paired output's map). For a fully-reduced chain this is
+            # the scalar element type; for partial reduction it is an
+            # hw.array of the output's shape.
             chained_arg_idx[i] = len(in_types)
-            in_types.append(data_opnd.type)
+            in_types.append(create_shaped_hw_array_type(data_opnd.type, input_sizes[i]))
         else:
             parallel_arg_idx[i] = len(in_types)
             in_types.append(create_shaped_hw_array_type(data_opnd.type, input_sizes[i]))
@@ -232,10 +244,17 @@ def resolve_input_wiring(
     """
     if input_index in layout.input_to_output_chain:
         paired_out = layout.input_to_output_chain[input_index]
-        prev = _previous_in_chain(iteration, spec.output_maps[paired_out], all_iters)
+        output_map = spec.output_maps[paired_out]
+        prev = _previous_in_chain(iteration, output_map, all_iters)
         if prev is None:
-            # First PE in the chain group → initial value from scalar block arg.
-            return FromScalarBlockArg(arg_index=layout.chained_arg_idx[input_index])
+            # First PE in the chain group → read the carry init from the
+            # block arg. For a fully-reduced output the block arg is a
+            # scalar; for partial reduction it is an array indexed by this
+            # group's position in output space.
+            group_pos = output_map.eval(iteration, ())
+            if group_pos == ():
+                return FromScalarBlockArg(arg_index=layout.chained_arg_idx[input_index])
+            return FromArrayBlockArg(arg_index=layout.chained_arg_idx[input_index], indices=group_pos)
         return FromPEOutput(iteration=prev, output_index=paired_out)
     else:
         # Parallel input: read from the array block arg using the input map.
@@ -385,25 +404,42 @@ def _compute_carry_used_expr(
         elif isinstance(owner, phs.ChooseOp):
             choose_op = owner
             regions = list(choose_op.regions)
-            if len(regions) == 1:
-                # Single-case choose: the result is the case's yielded value.
-                case = regions[0].block
+            # For each case, recurse with block-arg substitution so the case's
+            # body uses are expressed in terms of the ChooseOp's data_operands
+            # (accessible in the enclosing scope).
+            case_uses: list[SSAValue] = []
+            for case_region in regions:
+                case = case_region.block
                 case_yield = case.ops.last
                 assert isinstance(case_yield, phs.YieldOp)
-                # Map the case's block args to the choose's data_operands so
-                # recursion produces expressions in terms of values already
-                # accessible from the PE body.
                 new_subst = dict(subst)
                 for k, barg in enumerate(case.args):
                     new_subst[barg] = choose_op.data_operands[k]
-                result = _compute_carry_used_expr(
-                    case_yield.operands[0], carry_arg, pe_sw_to_array_sw, array_block, new_subst, cache
+                case_uses.append(
+                    _compute_carry_used_expr(
+                        case_yield.operands[0], carry_arg, pe_sw_to_array_sw, array_block, new_subst, cache
+                    )
                 )
+            if len(case_uses) == 1:
+                # Single-case choose: result = the one case's expression; no
+                # switch gating needed (and the switch may even be dead).
+                result = case_uses[0]
             else:
-                raise NotImplementedError(
-                    "Multi-case phs.choose isn't supported yet for carry-used expression; "
-                    "need to disjoin across cases gated by the choose switch."
-                )
+                # Multi-case: carry_used(choose.res) =
+                #   OR_i  (switch == i) AND case_uses[i]
+                # We only support switches that the _switch_as_i1 helper can
+                # project to an i1 (i.e. 1-bit mux-style switches). For a
+                # 2-case ChooseOp with a 1-bit switch, case 0 selects when
+                # the switch is 0, case 1 when it's 1. Map each case-index
+                # directly to a switch-value test.
+                if len(case_uses) > 2:
+                    raise NotImplementedError(
+                        f"phs.choose with {len(case_uses)} cases — need log2-bit comparisons "
+                        "for carry-used expression; only 1-bit switches supported today."
+                    )
+                sw = _switch_as_i1(choose_op.switch)
+                not_sw = _not(sw)
+                result = _or([_and(not_sw, case_uses[0]), _and(sw, case_uses[1])])
         else:
             # Generic op — result depends on the OR of its operands' carry-usage.
             operand_exprs = [
@@ -468,27 +504,70 @@ def build_pe_array_body(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
 
     # Append per-spatial-dim enable masks, one per logical streamer. Ordering
     # matches compute_layout: PE inputs first (read or readWrite), then
-    # outputs that aren't paired with an input. For a fresh array all dims are
-    # active so masks are all-ones constants. Uses streamer_pairs (= union of
-    # spatial chains and positional readWrite pairs).
+    # outputs that aren't paired with an input. Each mask bit d is set iff
+    # SOME mode's access map for this streamer references dim d — i.e., the
+    # OR across modes of "uses dim d." Modes that don't use a streamer (dead
+    # slot after widening) contribute nothing. A streamer scalar in every
+    # mode collapses to mask=0 (only lane 0 fires); a streamer vectorised in
+    # any mode gets the corresponding bits set. This is a safe superset:
+    # modes that want fewer lanes still get correct data (stride=0 replicates
+    # the scalar to unused lanes at the stream-config level).
     input_sizes = spec.get_input_sizes()
     streamer_mask_sizes: list[tuple[int, ...]] = []
+    streamer_mask_maps: list[tuple[AffineMap | None, ...]] = []
+
+    def _output_maps_for(j: int) -> tuple[AffineMap | None, ...]:
+        return tuple(mode_maps[j] if j < len(mode_maps) else None for mode_maps in spec.per_mode_output_maps)
+
+    def _input_maps_for(i: int) -> tuple[AffineMap | None, ...]:
+        return tuple(mode_maps[i] if i < len(mode_maps) else None for mode_maps in spec.per_mode_input_maps)
+
     for i in range(len(pe.data_operands())):
         if i in layout.streamer_pairs:
             paired_j = layout.streamer_pairs[i]
             streamer_mask_sizes.append(output_sizes[paired_j])
+            # readWrite streamer: its spatial access is the paired output's map.
+            streamer_mask_maps.append(_output_maps_for(paired_j))
         else:
             streamer_mask_sizes.append(input_sizes[i])
+            streamer_mask_maps.append(_input_maps_for(i))
     paired_output_set = set(layout.streamer_pairs.values())
     for j in range(len(pe_result_types)):
         if j in paired_output_set:
             continue
         streamer_mask_sizes.append(output_sizes[j])
+        streamer_mask_maps.append(_output_maps_for(j))
 
-    for size in streamer_mask_sizes:
+    num_dims = len(spec.template_bounds)
+    for size, mode_maps in zip(streamer_mask_sizes, streamer_mask_maps, strict=True):
         width = _mask_width_for_size(size)
-        all_ones = (1 << width) - 1
-        const = arith.ConstantOp.from_int_and_width(all_ones, width)
+        # Union across modes of which of *this streamer's own* spatial dims are
+        # active. Bit r corresponds to the r-th result of the affine map (=
+        # the r-th spatial dim of the streamer's data), NOT to iteration-space
+        # dim r. A streamer-dim is "active" in a mode if its corresponding
+        # result expression depends on at least one iteration dim (a constant
+        # result means the streamer never advances along that dim → scalar).
+        # If a mode's map has a different dim count from the template bounds,
+        # its dim-numbering doesn't correspond to PE-array dims and the dart
+        # scheduler handles the tile split elsewhere — treat as "all active"
+        # (conservative). A mode that's dead (None) contributes nothing.
+        used_bits = 0
+        for m in mode_maps:
+            if m is None:
+                continue
+            if m.num_dims != num_dims:
+                used_bits |= (1 << width) - 1
+                continue
+            for r_idx, result in enumerate(m.results):
+                if r_idx >= width:
+                    break
+                if result.used_dims():
+                    used_bits |= 1 << r_idx
+        # Scalar streamers have width=1 by convention (Integer port must be
+        # >=1 bit); a scalar-in-every-mode streamer ends up with used_bits=0
+        # and we emit the scalar-collapse mask.
+        mask_val = used_bits & ((1 << width) - 1)
+        const = arith.ConstantOp.from_int_and_width(mask_val, width)
         block.add_op(const)
         yield_operands.append(const.result)
 
