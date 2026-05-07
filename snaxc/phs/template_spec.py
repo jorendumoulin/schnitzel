@@ -10,28 +10,59 @@ from snaxc.dialects import phs
 from snaxc.ir.dart.access_pattern import Template, TemplatePattern
 
 
-def _union_map_at_position(maps_at_position: list[AffineMap], num_dims: int) -> AffineMap | None:
-    """Build a union AffineMap over ``num_dims`` whose results are the
-    distinct dim positions referenced by any mode's map at this operand
-    position, sorted by dim index. Used to decide port shape and per-PE
-    wiring when multiple modes share the same accelerator: the wider mode
-    dictates the port shape, narrower modes broadcast their unused dims at
-    runtime via the per-mode streamer mask.
-
-    Returns ``None`` if any mode's result expression is not a pure
-    ``AffineDimExpr`` (we don't try to union complex expressions today).
+def _used_dims_per_mode(maps_at_position: list[AffineMap], num_dims: int) -> list[set[int]] | None:
+    """Per-mode set of bounds-dim positions referenced by the result
+    expressions of each mode's map at this operand position. Returns ``None``
+    on any non-``AffineDimExpr`` result (caller should fall back to canonical).
+    Modes with mismatched ``num_dims`` are skipped (dart handles tiling).
     """
-    used_dims: set[int] = set()
+    out: list[set[int]] = []
     for m in maps_at_position:
         if m.num_dims != num_dims:
-            continue  # mode's map doesn't match template bounds — dart handles tiling
+            continue
+        used: set[int] = set()
         for result in m.results:
             if isinstance(result, AffineDimExpr):
-                used_dims.add(result.position)
+                used.add(result.position)
             else:
                 return None
-    sorted_dims = sorted(used_dims)
-    return AffineMap(num_dims, 0, tuple(AffineDimExpr(d) for d in sorted_dims))
+        out.append(used)
+    return out
+
+
+def _map_from_dims(dims: list[int], num_dims: int) -> AffineMap:
+    return AffineMap(num_dims, 0, tuple(AffineDimExpr(d) for d in dims))
+
+
+def _union_map_at_position(maps_at_position: list[AffineMap], num_dims: int) -> AffineMap | None:
+    """Build a union AffineMap whose results are the distinct dim positions
+    referenced by any mode's map at this operand position, sorted by dim
+    index. Used to decide port shape and per-PE wiring when multiple modes
+    share the same accelerator: the wider mode dictates the port shape,
+    narrower modes broadcast their unused dims at runtime via streamer
+    config (stride 0 + mask). Returns ``None`` on any complex result expr.
+    """
+    per_mode = _used_dims_per_mode(maps_at_position, num_dims)
+    if per_mode is None:
+        return None
+    union = set().union(*per_mode) if per_mode else set()
+    return _map_from_dims(sorted(union), num_dims)
+
+
+def _intersection_map_at_position(maps_at_position: list[AffineMap], num_dims: int) -> AffineMap | None:
+    """Build an intersection AffineMap whose results are the dim positions
+    referenced by EVERY mode's map at this operand position, sorted. Used to
+    define spatial-chain *groups* for outputs where some mode reduces but
+    another mode is wider: the chain runs along dims missing from the
+    intersection (= dims SOME mode reduces). PEs sharing an intersection
+    output position form a chain group. Returns ``None`` on any complex
+    result expr.
+    """
+    per_mode = _used_dims_per_mode(maps_at_position, num_dims)
+    if per_mode is None:
+        return None
+    common = set.intersection(*per_mode) if per_mode else set(range(num_dims))
+    return _map_from_dims(sorted(common), num_dims)
 
 
 PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
@@ -65,6 +96,17 @@ class TemplateSpec:
     # treats dead slots as "no dim accessed" in that mode.
     per_mode_input_maps: tuple[tuple[AffineMap, ...], ...]
     per_mode_output_maps: tuple[tuple[AffineMap, ...], ...]
+    # Per-output INTERSECTION map across modes — its results are the dims
+    # used by EVERY mode's output map (= dims that are NOT reduced by any
+    # mode). Used to define chain groups: PEs whose iteration evaluates to
+    # the same intersection-map position belong to the same spatial chain.
+    # When all modes agree on the output map, this equals ``output_maps``.
+    # When modes disagree (e.g., matmul reduces K, 3D-elementwise doesn't),
+    # this is narrower than ``output_maps`` (which is the union) — the
+    # chain still runs along dims dropped by the intersection so matmul mode
+    # gets its reduction; modes that don't reduce bypass the chain via the
+    # merged PE body's mux at runtime.
+    chain_output_maps: tuple[AffineMap, ...]
 
     def __init__(
         self,
@@ -74,6 +116,7 @@ class TemplateSpec:
         paired_outputs: tuple[int, ...] | None = None,
         per_mode_input_maps: tuple[tuple[AffineMap, ...], ...] | None = None,
         per_mode_output_maps: tuple[tuple[AffineMap, ...], ...] | None = None,
+        chain_output_maps: tuple[AffineMap, ...] | None = None,
     ):
         self.input_maps = input_maps
         self.output_maps = output_maps
@@ -82,9 +125,14 @@ class TemplateSpec:
         # Default per-mode lists: one mode matching the canonical flat view.
         self.per_mode_input_maps = (input_maps,) if per_mode_input_maps is None else per_mode_input_maps
         self.per_mode_output_maps = (output_maps,) if per_mode_output_maps is None else per_mode_output_maps
+        # Default chain_output_maps to output_maps (single-mode case where
+        # union == intersection); callers building from per-mode info pass
+        # the intersection explicitly.
+        self.chain_output_maps = output_maps if chain_output_maps is None else chain_output_maps
         assert len(self.per_mode_input_maps) == len(self.per_mode_output_maps), (
             "per_mode_input_maps and per_mode_output_maps must have the same number of modes"
         )
+        assert len(self.chain_output_maps) == len(self.output_maps), "chain_output_maps must have one entry per output"
         assert len(self.input_maps) > 0, "Expect input_maps to be non-empty"
         assert len(self.output_maps) > 0, "Expect output_maps to be non-empty"
         assert all(0 <= k < len(output_maps) for k in self.paired_outputs), (
@@ -213,33 +261,38 @@ class TemplateSpec:
             per_mode_maps = tuple(modes)
 
         # Build the canonical flat ``input_maps`` / ``output_maps`` view used
-        # for port shape and per-PE wiring.
+        # for port shape and per-PE wiring. Per operand we take the *union*
+        # across modes of the dim positions any mode's map result expression
+        # references — i.e., the wider-mode shape wins. Narrower modes
+        # broadcast their unused dims at runtime via streamer stride
+        # configuration (set per-mode by software).
         #
-        # PURE inputs: per operand position we take the *union* across modes
-        # of the dim positions any mode's map result expression references —
-        # i.e., the wider-mode shape wins. Narrower modes broadcast their
-        # unused dims at runtime via the per-mode streamer mask emitted by
-        # ``build_pe_array_body``. This lets a matmul mode with broadcast
-        # inputs share an accelerator with a wider elementwise mode that uses
-        # all dims, without needing per-mode block-arg adapters.
+        # This applies to PURE inputs, CARRY inputs, and OUTPUTS. Carry
+        # widening is required when an output is widened, because the carry
+        # input shares its streamer with the paired output (encode-pass
+        # convention) and their port types must match.
         #
-        # CARRY inputs and OUTPUTS: we DON'T union — they're tied to the
-        # output's reduction structure. Unioning the output would erase
-        # reduction info (matmul's (d0,d1,d2)->(d0,d1) unioned with a 3D
-        # identity becomes identity, losing the K-chain), and unioning the
-        # carry would put it out of sync with the output port shape and break
-        # chain init wiring. Instead we pick the first eligible mode's
-        # carry/output maps as canonical. Modes that disagree on
-        # carry/output shape are out of scope for this merge path and need a
-        # more invasive design (per-mode output assembly).
+        # Reduction structure (which drives chain wiring) is determined
+        # elsewhere by inspecting per-mode output maps directly — unioning
+        # the output map can erase the "some mode reduces this dim" signal
+        # (matmul's (d0,d1,d2)->(d0,d1) unioned with a 3D identity becomes
+        # identity), so ``compute_layout`` reads ``per_mode_output_maps`` to
+        # decide which outputs get a spatial chain. The HW chain is wired
+        # whenever ANY mode wants reduction; modes that don't bypass it via
+        # the merged PE body's mux. The IR output assembly with a union
+        # (= identity, when a mode is widest) becomes pure-parallel — every
+        # PE drives its own widened position. In matmul mode the writeback
+        # streamer is configured with stride 0 + last-write-wins on the
+        # reduced dim, so the chain-end PE's value sticks in memory; modes
+        # with full output use full strides.
         #
         # Only modes whose map ``num_dims`` matches ``num_dims`` contribute;
         # modes with mismatched dim counts are split off to temporal loops by
         # the dart scheduler and don't constrain the in-cycle shape. The
         # union helper requires result expressions to be pure
-        # ``AffineDimExpr`` — if any mode uses a complex expression we fall
-        # back to picking a single same-num_dims mode as canonical (prior
-        # behaviour) and finally to identity maps.
+        # ``AffineDimExpr`` — if any operand has a complex expression we fall
+        # back to canonical for that slot, and to identity maps for all
+        # operands when no mode is eligible at all.
         eligible_modes = [
             mode
             for mode in per_mode_maps
@@ -249,21 +302,28 @@ class TemplateSpec:
 
         if eligible_modes:
             canonical = eligible_modes[0]
-            # Try union for pure inputs only; on any complex result expr fall
-            # back to canonical for that slot.
             input_maps_list: list[AffineMap] = []
-            for i in range(num_pure_inputs):
+            for i in range(num_data):
                 u = _union_map_at_position([mode[i] for mode in eligible_modes], num_dims)
                 input_maps_list.append(u if u is not None else canonical[i])
-            # Carries: canonical's view (the encode-pass convention pairs
-            # them with outputs by position; mixing modes' carry maps would
-            # break that).
-            input_maps_list.extend(canonical[num_pure_inputs:])
+            output_maps_list: list[AffineMap] = []
+            chain_output_maps_list: list[AffineMap] = []
+            for j in range(num_outputs):
+                mode_output_maps_at_j = [mode[num_pure_inputs + j] for mode in eligible_modes]
+                u = _union_map_at_position(mode_output_maps_at_j, num_dims)
+                output_maps_list.append(u if u is not None else canonical[num_pure_inputs + j])
+                inter = _intersection_map_at_position(mode_output_maps_at_j, num_dims)
+                # If the intersection helper bails (complex expr), fall back
+                # to the canonical mode's output map — preserves the
+                # single-mode chain semantics.
+                chain_output_maps_list.append(inter if inter is not None else canonical[num_pure_inputs + j])
             input_maps = tuple(input_maps_list)
-            output_maps = canonical[num_pure_inputs:]
+            output_maps = tuple(output_maps_list)
+            chain_output_maps = tuple(chain_output_maps_list)
         else:
             input_maps = tuple(AffineMap.identity(num_dims) for _ in range(num_data))
             output_maps = tuple(AffineMap.identity(num_dims) for _ in range(num_outputs))
+            chain_output_maps = output_maps
 
         # Split per-mode maps into input- and output-sides. Each mode's raw
         # list is ``[ins..., outs...]``; the trailing ``num_outputs`` entries
@@ -292,4 +352,5 @@ class TemplateSpec:
             paired_outputs=paired_outputs,
             per_mode_input_maps=tuple(per_mode_input),
             per_mode_output_maps=tuple(per_mode_output),
+            chain_output_maps=chain_output_maps,
         )

@@ -110,7 +110,25 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     yield_op = pe.get_terminator()
     pe_result_types = list(yield_op.operand_types)
 
-    reduced_outputs = tuple(j for j, m in enumerate(spec.output_maps) if m.eval(bounds, ()) != bounds)
+    # An output is "reduced" (and gets a spatial chain along the dropped
+    # dim(s)) if SOME mode's per-mode output map drops some bounds dim.
+    # Reading the canonical/union ``spec.output_maps`` here would miss the
+    # signal in multi-mode merges where one mode is wider than another:
+    # e.g., matmul (drops K) merged with 3D-elementwise (identity) unions to
+    # identity, but the chain along K is still wired in HW for matmul mode
+    # (the body's mux bypasses it in the elementwise mode at runtime).
+    def _output_reduces_in_some_mode(j: int) -> bool:
+        for mode_maps in spec.per_mode_output_maps:
+            if j >= len(mode_maps):
+                continue
+            m = mode_maps[j]
+            if m.num_dims != len(bounds):
+                continue
+            if m.eval(bounds, ()) != bounds:
+                return True
+        return False
+
+    reduced_outputs = tuple(j for j in range(len(spec.output_maps)) if _output_reduces_in_some_mode(j))
     parallel_outputs = tuple(j for j in range(len(pe_result_types)) if j not in reduced_outputs)
 
     # Spatial chain pairs. A paired carry whose paired output is reduced (the
@@ -244,17 +262,25 @@ def resolve_input_wiring(
     """
     if input_index in layout.input_to_output_chain:
         paired_out = layout.input_to_output_chain[input_index]
-        output_map = spec.output_maps[paired_out]
-        prev = _previous_in_chain(iteration, output_map, all_iters)
+        # Chain *grouping* uses the intersection map (dims kept by every
+        # mode). When all modes agree this equals ``spec.output_maps``;
+        # when modes disagree (some reduce a dim, others don't) the
+        # intersection drops the disputed dim, so PEs along that dim still
+        # form a chain group — matmul mode reduces, other modes bypass via
+        # the body mux at runtime.
+        chain_map = spec.chain_output_maps[paired_out]
+        prev = _previous_in_chain(iteration, chain_map, all_iters)
         if prev is None:
             # First PE in the chain group → read the carry init from the
-            # block arg. For a fully-reduced output the block arg is a
-            # scalar; for partial reduction it is an array indexed by this
-            # group's position in output space.
-            group_pos = output_map.eval(iteration, ())
-            if group_pos == ():
+            # block arg. The carry block arg's port shape follows the
+            # union (= ``spec.input_maps[input_index]``), so we index it
+            # using the union map's evaluation of this iteration. For a
+            # fully-scalar carry port this collapses to a direct read.
+            indexing_map = spec.input_maps[input_index]
+            indices = indexing_map.eval(iteration, ())
+            if indices == ():
                 return FromScalarBlockArg(arg_index=layout.chained_arg_idx[input_index])
-            return FromArrayBlockArg(arg_index=layout.chained_arg_idx[input_index], indices=group_pos)
+            return FromArrayBlockArg(arg_index=layout.chained_arg_idx[input_index], indices=indices)
         return FromPEOutput(iteration=prev, output_index=paired_out)
     else:
         # Parallel input: read from the array block arg using the input map.
