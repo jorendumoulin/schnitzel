@@ -15,6 +15,8 @@ from xdsl.pattern_rewriter import (
 )
 
 from snaxc.dialects import dart
+from snaxc.hw.acc_context import AccContext
+from snaxc.hw.accelerators.tensorcore import TensorCore
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
 from snaxc.ir.dart.affine_transform import AffineTransform
 
@@ -27,10 +29,18 @@ class LayoutResolution(RewritePattern):
     to memory), using a certain memory layout of the memref operands of the operation.
     """
 
+    ctx: AccContext
+
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: dart.ScheduleOp, rewriter: PatternRewriter):
         bounds = [x.value.data for x in op.bounds.data]
         schedule = Schedule(SchedulePattern(bounds, pattern.data) for pattern in op.patterns)
+
+        assert op.accelerator is not None
+        accelerator = self.ctx.system.find_accelerator(op.accelerator)
+        assert isinstance(accelerator, TensorCore)
+
+        schedule = accelerator.transform_schedule(schedule)
 
         # small function to generate a list of n zeros with the i-th element 1
         # for example n = 4, i = 1  -> [0, 1, 0, 0]
@@ -86,4 +96,5 @@ class DartLayoutResolutionPass(ModulePass):
     name = "dart-layout-resolution"
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
-        PatternRewriteWalker(LayoutResolution()).rewrite_module(op)
+        assert isinstance(ctx, AccContext)
+        PatternRewriteWalker(LayoutResolution(ctx)).rewrite_module(op)
