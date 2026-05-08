@@ -12,11 +12,11 @@ message(STATUS "Install Directory: ${CMAKE_INSTALL_PREFIX}")
 # --------------------------------------------------
 # Parameters passed from command line
 # --------------------------------------------------
-set(M 16 CACHE STRING "Matrix dimension M")
-set(K 16 CACHE STRING "Matrix dimension K")
-set(N 16 CACHE STRING "Matrix dimension N")
+set(GEMM_M 16 CACHE STRING "Matrix dimension M")
+set(GEMM_K 16 CACHE STRING "Matrix dimension K")
+set(GEMM_N 16 CACHE STRING "Matrix dimension N")
 
-message(STATUS "GEMM sizes: M=${M} K=${K} N=${N}")
+message(STATUS "GEMM sizes: M=${GEMM_M} K=${GEMM_K} N=${GEMM_N}")
 
 # --------------------------------------------------
 # Find the installed runtime package
@@ -53,9 +53,9 @@ add_executable(gemm gemm.cpp)
 add_dependencies(gemm generate_gemm_mlir)
 
 target_compile_definitions(gemm PRIVATE
-    M=${M}
-    K=${K}
-    N=${N}
+    GEMM_M=${GEMM_M}
+    GEMM_K=${GEMM_K}
+    GEMM_N=${GEMM_N}
 )
 
 # --------------------------------------------------
