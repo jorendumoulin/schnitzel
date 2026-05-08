@@ -32,13 +32,13 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
   dontTouch(csrVals)
 
-  val aStreamer = Module(new Streamer(6, Seq(8), 3, addrWidth, dataWidth));
-  val bStreamer = Module(new Streamer(6, Seq(8), 3, addrWidth, dataWidth));
-  val cStreamer = Module(new Streamer(6, Seq(8, 4), 3, addrWidth, dataWidth));
+  val aStreamer = Module(new Streamer(6, Seq(8), 6, addrWidth, dataWidth));
+  val bStreamer = Module(new Streamer(6, Seq(8), 6, addrWidth, dataWidth));
+  val cStreamer = Module(new Streamer(6, Seq(8, 4), 6, addrWidth, dataWidth));
 
   aStreamer.io.tcdmReqs <> io.aData
   aStreamer.io.config := csrVals.aStreamerConfig
-  aStreamer.io.spatialDimMask := 0.U.asTypeOf(aStreamer.io.spatialDimMask)
+  aStreamer.io.spatialDimMask := VecInit(Seq.fill(1)(true.B))
   aStreamer.io.start := csrItf.io.start
   aStreamer.io.writeData := DontCare
   aStreamer.io.dir := StreamerDir.read
@@ -48,7 +48,7 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
 
   bStreamer.io.tcdmReqs <> io.bData
   bStreamer.io.config := csrVals.bStreamerConfig
-  bStreamer.io.spatialDimMask := 0.U.asTypeOf(bStreamer.io.spatialDimMask)
+  bStreamer.io.spatialDimMask := VecInit(Seq.fill(1)(true.B))
   bStreamer.io.start := csrItf.io.start
   bStreamer.io.writeData := DontCare
   bStreamer.io.dir := StreamerDir.read
@@ -58,7 +58,7 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
 
   cStreamer.io.tcdmReqs <> io.cData
   cStreamer.io.config := csrVals.cStreamerConfig
-  cStreamer.io.spatialDimMask := 0.U.asTypeOf(cStreamer.io.spatialDimMask)
+  cStreamer.io.spatialDimMask := VecInit(Seq.fill(2)(true.B))
   cStreamer.io.start := csrItf.io.start
   cStreamer.io.dir := StreamerDir.readWrite
   cStreamer.io.readData.ready := aStreamer.io.readData.valid && cStreamer.io.readData.valid && cStreamer.io.writeData.ready
