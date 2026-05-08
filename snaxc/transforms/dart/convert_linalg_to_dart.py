@@ -1,16 +1,13 @@
-import warnings
 from dataclasses import dataclass
 
-from xdsl.builder import Builder
 from xdsl.context import Context
 from xdsl.dialects.arith import ConstantOp
+from xdsl.dialects import linalg
 from xdsl.dialects.builtin import (
-    AffineMapAttr,
     ArrayAttr,
     ModuleOp,
     ShapedType,
     StringAttr,
-    TensorType,
 )
 from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
@@ -18,6 +15,7 @@ from xdsl.dialects.tensor import EmptyOp, ExtractSliceOp
 from xdsl.ir import Block, BlockArgument, OpResult, Region, SSAValue
 from xdsl.ir.affine import AffineMap
 from xdsl.parser import MemRefType
+from xdsl.ir import Block, Region, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     PatternRewriter,
@@ -26,24 +24,18 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 from xdsl.rewriter import InsertPoint
-from xdsl.utils.hints import isa
 
 from snaxc.dialects import dart
-from snaxc.dialects.kernel import AddOp
+from snaxc.hw.acc_context import AccContext
+from snaxc.hw.system import System
 
 
 @dataclass
 class StreamifyGenericOpPattern(RewritePattern):
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: LinalgGenericOp, rewriter: PatternRewriter) -> None:
-        # place guard for library calls ending in _stream
-        if not op.library_call:
-            return
-        if op.library_call.data.endswith("_stream"):
-            op.library_call = StringAttr(op.library_call.data[: -len("_stream")])
-        else:
-            return
+    system: System
 
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: linalg.GenericOp, rewriter: PatternRewriter) -> None:
         # find streamable operands: shaped operands of the generic op
         input_count = len(op.inputs)
         streamable_input_indices = tuple(
@@ -70,23 +62,8 @@ class StreamifyGenericOpPattern(RewritePattern):
 
         # if outputs isn't an empty tensor, explicit add should be added
         outputs: list[SSAValue] = []
-        outputs_to_add: list[SSAValue] = []
         for output in (op.operands[index] for index, _ in streamable_output_indices):
-            if isinstance(output, OpResult) and isinstance(output.op, EmptyOp):
-                outputs.append(output)
-            elif isinstance(output, OpResult) and isinstance(output.op, ExtractSliceOp):
-                # TODO: this case isn't entirely correct, for tiled execution, i think
-                # depending on the tiling we sould add / not add
-                outputs.append(output)
-            elif isinstance(output.type, MemRefType):
-                warnings.warn("You really shoulnd't be using memrefs at this point")
-                outputs.append(output)
-            else:
-                # replace with an empty tensor
-                empty = EmptyOp([], tensor_type=output.type)
-                rewriter.insert_op(empty, InsertPoint.before(op))
-                outputs.append(empty.tensor)
-                outputs_to_add.append(output)
+            outputs.append(output)
 
         # create the streaming region to wrap around the stream.generic
         streaming_region_op = dart.OperationOp(
@@ -95,7 +72,7 @@ class StreamifyGenericOpPattern(RewritePattern):
             patterns=patterns,
             body=Region(Block(arg_types=input_stream_types + result_stream_types)),
             result_types=op.result_types,
-            accelerator=op.library_call,
+            accelerator=StringAttr("tensorcore"),
         )
 
         new_body = streaming_region_op.body.block
@@ -126,76 +103,6 @@ class StreamifyGenericOpPattern(RewritePattern):
 
         rewriter.replace_op(op, streaming_region_op)
 
-        # Add explicit adds for outputs that were not empty tensors
-        for output in outputs_to_add:
-            assert len(streaming_region_op.results) == 1
-            output_idx = 0
-
-            # add body for outputs:
-            arg_types = [result_stream_types[output_idx].element_type] * 3
-            stream_arg_types = [result_stream_types[output_idx]] * 3
-
-            # generic body:
-            @Builder.implicit_region(arg_types)
-            def generic_region(args: tuple[BlockArgument, ...]) -> None:
-                result = AddOp(operands=[args[0], args[1]], result_types=[args[2].type])
-                dart.YieldOp(result)
-
-            assert streaming_region_op.accelerator is not None
-
-            @Builder.implicit_region(stream_arg_types)
-            def dart_region(args: tuple[BlockArgument, ...]) -> None:
-                result = dart.GenericOp(
-                    inputs=[args[0], args[1]],
-                    body=generic_region,
-                    library_call=streaming_region_op.accelerator,
-                    result_types=[args[2].type],
-                )
-                dart.YieldOp(result)
-
-            if isinstance(output, OpResult) and isinstance(output.op, ConstantOp):
-                empty = EmptyOp([], output.type)
-                assert isa(output.type, TensorType)
-                add_op = dart.OperationOp(
-                    [streaming_region_op.results[0], output],
-                    [empty],
-                    ArrayAttr([AffineMapAttr(AffineMap.identity(output.type.get_num_dims()))] * 3),
-                    body=dart_region,
-                    result_types=[output.type],
-                    accelerator=streaming_region_op.accelerator,
-                )
-                rewriter.insert_op([empty, add_op], InsertPoint.after(streaming_region_op))
-                streaming_region_op.results[output_idx].replace_uses_with_if(
-                    add_op.results[0], lambda use: use.operation is not add_op
-                )
-            elif (
-                isinstance(output, OpResult)
-                and isinstance(generic := output.op, LinalgGenericOp)
-                and isinstance(generic.body.block.first_op, LinalgYieldOp)
-            ):
-                assert isa(output.type, TensorType)
-                assert isinstance(out := generic.outputs[0], OpResult)
-                assert isinstance(out.op, EmptyOp)
-                # for the operation a + b = c, the generic supplies indexing maps
-                # for b and c. As a is the same shape as c, we can use the same indexing map
-                indexing_maps = tuple(map for map in generic.indexing_maps.data)
-                indexing_maps = (indexing_maps[1], indexing_maps[0], indexing_maps[1])
-                add_op = dart.OperationOp(
-                    [streaming_region_op.results[0], generic.inputs[0]],
-                    [out.op.tensor],
-                    ArrayAttr(indexing_maps),
-                    body=dart_region,
-                    result_types=[output.type],
-                    accelerator=streaming_region_op.accelerator,
-                )
-                rewriter.insert_op(add_op, InsertPoint.after(streaming_region_op))
-                rewriter.erase_op(generic)
-                streaming_region_op.results[output_idx].replace_uses_with_if(
-                    add_op.results[0], lambda use: use.operation is not add_op
-                )
-            else:
-                raise NotImplementedError("currently unsupported")
-
 
 @dataclass(frozen=True)
 class ConvertLinalgToDart(ModulePass):
@@ -207,4 +114,5 @@ class ConvertLinalgToDart(ModulePass):
     name = "convert-linalg-to-dart"
 
     def apply(self, ctx: Context, op: ModuleOp) -> None:
-        PatternRewriteWalker(StreamifyGenericOpPattern()).rewrite_module(op)
+        assert isinstance(ctx, AccContext)
+        PatternRewriteWalker(StreamifyGenericOpPattern(ctx.system)).rewrite_module(op)
