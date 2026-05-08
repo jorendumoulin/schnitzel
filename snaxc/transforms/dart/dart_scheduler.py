@@ -19,6 +19,7 @@ from xdsl.pattern_rewriter import (
 
 from snaxc.dialects import dart
 from snaxc.hw import AccContext
+from snaxc.hw.accelerators.tensorcore import TensorCore
 from snaxc.hw.streamer_accelerator import StreamerAccelerator
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
 from snaxc.ir.dart.scheduler import (
@@ -41,15 +42,10 @@ class AutoflowScheduler(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: dart.OperationOp, rewriter: PatternRewriter):
-        assert op.accelerator
-        accelerator_type = self.ctx.get_acc(op.accelerator.data)
-        assert isinstance(accelerator_type, StreamerAccelerator)
-        template = accelerator_type.get_template(op)
-
-        # Make sure the operands are memrefs
-        for memref_operand in op.operands:
-            if not isinstance(memref_operand.type, builtin.MemRefType):
-                return
+        assert op.accelerator is not None
+        accelerator = self.ctx.system.find_accelerator(op.accelerator)
+        assert isinstance(accelerator, TensorCore)
+        template = accelerator.get_template(op)
 
         # First, run the stream scheduling algorithm
         schedule_bounds = tuple(op.get_static_pattern_bounds())
