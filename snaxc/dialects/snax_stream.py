@@ -25,6 +25,8 @@ from xdsl.irdl import (
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
 
+from snaxc.hw.streamers.streamers import Streamer
+
 
 @irdl_attr_definition
 class StridePattern(ParametrizedAttribute):
@@ -96,6 +98,13 @@ class StridePattern(ParametrizedAttribute):
                 new_temporal_strides.append(ts)
 
         return type(self)(new_upper_bounds, new_temporal_strides, self.spatial_strides)
+
+    def legalize(self, streamer: Streamer) -> Self:
+        upper_bounds = [x.data for x in self.upper_bounds.data] + [1] * (streamer.temporal_dim - len(self.upper_bounds))
+        temporal_strides = [x.data for x in self.temporal_strides.data] + [1] * (
+            streamer.temporal_dim - len(self.temporal_strides)
+        )
+        return type(self)(upper_bounds, temporal_strides, self.spatial_strides)
 
     @classmethod
     def parse_parameters(cls, parser: AttrParser) -> Sequence[Attribute]:
