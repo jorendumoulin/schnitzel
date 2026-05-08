@@ -22,8 +22,14 @@ def get_all_accelerators() -> dict[str, Callable[[], type[Accelerator]]]:
 
         return Phs
 
+    def get_tensorcore():
+        from snaxc.hw.accelerators.tensorcore import TensorCore
+
+        return TensorCore
+
     return {
         "alu": get_alu,
         "dma": get_dma,
         "phs": get_phs,
+        "tensorcore": get_tensorcore,
     }
