@@ -4,7 +4,9 @@ from math import ceil, prod
 import numpy as np
 from xdsl.context import Context
 from xdsl.dialects import builtin
+from xdsl.dialects.tensor import Tensor
 from xdsl.ir import Attribute, SSAValue
+from xdsl.ir.affine import AffineDimExpr, AffineMap
 from xdsl.parser import MemRefType
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -20,8 +22,9 @@ from snaxc.dialects import dart
 from snaxc.dialects.snax import LayoutCast
 from snaxc.dialects.tsl import TiledStridedLayoutAttr
 from snaxc.hw.acc_context import AccContext
-from snaxc.hw.streamer_accelerator import StreamerAccelerator
+from snaxc.hw.accelerators.tensorcore import TensorCore
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
+from snaxc.ir.dart.affine_transform import AffineTransform
 from snaxc.ir.tsl import Stride, TiledStride, TiledStridedLayout
 
 
@@ -31,38 +34,10 @@ def spatial_dims(ctx: AccContext, op: dart.ScheduleOp) -> int:
     """
     # get accelerator
     assert op.accelerator
-    accelerator_type = ctx.get_acc(op.accelerator.data)
-    assert isinstance(accelerator_type, StreamerAccelerator)
-    template = accelerator_type.get_template(op)
+    accelerator = ctx.system.find_accelerator(op.accelerator)
+    assert isinstance(accelerator, TensorCore)
+    template = accelerator.get_template(op)
     return template[0].pattern.num_dims
-
-
-def ensure_access_granularity(
-    ctx: AccContext, current_stride: int, schedule_dim: int, op: dart.ScheduleOp, operand: SSAValue
-) -> int:
-    if current_stride == 1:
-        return current_stride
-
-    # assess access granularity:
-    # TODO: build out this system to be better
-    # this is a hack that works, this information needs to come from accelerators:
-    assert isa(operand.type, MemRefType[builtin.FixedBitwidthType])
-
-    # TODO: these granularity values should come from the system config
-    # (TCDM bank count, bank width, etc.) instead of being hardcoded.
-    # For schnitzel with 32-bit TCDM, no interleaving adjustment is needed.
-    if schedule_dim >= spatial_dims(ctx, op):
-        # we are in temporal regime
-        temporal_access_granularity = 1
-        if current_stride % temporal_access_granularity != 0:
-            current_stride += (temporal_access_granularity - current_stride) % 64
-    else:
-        # we are in spatial regime
-        spatial_access_granularity = 1
-        if current_stride % spatial_access_granularity != 0:
-            current_stride += (spatial_access_granularity - current_stride) % 64
-
-    return current_stride
 
 
 @dataclass
@@ -94,6 +69,13 @@ class AddCyclicMemoryLayout(RewritePattern):
         bounds = [x.value.data for x in op.bounds]
         schedule = Schedule(SchedulePattern(bounds, x.data) for x in op.patterns)
 
+        assert op.accelerator is not None
+        accelerator = self.ctx.system.find_accelerator(op.accelerator)
+        assert isinstance(accelerator, TensorCore)
+
+        # transform schedule to match accelerator access pattern
+        schedule = accelerator.transform_schedule(schedule)
+
         # list to store newly generated operands for op
         new_operands: list[LayoutCast] = []
 
@@ -111,7 +93,7 @@ class AddCyclicMemoryLayout(RewritePattern):
 
             # iterate over the columns of the schedule pattern in reversed order, to find out
             # which dimension is accessed in the innermost loop of the operation
-            for schedule_dim, (schedule_bound, accesses) in enumerate(
+            for i, (schedule_bound, accesses) in enumerate(
                 zip(schedule.bounds[::-1], np.flip(schedule.pattern.A, axis=1).T)
             ):
                 # normalize accesses to binary list
@@ -120,8 +102,6 @@ class AddCyclicMemoryLayout(RewritePattern):
 
                 if 1 not in accesses:
                     continue
-
-                current_stride = ensure_access_granularity(self.ctx, current_stride, schedule_dim, op, operand)
 
                 # find operand dimension that is accessed
                 accessed_dim = accesses.index(1)
@@ -138,22 +118,21 @@ class AddCyclicMemoryLayout(RewritePattern):
                 size_remaining = ceil(memref_type.get_shape()[accessed_dim] // existing_bound)
 
                 # can we further tile the layout according to the remaining size?
-                to_tile = self.tiled_layout
+                to_tile = True
 
-                if to_tile:
-                    # only apply tiling if entire size is nicely divisible by the tile size for now
-                    # (this isn't strictly necessary but might break some things)
-                    if size_remaining % schedule_bound != 0:
-                        to_tile = False
+                # only apply tiling if entire size is nicely divisible by the tile size for now
+                # (this isn't strictly necessary but might break some things)
+                if size_remaining % schedule_bound != 0:
+                    to_tile = False
 
-                    # only apply tiling if all access patterns remain hyperrectangular
-                    # for example if there is one dimensions that accesses with stride=1, bound=3 and another dim with
-                    # stride=1, bound=8
-                    # we cannot tile for either 8 or 3 because then the other pattern is no longer affine
-                    else:
-                        for stride, bound in zip(schedule.pattern.A[accessed_dim, :], schedule.bounds):
-                            if stride % schedule_bound != 0 and bound != schedule_bound:
-                                to_tile = False
+                # only apply tiling if all access patterns remain hyperrectangular
+                # for example if there is one dimensions that accesses with stride=1, bound=3 and another dim with
+                # stride=1, bound=8
+                # we cannot tile for either 8 or 3 because then the other pattern is no longer affine
+                else:
+                    for stride, bound in zip(schedule.pattern.A[accessed_dim, :], schedule.bounds):
+                        if stride % schedule_bound != 0 and bound != schedule_bound:
+                            to_tile = False
 
                 if to_tile:
                     layout_bound = schedule_bound
