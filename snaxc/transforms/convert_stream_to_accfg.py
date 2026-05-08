@@ -16,6 +16,7 @@ from snaxc.dialects import snax_stream
 from snaxc.dialects.accfg import AwaitOp, LaunchOp, SetupOp
 from snaxc.hw import AccContext
 from snaxc.hw.accelerators.dma import Dma
+from snaxc.hw.accelerators.tensorcore import TensorCore
 
 
 @dataclass
@@ -26,7 +27,7 @@ class ConvertStreamToAccfgPattern(RewritePattern):
     def match_and_rewrite(self, op: snax_stream.StreamingRegionOp, rewriter: PatternRewriter):
         dynamic_operands = [x for x in op.dynamic_operands]
         accelerator = self.ctx.system.find_accelerator(op.accelerator)
-        if not isinstance(accelerator, Dma):
+        if not isinstance(accelerator, Dma | TensorCore):
             return
         setup_vals: dict[str, SSAValue | Operation] = {}
         ops_to_add: list[Operation] = []
