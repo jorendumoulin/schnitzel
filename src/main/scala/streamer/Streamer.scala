@@ -7,6 +7,7 @@ import chisel3.util.{Decoupled, RRArbiter, log2Ceil}
 import dataclass.data
 import streamer.AguOutput
 import core.BusReq
+import streamer.StreamerDir.write
 
 object StreamerDir extends ChiselEnum { val read, write, readWrite = Value }
 
@@ -38,162 +39,173 @@ class Streamer(
   agu.io.start := io.start
   agu.io.config := io.config
 
-  // A port is disabled if any masked-off dim has dimIndex != 0 for that port.
-  // The dimIndex==0 "representative" keeps the port live; duplicates are gated.
-  val laneEnabled = VecInit((0 until numPorts).map { outputIdx =>
-    var multiplier = 1
-    val checks = for (dim <- spatialDimSizes.indices) yield {
-      val dimSize = spatialDimSizes(dim)
-      val dimIndex = (outputIdx / multiplier) % dimSize
-      multiplier = multiplier * dimSize
-      if (dimIndex == 0) true.B else io.spatialDimMask(dim)
-    }
-    checks.foldLeft(true.B)(_ && _)
-  })
+  // Step 1: Turn result from AGU into read + write requests
+  val readReq = agu.io.addrs.bits.isFirst && (io.dir === StreamerDir.read || io.dir === StreamerDir.readWrite);
+  val writeReq = agu.io.addrs.bits.isLast && (io.dir === StreamerDir.write || io.dir === StreamerDir.readWrite);
+  dontTouch(readReq)
+  dontTouch(agu.io)
+  dontTouch(writeReq)
 
-  // --- Bypass buffer state machine for readWrite (reduction) mode ---
-  // TCDM:   first iteration, readData sourced from TCDM response queue
-  // Bypass: subsequent iterations, readData sourced from bypass buffer
-  object BypassState extends ChiselEnum { val tcdm, bypass = Value }
-  val bypassState = RegInit(BypassState.tcdm)
-  val bypassBuffer = Reg(Vec(numPorts, UInt(dataWidth.W)))
-  // Tracks whether bypass data has been consumed this iteration,
-  // preventing the accelerator from seeing multiple valid pulses for the same data
-  val bypassConsumed = RegInit(false.B)
-  val inReadWrite = io.dir === StreamerDir.readWrite
+  // create separate read / write queues for read reqs and write reqs
+  val readQueuesReady, writeQueuesReady = WireInit(false.B)
 
-  // Split full-width read/write ports into data port widths:
-  val readVec = Wire(Vec(numPorts, UInt(dataWidth.W)))
-  io.readData.bits := readVec.asTypeOf(streamerDataType)
+  // read queues:
+  val readReqQueues = (0 until numPorts).map { i =>
+    val queue = Module(new Queue(UInt(addrWidth.W), queueDepth))
+    queue.io.enq.bits := agu.io.addrs.bits.addrs(i)
+    // can enqueue read request if it is valid, if both read and write, also wait for write queues
+    queue.io.enq.valid := agu.io.addrs.valid && readReq && readQueuesReady && (!writeReq || writeQueuesReady);
+    queue
+  }
+  readQueuesReady := readReqQueues.map { q => q.io.enq.ready }.reduce(_ && _);
+
+  // write queues:
+  val writeReqQueues = (0 until numPorts).map { i =>
+    val queue = Module(new Queue(UInt(addrWidth.W), queueDepth))
+    queue.io.enq.bits := agu.io.addrs.bits.addrs(i)
+    // can enqueue write request if it is valid, if both read and write, also wait for read queues
+    queue.io.enq.valid := agu.io.addrs.valid && writeReq && writeQueuesReady && (!readReq || readQueuesReady);
+    queue
+  }
+  writeQueuesReady := writeReqQueues.map { q => q.io.enq.ready }.reduce(_ && _);
+
+  // keep track of the isLast signals to determine coupling with bypass buffer
+  val isLastQueue = Module(new Queue(Bool(), 32))
+  isLastQueue.io.enq.bits := agu.io.addrs.bits.isLast
+  // FIXME: address gen does not wait for isLastQueue, hopefully it is deep enough :')
+  isLastQueue.io.enq.valid := agu.io.addrs.fire
+
+  // assign ready signal of agu
+  agu.io.addrs.ready := (readQueuesReady || ~readReq) && (writeQueuesReady || ~writeReq)
+
+  // Step 2: Couple write requests with actual write data and put into new queue:
   val writeVec = io.writeData.bits.asTypeOf(Vec(numPorts, UInt(dataWidth.W)))
 
-  // In readWrite mode, the AGU doesn't advance on isFirst until writeData fires,
-  // but the readReqQueue must issue the TCDM read exactly once before that.
-  // This register prevents duplicate enqueues while the AGU is stalled.
-  val firstReadIssued = RegInit(false.B)
-
-  // Queue to request reads from TCDM
-  // For the reads, no data is necessary, so we just make a queue of addresses instead
-  val readReqQueues = (0 until numPorts).map { i =>
-    val readReqQueue = Module(new Queue(UInt(addrWidth.W), queueDepth))
-    readReqQueue.io.enq.bits := agu.io.addrs.bits.addrs(i)
-    readReqQueue.io.enq.valid := agu.io.addrs.valid && agu.io.addrs.bits.isFirst && laneEnabled(i) && (
-      (io.dir === StreamerDir.read) ||
-        (io.dir === StreamerDir.readWrite && !firstReadIssued)
+  // The last write goes into a queue:
+  val writeDataQueues = (0 until numPorts).map { i =>
+    val queue = Module(
+      new Queue(
+        new Bundle {
+          val data = UInt(dataWidth.W)
+          val addr = UInt(addrWidth.W)
+        },
+        queueDepth
+      )
     )
-    readReqQueue
-  }
+    queue.io.enq.bits.addr := writeReqQueues(i).io.deq.bits
+    queue.io.enq.bits.data := writeVec(i)
+    queue.io.enq.valid :=
+      // We are writing the last element
+      isLastQueue.io.deq.bits && isLastQueue.io.deq.valid &&
+        // A write address is available
+        writeReqQueues(i).io.deq.valid &&
+        // Write data is available
+        io.writeData.valid
 
-  // Queue to request writes to TCDM
-  val writeReqQueues = (0 until numPorts).map { i =>
-    // Convert write queue outputs to request
-    // port 1 on arbiter is for writes
-    val writeReqQueue = Module(new Queue(new BusReq(addrWidth, dataWidth), queueDepth))
-    writeReqQueue.io.enq.bits.addr := agu.io.addrs.bits.addrs(i)
-    writeReqQueue.io.enq.bits.wdata := writeVec(i)
-    writeReqQueue.io.enq.bits.wen := true.B;
-    writeReqQueue.io.enq.bits.ben := VecInit(Seq.fill(dataWidth / 8)(true.B)).asUInt
-    // Only queue if the streamer is writing and, when reducing if it is the last address
-    // Also gate on writeData.valid to ensure we capture valid data (not garbage)
-    writeReqQueue.io.enq.valid := agu.io.addrs.valid && io.writeData.valid && agu.io.addrs.bits.isLast && laneEnabled(i) && ((io.dir === StreamerDir.write) || (io.dir === StreamerDir.readWrite))
-    writeReqQueue
+    writeReqQueues(i).io.deq.ready := queue.io.enq.fire
+    queue
   }
+  val writeDataQueuesReady = writeDataQueues.map { q => q.io.enq.ready }.reduce(_ && _);
+  val writeDataQueuesFire = writeDataQueues.map { q => q.io.enq.fire }.reduce(_ && _);
 
-  // Read/write request arbiter per port
+  // Other writes go into the bypass buffer
+  val bypassBuffer = Module(new Queue(Vec(numPorts, UInt(dataWidth.W)), 1, pipe = true))
+  bypassBuffer.io.enq.bits := writeVec
+  bypassBuffer.io.enq.valid :=
+    // We are not writing to the last element
+    ~isLastQueue.io.deq.bits && isLastQueue.io.deq.valid &&
+      // Write data is available
+      io.writeData.valid
+
+  // Ready for new data:
+  when(isLastQueue.io.deq.valid) {
+    when(isLastQueue.io.deq.bits) {
+      io.writeData.ready := writeDataQueuesReady
+    }.otherwise {
+      // In this case, write data to the bypass buffer.
+      // Coupling the ready signals creates a combinational loop.
+      // However, on writing new data, we are sure the existing element
+      // of the buffer will be consumed in a correctly configured system.
+      io.writeData.ready := true.B
+      // During simulation, assert that this is actually the case.
+      assert(bypassBuffer.io.enq.ready)
+    }
+  }.otherwise { io.writeData.ready := false.B }
+
+  isLastQueue.io.deq.ready := bypassBuffer.io.enq.fire || writeDataQueuesFire
+
+  // Step 3: arbitrate read and write requests to the TCDM
+
+  // signal to check if we can accept new responses
+  val roomForRsp = VecInit(Seq.fill(numPorts)(false.B))
+  dontTouch(roomForRsp)
+
   val reqArbiters = (0 until numPorts).map { i =>
     val reqArbiter = Module(new RRArbiter(new BusReq(addrWidth, dataWidth), 2))
     // Attach each arbiters output to the req part of a TCDM port
     io.tcdmReqs(i).req <> reqArbiter.io.out
-    // port 0 on arbiter is for reads, only connect address, rest is hardcoded anyways
-    readReqQueues(i).io.deq.ready := reqArbiter.io.in(0).ready
-    reqArbiter.io.in(0).valid := readReqQueues(i).io.deq.valid
+
+    // Read requests:
+    readReqQueues(i).io.deq.ready := reqArbiter.io.in(0).fire
+    reqArbiter.io.in(0).valid := readReqQueues(i).io.deq.valid && roomForRsp(i)
     reqArbiter.io.in(0).bits.addr := readReqQueues(i).io.deq.bits
     reqArbiter.io.in(0).bits.wdata := DontCare
     reqArbiter.io.in(0).bits.wen := false.B;
     reqArbiter.io.in(0).bits.ben := VecInit(Seq.fill(dataWidth / 8)(true.B)).asUInt
-    // port 1 on arbiter is for writes
-    reqArbiter.io.in(1) <> writeReqQueues(i).io.deq
+
+    // Write requests:
+    writeDataQueues(i).io.deq.ready := reqArbiter.io.in(1).ready
+    reqArbiter.io.in(1).valid := writeDataQueues(i).io.deq.valid
+    reqArbiter.io.in(1).bits.addr := writeDataQueues(i).io.deq.bits.addr
+    reqArbiter.io.in(1).bits.wdata := writeDataQueues(i).io.deq.bits.data
+    reqArbiter.io.in(1).bits.wen := true.B;
+    reqArbiter.io.in(1).bits.ben := VecInit(Seq.fill(dataWidth / 8)(true.B)).asUInt
+
     reqArbiter
   }
 
-  // Aggregate queue readies and mode flags
-  val allReadReqQueuesReady = readReqQueues.map(_.io.enq.ready).reduce(_ && _)
-  val allWriteReqQueuesReady = writeReqQueues.map(_.io.enq.ready).reduce(_ && _)
-  val isRead = io.dir === StreamerDir.read
-  val isWrite = io.dir === StreamerDir.write
-  val inBypass = inReadWrite && bypassState === BypassState.bypass
+  // Step 4: collect responses from tcdm
 
-  // agu.ready: only wait for the queues actually exercised this iter. In
-  // readWrite, writeData.valid paces the AGU with the ALU so every iteration
-  // produces one ALU beat (otherwise iter 0 races ahead and we lose an
-  // accumulation in reductions).
-  val needsRead = isRead || (inReadWrite && agu.io.addrs.bits.isFirst)
-  val needsWrite = isWrite || (inReadWrite && agu.io.addrs.bits.isLast)
-  agu.io.addrs.ready :=
-    (!needsRead || allReadReqQueuesReady) &&
-      (!needsWrite || allWriteReqQueuesReady) &&
-      (isRead || io.writeData.valid)
-
-  // writeData.ready: write mode needs only writeReq; readWrite also needs
-  // readReq to keep address/data in lockstep. Read mode never consumes.
-  io.writeData.ready := (isWrite && allWriteReqQueuesReady) ||
-    (inReadWrite && allReadReqQueuesReady && allWriteReqQueuesReady)
-
-  // Capture non-last writeData into the bypass buffer
-  when(inReadWrite && io.writeData.fire && !agu.io.addrs.bits.isLast) {
-    bypassBuffer := writeVec
+  // only collect read requests
+  val readPending = (0 until numPorts).map { i =>
+    RegNext(io.tcdmReqs(i).req.fire && ~io.tcdmReqs(i).req.bits.wen)
   }
-
-  // Bypass FSM: enter on non-last writeData.fire, exit on isLast or leaving readWrite
-  when(!inReadWrite || (io.writeData.fire && agu.io.addrs.bits.isLast)) {
-    bypassState := BypassState.tcdm
-  }.elsewhen(io.writeData.fire) {
-    bypassState := BypassState.bypass
-  }
-
-  // Prevent duplicate readReqQueue enqueues while AGU stalls on iter 0
-  when(!inReadWrite || agu.io.addrs.fire) {
-    firstReadIssued := false.B
-  }.elsewhen(readReqQueues.zip(laneEnabled).map { case (q, en) => q.io.enq.fire || !en }.reduce(_ && _)) {
-    firstReadIssued := true.B
-  }
-
-  // bypassConsumed: gate readData.valid to one pulse per bypass iter.
-  // writeData.fire wins same-cycle ties (new result ready for next read).
-  when(!inBypass || io.writeData.fire) {
-    bypassConsumed := false.B
-  }.elsewhen(io.readData.fire) {
-    bypassConsumed := true.B
-  }
-
-  // In readWrite, read and write requests share one TCDM port via the arbiter,
-  // so rspQueue must reject write responses. readPending tracks whether an
-  // outstanding read is in flight (1-bit suffices for 1-cycle TCDM latency).
-  val readPending = RegInit(VecInit(Seq.fill(numPorts)(false.B)))
-
   val rspQueues = (0 until numPorts).map { i =>
     val rspQueue = Module(new Queue(UInt(dataWidth.W), queueDepth))
     rspQueue.io.enq.bits := io.tcdmReqs(i).rsp.bits.data
-    readVec(i) := Mux(inBypass, bypassBuffer(i), rspQueue.io.deq.bits)
-    rspQueue.io.enq.valid := io.tcdmReqs(i).rsp.valid && (isRead || (inReadWrite && readPending(i)))
-    // Ack TCDM rsp when in bypass (nothing expected), when it's a write rsp to discard,
-    // or when the rspQueue has room.
-    io.tcdmReqs(i).rsp.ready := (inReadWrite && (inBypass || readPending(i))) || rspQueue.io.enq.ready
+    rspQueue.io.enq.valid := io.tcdmReqs(i).rsp.valid && readPending(i)
+    // We should always be ready for a tcdm response
+    io.tcdmReqs(i).rsp.ready := true.B
+    // Check to make sure:
+    when(io.tcdmReqs(i).rsp.valid) { assert(io.readData.bits(3) =/= 1.U, "something failed") };
+    when(io.tcdmReqs(i).rsp.valid) { assert(io.readData.bits(3) === 1.U, "something else failed") };
+    // By default, not ready:
+    rspQueue.io.deq.ready := false.B
+    // TODO: this is a very conservative bound
+    roomForRsp(i) := rspQueue.io.count < (rspQueue.entries.U - 1.U);
     rspQueue
   }
+  val allRspQueuesValid = rspQueues.map { q => q.io.deq.valid }.reduce(_ && _);
 
-  // readPending toggles: xor of req-fire and rsp-fire captures "only one side moved"
-  for (i <- 0 until numPorts) {
-    when(readReqQueues(i).io.deq.fire =/= rspQueues(i).io.enq.fire) {
-      readPending(i) := readReqQueues(i).io.deq.fire
+  // Step 5: send response to the outside
+  val readVec = Wire(Vec(numPorts, UInt(dataWidth.W)))
+  io.readData.bits := readVec.asTypeOf(streamerDataType)
+
+  bypassBuffer.io.deq.ready := false.B
+  when(bypassBuffer.io.deq.valid) {
+    readVec := bypassBuffer.io.deq.bits
+    bypassBuffer.io.deq.ready := io.readData.ready
+    io.readData.valid := true.B
+  }.elsewhen(allRspQueuesValid) {
+    readVec.zip(rspQueues).map { case (read, resp) =>
+      read := resp.io.deq.bits
+      resp.io.deq.ready := io.readData.ready
     }
+    io.readData.valid := true.B
+  }.otherwise {
+    readVec := DontCare
+    io.readData.valid := false.B
   }
-
-  // Disabled lanes never issue requests, so their rspQueues stay empty.
-  // Treat them as "trivially valid" so they don't block readData.valid.
-  val allRspValid = rspQueues.zip(laneEnabled).map { case (q, en) => q.io.deq.valid || !en }.reduce(_ && _)
-  io.readData.valid := Mux(inBypass, !bypassConsumed, allRspValid)
-  rspQueues.foreach { q => q.io.deq.ready := !inBypass && io.readData.ready && allRspValid }
 
   val allRspEmpty = rspQueues.map(_.io.count === 0.U).reduce(_ && _)
   io.done := agu.io.done && allRspEmpty

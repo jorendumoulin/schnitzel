@@ -119,27 +119,19 @@ class AffineAgu(
     }
     .reduce(_ && _);
 
-  // High when not performing a reduction: All strides are larger than 0
-  // When performing a temporal reduction, only high for first element
-  // Not affected by dimensions with bound <= 1
-  val globalIsFirst = io.config.temporalStrides
-    .zip(io.config.temporalBounds)
-    .zip(temporalCounters)
-    .map { case ((stride, bound), count) =>
-      (bound <= 1.U) || (stride =/= 0.U) || (count === 0.U)
-    }
-    .reduce(_ && _)
+  // Is this the first time the element is loaded?
+  // (only concers innermost dimension, larger caches are not suppported)
+  val globalIsFirst =
+    // when innermost stride != 0, always get new element
+    io.config.temporalStrides(nTemporalDims - 1) =/= 0.U ||
+      // otherwise only access it the first time
+      temporalCounters(nTemporalDims - 1) === 0.U
 
-  // High when not performing a reduction: All strides are larger than 0
-  // When performing a temporal reduction, only high for last element
-  // Not affected by dimensions with bound <= 1
-  val globalIsLast = io.config.temporalStrides
-    .zip(io.config.temporalBounds)
-    .zip(temporalCounters)
-    .map { case ((stride, bound), count) =>
-      (bound <= 1.U) || (stride =/= 0.U) || (count === bound - 1.U)
-    }
-    .reduce(_ && _)
+  val globalIsLast =
+    // when innermost stride != 0, always get new element
+    io.config.temporalStrides(nTemporalDims - 1) =/= 0.U ||
+      // otherwise only access it the last time
+      temporalCounters(nTemporalDims - 1) === io.config.temporalBounds(nTemporalDims - 1) - 1.U;
 
   io.addrs.valid := state === State.busy
   io.addrs.bits.addrs := addresses
@@ -154,15 +146,16 @@ class AffineAgu(
     val carries = Wire(Vec(nTemporalDims + 1, Bool()))
     carries(0) := true.B
     for (i <- 0 until nTemporalDims) {
-      val wraps = io.config.temporalBounds(i) <= 1.U || temporalCounters(i) === io.config.temporalBounds(i) - 1.U
+      val ri = nTemporalDims - 1 - i // temporal bounds is outermost -> innermost thus we must reverse
+      val wraps = io.config.temporalBounds(ri) <= 1.U || temporalCounters(ri) === io.config.temporalBounds(ri) - 1.U
       when(carries(i)) {
-        when(io.config.temporalBounds(i) <= 1.U) {
+        when(io.config.temporalBounds(ri) <= 1.U) {
           // Unused dimension (bound 0 or 1): skip, carry propagates
-          temporalCounters(i) := 0.U
-        }.elsewhen(temporalCounters(i) === io.config.temporalBounds(i) - 1.U) {
-          temporalCounters(i) := 0.U
+          temporalCounters(ri) := 0.U
+        }.elsewhen(temporalCounters(ri) === io.config.temporalBounds(ri) - 1.U) {
+          temporalCounters(ri) := 0.U
         }.otherwise {
-          temporalCounters(i) := temporalCounters(i) + 1.U
+          temporalCounters(ri) := temporalCounters(ri) + 1.U
         }
       }
       // Carry propagates when this dimension wraps (or is unused)
