@@ -1,30 +1,21 @@
 import os
-from io import StringIO
-from typing import Sequence
+from collections.abc import Sequence
 
-import numpy as np
 from xdsl.builder import Builder
 from xdsl.dialects.arith import ConstantOp
 from xdsl.dialects.builtin import (
-    DenseIntOrFPElementsAttr,
     ModuleOp,
-    StringAttr,
     TensorType,
     i8,
     i32,
 )
 from xdsl.dialects.func import FuncOp, ReturnOp
-from xdsl.dialects.linalg import AddOp, QuantizedMatmulOp
-from xdsl.dialects.memref import GlobalOp
+from xdsl.dialects.linalg import QuantizedMatmulOp
 from xdsl.dialects.tensor import EmptyOp
-from xdsl.dialects.arith import ConstantOp
 from xdsl.ir import BlockArgument
-from xdsl.parser import NoneAttr
-from xdsl.printer import Printer
 
 
 def gemm(m: int = 16, n: int = 16, k: int = 16):
-
     # Define Variables For Program:
     a_type = TensorType(i8, (m, k))
     b_type = TensorType(i8, (k, n))
