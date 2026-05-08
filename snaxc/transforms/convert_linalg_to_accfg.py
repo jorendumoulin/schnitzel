@@ -263,8 +263,8 @@ class ConvertLinalgToAccPass(ModulePass):
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         assert isinstance(ctx, AccContext)
-        PatternRewriteWalker(ConvertLinalgToAcceleratorPattern(op, ctx)).rewrite_module(op)
-        PatternRewriteWalker(ConvertSnaxStreamToAcceleratorPattern(op, ctx)).rewrite_module(op)
+        # PatternRewriteWalker(ConvertLinalgToAcceleratorPattern(op, ctx)).rewrite_module(op)
+        # PatternRewriteWalker(ConvertSnaxStreamToAcceleratorPattern(op, ctx)).rewrite_module(op)
         # run these strictly sequentially, otherwise stuff breaks
         PatternRewriteWalker(ConnectStatesThroughControlFlowPattern()).rewrite_module(op)
 

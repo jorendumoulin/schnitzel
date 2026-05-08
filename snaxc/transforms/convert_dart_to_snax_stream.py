@@ -1,11 +1,12 @@
 import warnings
 from dataclasses import dataclass
-from typing import cast
+from typing import Sequence, cast
 
 import numpy as np
 from numpy.typing import NDArray
 from xdsl.context import Context
 from xdsl.dialects import builtin
+from xdsl.ir import Block, Region
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     PatternRewriter,
@@ -15,11 +16,12 @@ from xdsl.pattern_rewriter import (
 )
 
 from snaxc.dialects import dart, snax_stream
+from snaxc.dialects.accfg import LaunchOp, SetupOp
 from snaxc.hw import AccContext
-from snaxc.hw.streamer_accelerator import StreamerAccelerator
+from snaxc.hw.accelerators.tensorcore import TensorCore
 from snaxc.ir.dart.affine_transform import AffineTransform
 
-TCDM_BANK_WIDTH = 4
+TCDM_BANK_WIDTH = 8
 
 
 @dataclass
@@ -35,10 +37,10 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: dart.AccessPatternOp, rewriter: PatternRewriter):
         assert op.accelerator
-        accelerator_type = self.ctx.get_acc(op.accelerator.data)
-        assert isinstance(accelerator_type, StreamerAccelerator)
-        template = accelerator_type.get_template(op)
-        streamers = accelerator_type.get_streamers(op)
+        accelerator = self.ctx.system.find_accelerator(op.accelerator)
+        assert isinstance(accelerator, TensorCore)
+        template = accelerator.get_template(op)
+        streamers = accelerator.streamers.streamers
 
         snax_stride_patterns: list[snax_stream.StridePattern] = []
 
@@ -125,24 +127,31 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
             )
             snax_stride_patterns.append(snax_stride_pattern)
 
-        new_inputs, new_outputs, new_stride_patterns, ops_to_add = accelerator_type.set_stride_patterns(
-            op, snax_stride_patterns
-        )
-        snax_stride_patterns = list(new_stride_patterns)
+        snax_stride_patterns = list(snax_stride_patterns)
 
-        snax_stride_patterns = [pattern.canonicalize() for pattern in snax_stride_patterns]
+        snax_stride_patterns = [
+            pattern.canonicalize().legalize(streamer)
+            for (pattern, streamer) in zip(snax_stride_patterns, accelerator.streamers.streamers)
+        ]
+
+        # only keep setup ops from dart body:
+        bops: Sequence[SetupOp] = []
+        for bop in op.body.block.ops:
+            if isinstance(bop, SetupOp):
+                bop.detach()
+                bops.append(bop)
 
         # now create snax_streaming region op
         new_op = snax_stream.StreamingRegionOp(
-            inputs=new_inputs,
-            outputs=new_outputs,
+            inputs=op.inputs,
+            outputs=op.outputs,
             stride_patterns=snax_stride_patterns,
             dynamic_operands=[],
             accelerator=op.accelerator.data,
-            body=rewriter.move_region_contents_to_new_regions(op.body),
+            body=Region(Block(bops)),
         )
 
-        rewriter.replace_op(op, [*ops_to_add, new_op], new_op.results)
+        rewriter.replace_op(op, new_op, new_op.results)
 
 
 @dataclass(frozen=True)
