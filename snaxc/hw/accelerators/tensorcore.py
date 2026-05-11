@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 
+import numpy as np
 from xdsl.ir import Operation
 from xdsl.ir.affine import AffineDimExpr, AffineMap
 
 from snaxc.hw.streamers.streamers import Streamer, StreamerConfiguration
 from snaxc.hw.system import Accelerator
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern, Template, TemplatePattern
-import numpy as np
-
 from snaxc.ir.dart.affine_transform import AffineTransform
 
 
@@ -20,9 +19,9 @@ class TensorCore(Accelerator):
     name = "tensorcore"
     streamers = StreamerConfiguration(
         [
-            Streamer(4, 6, (8,), "a"),
-            Streamer(4, 6, (8,), "b"),
-            Streamer(4, 6, (8, 4), "c"),
+            Streamer(4, 6, (4,), "a"),
+            Streamer(4, 6, (4,), "b"),
+            Streamer(4, 6, (4, 4), "c"),
         ]
     )
 
@@ -51,7 +50,7 @@ class TensorCore(Accelerator):
             AffineMap(3, 0, (k, n)),
             AffineMap(3, 0, (m, n)),
         ]
-        template_bounds = (8, 8, 8)
+        template_bounds = (4, 4, 4)
         return Template(TemplatePattern(template_bounds, tp) for tp in template)
 
     # Transform the schedule to match with the way data is accessed in the accelerator:
