@@ -14,16 +14,16 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   // opposite ordering of signals as they are presented here:
   // additionally, all signals here should be 32 bits.
   class CsrVals extends Bundle {
-    val aStreamerConfig = new AffineAguConfig(6, Seq(8))
-    val bStreamerConfig = new AffineAguConfig(6, Seq(8))
-    val cStreamerConfig = new AffineAguConfig(6, Seq(8, 4))
+    val aStreamerConfig = new AffineAguConfig(6, Seq(4))
+    val bStreamerConfig = new AffineAguConfig(6, Seq(4))
+    val cStreamerConfig = new AffineAguConfig(6, Seq(4, 4))
     def numRegs = aStreamerConfig.numRegs + bStreamerConfig.numRegs + cStreamerConfig.numRegs
   }
 
   val io = IO(new Bundle {
-    val aData = Vec(8, new DecoupledBusIO(addrWidth, dataWidth));
-    val bData = Vec(8, new DecoupledBusIO(addrWidth, dataWidth));
-    val cData = Vec(32, new DecoupledBusIO(addrWidth, dataWidth));
+    val aData = Vec(4, new DecoupledBusIO(addrWidth, dataWidth));
+    val bData = Vec(4, new DecoupledBusIO(addrWidth, dataWidth));
+    val cData = Vec(16, new DecoupledBusIO(addrWidth, dataWidth));
     val csr = Flipped(new CsrIO)
   })
 
@@ -32,9 +32,9 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
   dontTouch(csrVals)
 
-  val aStreamer = Module(new Streamer(6, Seq(8), 6, addrWidth, dataWidth));
-  val bStreamer = Module(new Streamer(6, Seq(8), 6, addrWidth, dataWidth));
-  val cStreamer = Module(new Streamer(6, Seq(8, 4), 6, addrWidth, dataWidth));
+  val aStreamer = Module(new Streamer(6, Seq(4), 6, addrWidth, dataWidth));
+  val bStreamer = Module(new Streamer(6, Seq(4), 6, addrWidth, dataWidth));
+  val cStreamer = Module(new Streamer(6, Seq(4, 4), 6, addrWidth, dataWidth));
 
   aStreamer.io.tcdmReqs <> io.aData
   aStreamer.io.config := csrVals.aStreamerConfig
@@ -44,7 +44,7 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   aStreamer.io.dir := StreamerDir.read
   aStreamer.io.readData.ready := bStreamer.io.readData.valid && cStreamer.io.readData.valid && cStreamer.io.writeData.ready
 
-  val aMat = aStreamer.io.readData.bits.asTypeOf(Vec(8, Vec(8, SInt(8.W))))
+  val aMat = aStreamer.io.readData.bits.asTypeOf(Vec(4, Vec(4, SInt(8.W))))
 
   bStreamer.io.tcdmReqs <> io.bData
   bStreamer.io.config := csrVals.bStreamerConfig
@@ -54,7 +54,7 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   bStreamer.io.dir := StreamerDir.read
   bStreamer.io.readData.ready := aStreamer.io.readData.valid && cStreamer.io.readData.valid && cStreamer.io.writeData.ready
 
-  val bMat = cStreamer.io.readData.bits.asTypeOf(Vec(8, Vec(8, SInt(8.W))))
+  val bMat = cStreamer.io.readData.bits.asTypeOf(Vec(4, Vec(4, SInt(8.W))))
 
   cStreamer.io.tcdmReqs <> io.cData
   cStreamer.io.config := csrVals.cStreamerConfig
@@ -64,24 +64,24 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   cStreamer.io.readData.ready := aStreamer.io.readData.valid && cStreamer.io.readData.valid && cStreamer.io.writeData.ready
   cStreamer.io.writeData.valid := aStreamer.io.readData.fire && bStreamer.io.readData.fire && cStreamer.io.readData.fire
 
-  val cMat = cStreamer.io.readData.bits.asTypeOf(Vec(8, Vec(8, SInt(32.W))))
+  val cMat = cStreamer.io.readData.bits.asTypeOf(Vec(4, Vec(4, SInt(32.W))))
 
-  val dMat = Wire(Vec(8, Vec(8, SInt(32.W))))
+  val dMat = Wire(Vec(4, Vec(4, SInt(32.W))))
 
   // Transpose B:
-  val bMatT = Wire(Vec(8, Vec(8, SInt(32.W))))
-  for (k <- 0 until 8) {
-    for (n <- 0 until 8) {
+  val bMatT = Wire(Vec(4, Vec(4, SInt(32.W))))
+  for (k <- 0 until 4) {
+    for (n <- 0 until 4) {
       bMatT(n)(k) := bMat(k)(n);
     }
   }
 
   // Compute GeMM:
-  for (n <- 0 until 8) {
-    for (m <- 0 until 8) {
+  for (n <- 0 until 4) {
+    for (m <- 0 until 4) {
       val prod = (aMat(m) zip bMatT(n)).map { case (x, y) => (x * y).asSInt }
       val dot = prod.reduce(_ +& _)
-      dMat(m)(n) := dot
+      dMat(m)(n) := dot + cMat(m)(n)
     }
   }
   cStreamer.io.writeData.bits := dMat.asUInt
