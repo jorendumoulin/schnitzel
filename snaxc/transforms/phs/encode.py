@@ -1,6 +1,6 @@
 from xdsl.context import Context
 from xdsl.dialects import builtin, linalg
-from xdsl.dialects.builtin import DenseArrayBase, ModuleOp, i64
+from xdsl.dialects.builtin import ArrayAttr, DenseArrayBase, ModuleOp, i64
 from xdsl.parser import SymbolRefAttr
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import PatternRewriter, PatternRewriteWalker, RewritePattern, op_type_rewrite_pattern
@@ -14,6 +14,7 @@ from snaxc.phs.encode import convert_generic_body_to_phs
 MAGIC_ATTR_NAME = "phs_acc"
 BOUNDS_ATTR_NAME = "phs_array_bounds"
 PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
+INDEXING_MAPS_ATTR_NAME = "phs.indexing_maps"
 
 
 class EncodeLinalgGeneric(RewritePattern):
@@ -35,6 +36,15 @@ class EncodeLinalgGeneric(RewritePattern):
         # are paired; the prune pass may shrink this list for outputs whose
         # carry is unread in the merged PE body.
         pe.attributes[PAIRED_OUTPUTS_ATTR_NAME] = DenseArrayBase.from_list(i64, list(range(len(linalg_op.outputs))))
+
+        # Propagate the linalg operand access patterns per mode. The attribute
+        # is an outer ArrayAttr indexed by mode; each inner entry is the raw
+        # linalg ``indexing_maps`` for that mode (order: [ins..., outs...]).
+        # When a linalg generic is merged into an existing abstract PE we
+        # append its maps as a new mode entry; downstream mask emission uses
+        # the per-mode maps to decide which dims a streamer accesses in each
+        # mode (dead slots implied by shorter inner lists after widening).
+        pe.attributes[INDEXING_MAPS_ATTR_NAME] = ArrayAttr([linalg_op.indexing_maps])
 
         # Pick up optional array bounds annotation
         if BOUNDS_ATTR_NAME in linalg_op.attributes:
@@ -59,6 +69,16 @@ class EncodeLinalgGeneric(RewritePattern):
             # Propagate array bounds to existing PE if not already set
             if BOUNDS_ATTR_NAME not in abstract_pe.attributes and BOUNDS_ATTR_NAME in pe.attributes:
                 abstract_pe.attributes[BOUNDS_ATTR_NAME] = pe.attributes[BOUNDS_ATTR_NAME]
+            # Append this mode's indexing maps to the abstract PE's per-mode list.
+            existing_maps = abstract_pe.attributes.get(INDEXING_MAPS_ATTR_NAME)
+            if isinstance(existing_maps, ArrayAttr):
+                abstract_pe.attributes[INDEXING_MAPS_ATTR_NAME] = ArrayAttr(
+                    [*existing_maps.data, linalg_op.indexing_maps]
+                )
+            else:
+                # First-time seed: include both the pre-existing mode (if any
+                # flat attr leaked through) and the new one.
+                abstract_pe.attributes[INDEXING_MAPS_ATTR_NAME] = ArrayAttr([linalg_op.indexing_maps])
 
 
 class PhsEncodePass(ModulePass):
