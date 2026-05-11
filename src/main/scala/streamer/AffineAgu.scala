@@ -123,15 +123,15 @@ class AffineAgu(
   // (only concers innermost dimension, larger caches are not suppported)
   val globalIsFirst =
     // when innermost stride != 0, always get new element
-    io.config.temporalStrides(nTemporalDims - 1) =/= 0.U ||
+    io.config.temporalStrides(0) =/= 0.U ||
       // otherwise only access it the first time
-      temporalCounters(nTemporalDims - 1) === 0.U
+      temporalCounters(0) === 0.U
 
   val globalIsLast =
     // when innermost stride != 0, always get new element
-    io.config.temporalStrides(nTemporalDims - 1) =/= 0.U ||
+    io.config.temporalStrides(0) =/= 0.U ||
       // otherwise only access it the last time
-      temporalCounters(nTemporalDims - 1) === io.config.temporalBounds(nTemporalDims - 1) - 1.U;
+      temporalCounters(0) === io.config.temporalBounds(0) - 1.U;
 
   io.addrs.valid := state === State.busy
   io.addrs.bits.addrs := addresses
@@ -146,16 +146,15 @@ class AffineAgu(
     val carries = Wire(Vec(nTemporalDims + 1, Bool()))
     carries(0) := true.B
     for (i <- 0 until nTemporalDims) {
-      val ri = nTemporalDims - 1 - i // temporal bounds is outermost -> innermost thus we must reverse
-      val wraps = io.config.temporalBounds(ri) <= 1.U || temporalCounters(ri) === io.config.temporalBounds(ri) - 1.U
+      val wraps = io.config.temporalBounds(i) <= 1.U || temporalCounters(i) === io.config.temporalBounds(i) - 1.U
       when(carries(i)) {
-        when(io.config.temporalBounds(ri) <= 1.U) {
+        when(io.config.temporalBounds(i) <= 1.U) {
           // Unused dimension (bound 0 or 1): skip, carry propagates
-          temporalCounters(ri) := 0.U
-        }.elsewhen(temporalCounters(ri) === io.config.temporalBounds(ri) - 1.U) {
-          temporalCounters(ri) := 0.U
+          temporalCounters(i) := 0.U
+        }.elsewhen(temporalCounters(i) === io.config.temporalBounds(i) - 1.U) {
+          temporalCounters(i) := 0.U
         }.otherwise {
-          temporalCounters(ri) := temporalCounters(ri) + 1.U
+          temporalCounters(i) := temporalCounters(i) + 1.U
         }
       }
       // Carry propagates when this dimension wraps (or is unused)
