@@ -28,7 +28,9 @@ object EmitVerilog extends App {
     args = Array("--target-dir", outputDir),
     firtoolOpts = Array(
       "-disable-all-randomization",
-      "-strip-debug-info"
+      "-strip-debug-info",
+      // inline verilog verification
+      "--enable-layers=Verification,Verification.Assert,Verification.Assume,Verification.Cover"
     )
   )
   val configJson = write(topModule.getConfig, indent = 2)

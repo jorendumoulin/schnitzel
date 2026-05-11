@@ -62,6 +62,7 @@ verilate(sim
         -Wno-IMPLICITSTATIC
         -I${GENERATED_DIR}/
         -I${RTL_DIR}/
+        --assert
 )
 
 
