@@ -64,7 +64,7 @@ class Streamer:
     @property
     def byte_offsets(self) -> Sequence[int]:
         """The spatial byte offset for contiguous access across all spatial dims"""
-        return tuple(self.access_width * prod(self.spatial_dims[i + 1 :]) for i in range(self.spatial_dim))
+        return tuple(self.access_width * prod(self.spatial_dims[i + 1 :]) for i in range(self.spatial_dim))[::-1]
 
 
 @dataclass
