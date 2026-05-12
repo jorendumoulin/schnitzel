@@ -128,7 +128,9 @@ class Streamer(
       // of the buffer will be consumed in a correctly configured system.
       io.writeData.ready := true.B
       // During simulation, assert that this is actually the case.
-      assert(bypassBuffer.io.enq.ready)
+      when(bypassBuffer.io.enq.valid) {
+        assert(bypassBuffer.io.enq.ready, "bypass buffer is not ready for new data!")
+      }
     }
   }.otherwise { io.writeData.ready := false.B }
 
@@ -177,8 +179,7 @@ class Streamer(
     // We should always be ready for a tcdm response
     io.tcdmReqs(i).rsp.ready := true.B
     // Check to make sure:
-    when(io.tcdmReqs(i).rsp.valid) { assert(io.readData.bits(3) =/= 1.U, "something failed") };
-    when(io.tcdmReqs(i).rsp.valid) { assert(io.readData.bits(3) === 1.U, "something else failed") };
+    when(io.tcdmReqs(i).rsp.valid) { assert(rspQueue.io.enq.ready, "no room in streamer response buffer") };
     // By default, not ready:
     rspQueue.io.deq.ready := false.B
     // TODO: this is a very conservative bound
