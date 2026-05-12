@@ -46,15 +46,15 @@ class ConvertStreamToAccfgPattern(RewritePattern):
                 setup_vals[param] = val_op
 
             # upper bounds
-            for ub, ub_param in zip(pattern.upper_bounds, streamer.ub_params(), strict=True):
+            for ub, ub_param in zip(reversed(pattern.upper_bounds.data), streamer.ub_params(), strict=True):
                 add_setup_op(ub.data, ub_param)
 
             # temporal strides
-            for ts, ts_param in zip(pattern.temporal_strides, streamer.ts_params(), strict=True):
+            for ts, ts_param in zip(reversed(pattern.temporal_strides.data), streamer.ts_params(), strict=True):
                 add_setup_op(ts.data, ts_param)
 
             # spatial strides
-            for ss, ss_param in zip(pattern.spatial_strides, streamer.ss_params(), strict=True):
+            for ss, ss_param in zip(reversed(pattern.spatial_strides.data), streamer.ss_params(), strict=True):
                 add_setup_op(ss.data, ss_param)
 
         # get all remaining ops from streaming op body
