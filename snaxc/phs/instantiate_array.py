@@ -24,7 +24,7 @@ from dataclasses import dataclass
 
 from xdsl.dialects import arith, builtin, hw
 from xdsl.ir import Attribute, Block, BlockArgument, Region, SSAValue
-from xdsl.ir.affine import AffineMap
+from xdsl.ir.affine import AffineDimExpr, AffineMap
 from xdsl.utils.hints import isa
 
 from snaxc.dialects import phs
@@ -69,11 +69,6 @@ WiringResolution = FromArrayBlockArg | FromScalarBlockArg | FromPEOutput
 # =====================================================================
 # Phase 1: layout — derive block arg structure from a TemplateSpec
 # =====================================================================
-
-
-def _is_scalar_map(m: AffineMap, bounds: tuple[int, ...]) -> bool:
-    """True if this map produces a 0-dimensional (scalar) output."""
-    return len(m.eval(bounds, ())) == 0
 
 
 @dataclass(frozen=True)
@@ -548,54 +543,122 @@ def build_pe_array_body(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
     def _input_maps_for(i: int) -> tuple[AffineMap | None, ...]:
         return tuple(mode_maps[i] if i < len(mode_maps) else None for mode_maps in spec.per_mode_input_maps)
 
+    streamer_mask_unions: list[AffineMap] = []
     for i in range(len(pe.data_operands())):
         if i in layout.streamer_pairs:
             paired_j = layout.streamer_pairs[i]
             streamer_mask_sizes.append(output_sizes[paired_j])
             # readWrite streamer: its spatial access is the paired output's map.
             streamer_mask_maps.append(_output_maps_for(paired_j))
+            streamer_mask_unions.append(spec.output_maps[paired_j])
         else:
             streamer_mask_sizes.append(input_sizes[i])
             streamer_mask_maps.append(_input_maps_for(i))
+            streamer_mask_unions.append(spec.input_maps[i])
     paired_output_set = set(layout.streamer_pairs.values())
     for j in range(len(pe_result_types)):
         if j in paired_output_set:
             continue
         streamer_mask_sizes.append(output_sizes[j])
         streamer_mask_maps.append(_output_maps_for(j))
+        streamer_mask_unions.append(spec.output_maps[j])
 
     num_dims = len(spec.template_bounds)
-    for size, mode_maps in zip(streamer_mask_sizes, streamer_mask_maps, strict=True):
+
+    # Bit r of the per-streamer mask labels streamer-spatial-dim r, which
+    # tracks the r-th result of the streamer's *unioned* access map (the
+    # one used to size the port). The Chisel streamer's `laneEnabled`
+    # logic (Streamer.scala:43–52) uses this mask to gate lane-index
+    # duplicates along each spatial dim. A per-mode value is needed
+    # because narrower modes (e.g., matmul broadcasting one dim that
+    # elementwise vectorises) want different mask bits than the broader
+    # mode; a static union over-enables and lets duplicate-address lanes
+    # fire — the resulting bank arbitration prevents the streamer's
+    # response queue from draining at the rate the accelerator expects,
+    # and the spatial chain stalls. We emit one mask per mode and select
+    # with an `arith.select` driven by the merge-added mode switch (last
+    # in ``pe.get_switches()``). Reduces to a constant when all modes
+    # agree, matching the previous single-mode behaviour.
+    def _used_bits_for_mode(m: AffineMap | None, union: AffineMap, width: int) -> int:
+        """Compute the per-streamer mask bits for one mode's access map.
+
+        Bit r of the mask labels the streamer-spatial-dim r, which tracks
+        result r of the *unioned* map (the one that sized the streamer's
+        port). For each result in the narrower mode's map, find which
+        result of the unioned map references the same iter dim, and set
+        that bit. Modes that don't access a streamer (dead slot) contribute
+        no bits; modes whose map's dim count doesn't match the template
+        (handled externally by the dart scheduler) fall back to "all
+        active" — the same conservative behaviour the original code had.
+        """
+        if m is None:
+            return 0
+        if m.num_dims != num_dims:
+            return (1 << width) - 1
+        # Map iter-dim position -> the union-result index that references it.
+        # When the unioned map is identity (the common case for our merges),
+        # this is the identity dict. For non-AffineDimExpr unioned results
+        # we conservatively skip them — they aren't lanes the mask can
+        # individually gate anyway.
+        dim_to_union_idx: dict[int, int] = {}
+        for u_idx, u_result in enumerate(union.results):
+            if u_idx >= width:
+                break
+            if isinstance(u_result, AffineDimExpr):
+                dim_to_union_idx[u_result.position] = u_idx
+        bits = 0
+        for result in m.results:
+            if isinstance(result, AffineDimExpr):
+                u_idx = dim_to_union_idx.get(result.position)
+                if u_idx is not None:
+                    bits |= 1 << u_idx
+            else:
+                for d in result.used_dims():
+                    u_idx = dim_to_union_idx.get(d)
+                    if u_idx is not None:
+                        bits |= 1 << u_idx
+        return bits & ((1 << width) - 1)
+
+    for size, mode_maps, union in zip(streamer_mask_sizes, streamer_mask_maps, streamer_mask_unions, strict=True):
         width = _mask_width_for_size(size)
-        # Union across modes of which of *this streamer's own* spatial dims are
-        # active. Bit r corresponds to the r-th result of the affine map (=
-        # the r-th spatial dim of the streamer's data), NOT to iteration-space
-        # dim r. A streamer-dim is "active" in a mode if its corresponding
-        # result expression depends on at least one iteration dim (a constant
-        # result means the streamer never advances along that dim → scalar).
-        # If a mode's map has a different dim count from the template bounds,
-        # its dim-numbering doesn't correspond to PE-array dims and the dart
-        # scheduler handles the tile split elsewhere — treat as "all active"
-        # (conservative). A mode that's dead (None) contributes nothing.
-        used_bits = 0
-        for m in mode_maps:
-            if m is None:
-                continue
-            if m.num_dims != num_dims:
-                used_bits |= (1 << width) - 1
-                continue
-            for r_idx, result in enumerate(m.results):
-                if r_idx >= width:
-                    break
-                if result.used_dims():
-                    used_bits |= 1 << r_idx
-        # Scalar streamers have width=1 by convention (Integer port must be
-        # >=1 bit); a scalar-in-every-mode streamer ends up with used_bits=0
-        # and we emit the scalar-collapse mask.
-        mask_val = used_bits & ((1 << width) - 1)
-        const = arith.ConstantOp.from_int_and_width(mask_val, width)
-        block.add_op(const)
-        yield_operands.append(const.result)
+        per_mode_bits = [_used_bits_for_mode(m, union, width) for m in mode_maps]
+
+        if len(set(per_mode_bits)) <= 1:
+            # Single-mode PE, or all modes agree on this streamer's mask:
+            # emit a constant (matches the pre-multi-mode behaviour).
+            mask_val = per_mode_bits[0] if per_mode_bits else 0
+            const = arith.ConstantOp.from_int_and_width(mask_val, width)
+            block.add_op(const)
+            yield_operands.append(const.result)
+            continue
+
+        if len(per_mode_bits) != 2:
+            # >2 modes don't have a single-switch mode selector (each
+            # additional merge adds its own switch). Falling back to the
+            # union here keeps the previous (latent) behaviour and lets
+            # the deadlock surface in the same way it does today; the fix
+            # is to walk the merge-tree once support is needed.
+            union = 0
+            for b in per_mode_bits:
+                union |= b
+            const = arith.ConstantOp.from_int_and_width(union, width)
+            block.add_op(const)
+            yield_operands.append(const.result)
+            continue
+
+        # Two modes: pick on the most-recently-added switch.
+        pe_mode_switch = switches[-1]
+        arr_mode_switch = block.args[len(layout.in_types) - len(switches) + len(switches) - 1]
+        cast_op, sw_i1 = builtin.UnrealizedConversionCastOp.cast_one(arr_mode_switch, builtin.IntegerType(1))
+        block.add_op(cast_op)
+        const_a = arith.ConstantOp.from_int_and_width(per_mode_bits[0], width)
+        const_b = arith.ConstantOp.from_int_and_width(per_mode_bits[1], width)
+        block.add_op(const_a)
+        block.add_op(const_b)
+        sel = arith.SelectOp(sw_i1, const_b.result, const_a.result)
+        block.add_op(sel)
+        yield_operands.append(sel.result)
+        del pe_mode_switch  # silence "unused": tracked here for clarity but the cast goes via arr_mode_switch
 
     # Build per-pair dynamic carry_used i1 signals. For each pair (input i,
     # output j) we trace the PE body from the yielded value for output j and

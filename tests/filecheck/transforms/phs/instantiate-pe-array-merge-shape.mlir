@@ -59,9 +59,18 @@ func.func @merged(%am: tensor<2xi32>, %bm: tensor<2xi32>, %cm: tensor<2x2xi32>,
 // CHECK: phs.instance "acc_pe_1_0" @acc(%{{.+}}, %{{.+}}, %{{.+}} : i32, i32, i32)
 // CHECK: phs.instance "acc_pe_1_1" @acc(%{{.+}}, %{{.+}}, %{{.+}} : i32, i32, i32)
 
-// Streamer masks are the OR-across-modes superset (both modes vectorised
-// in any dim → all bits on). Per-mode broadcast is handled by stride
-// configuration, not by the static mask.
-// CHECK: %{{.+}} = arith.constant -1 : i2
+// Streamer masks are emitted per-mode and selected by the merge-added
+// outermost switch. A static union over-enables: it lets duplicate-address
+// lanes fire in matmul mode (where A is broadcast on d1 and B on d0), two
+// PEs hit the same TCDM bank, and the streamer deadlocks. With per-mode
+// selection: A's mask = (matmul: 1, ew: 3); B's mask = (matmul: 2, ew: 3);
+// C is full 2D in both modes, so its mask collapses to a single constant.
+// CHECK: %{{.+}} = builtin.unrealized_conversion_cast {{.+}} : index to i1
+// CHECK-NEXT: %{{.+}} = arith.constant 1 : i2
 // CHECK-NEXT: %{{.+}} = arith.constant -1 : i2
+// CHECK-NEXT: %{{.+}} = arith.select %{{.+}}, %{{.+}}, %{{.+}} : i2
+// CHECK-NEXT: %{{.+}} = builtin.unrealized_conversion_cast {{.+}} : index to i1
+// CHECK-NEXT: %{{.+}} = arith.constant -2 : i2
+// CHECK-NEXT: %{{.+}} = arith.constant -1 : i2
+// CHECK-NEXT: %{{.+}} = arith.select %{{.+}}, %{{.+}}, %{{.+}} : i2
 // CHECK-NEXT: %{{.+}} = arith.constant -1 : i2
