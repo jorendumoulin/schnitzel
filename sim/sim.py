@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 from types import ModuleType
+from typing import Sequence
 
 import numpy as np
 
@@ -42,8 +43,7 @@ class Simulator:
         # Smoke test — retained for backward compatibility, hardcoded paths.
         sim = self._lib.Sim(
             [
-                "/home/joren/phd/schnitzel/build/device/apps/hello_world.elf",
-                "/home/joren/phd/schnitzel/build/host/apps/hello_world.elf",
+                "/home/joren/phd/schnitzel/tests/operators/gemm/build/gemm",
             ]
         )
         symbols = sim.get_symbols()
