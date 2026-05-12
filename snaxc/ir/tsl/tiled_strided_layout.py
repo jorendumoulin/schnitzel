@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Self
+from typing import Self, Sequence
 
 import numpy as np
 from numpy._typing import NDArray
@@ -25,8 +25,8 @@ class TiledStridedLayout:
 
     @staticmethod
     def from_strides(
-        strides: list[int | None],
-        tile_bounds: list[list[int | None]],
+        strides: Sequence[int | None],
+        tile_bounds: Sequence[list[int | None]],
         offset: int | None = 0,
     ) -> TiledStridedLayout:
         """Create a TiledStridedLayout from a list of strides and tile bounds
