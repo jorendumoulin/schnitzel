@@ -130,18 +130,41 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
         """Generate all setup values: streamer configs + switch values."""
         result: list[tuple[Sequence[Operation], SSAValue]] = []
 
-        for operand, pattern, _streamer in zip(
+        # The Chisel Streamer reserves a fixed number of CSR slots per
+        # streamer (``temporal_dims`` ts + ``temporal_dims`` ub +
+        # ``spatial_dim`` ss). The canonicalized snax_stream pattern
+        # is allowed to be shorter (bound-1 dims dropped, missing spatial
+        # dims for narrow-mode candidates) — if we emit fewer values here,
+        # every CSR after this streamer shifts up by the missing count,
+        # and the next streamer's base lands in this one's bound slot.
+        # The hardware then reads garbage bounds and locks up. Pad ts/ub
+        # to the streamer's declared ``temporal_dims`` (stride 0, bound 1
+        # = one no-op iteration) and ss to ``spatial_dim`` (stride 0 =
+        # runtime broadcast on that lane).
+        for operand, pattern, streamer in zip(
             (*op.inputs, *op.outputs), op.stride_patterns.data, self.phs.streamers.streamers
         ):
             result.append(([], operand))
+            ts_count = len(pattern.temporal_strides)
+            ub_count = len(pattern.upper_bounds)
+            ss_count = len(pattern.spatial_strides)
             for ts in pattern.temporal_strides:
                 c = arith.ConstantOp.from_int_and_width(ts.data, 32)
+                result.append(([c], c.result))
+            for _ in range(streamer.temporal_dims - ts_count):
+                c = arith.ConstantOp.from_int_and_width(0, 32)
                 result.append(([c], c.result))
             for ub in pattern.upper_bounds:
                 c = arith.ConstantOp.from_int_and_width(ub.data, 32)
                 result.append(([c], c.result))
+            for _ in range(streamer.temporal_dims - ub_count):
+                c = arith.ConstantOp.from_int_and_width(1, 32)
+                result.append(([c], c.result))
             for ss in pattern.spatial_strides:
                 c = arith.ConstantOp.from_int_and_width(ss.data, 32)
+                result.append(([c], c.result))
+            for _ in range(streamer.spatial_dim - ss_count):
+                c = arith.ConstantOp.from_int_and_width(0, 32)
                 result.append(([c], c.result))
 
         generic = op.regions[0].ops.first
