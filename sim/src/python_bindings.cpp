@@ -14,7 +14,10 @@ public:
     sim = std::make_unique<Sim>(program_args, vlt_args);
   }
 
-  int run() { return sim->run(); }
+  int run() {
+    sim->enable_trace("./sim.vcd");
+    return sim->run();
+  }
 
   std::map<std::string, int> get_symbols() { return g_loader.get_symbols(); };
 
