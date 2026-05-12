@@ -21,7 +21,7 @@ from snaxc.hw import AccContext
 from snaxc.hw.accelerators.tensorcore import TensorCore
 from snaxc.ir.dart.affine_transform import AffineTransform
 
-TCDM_BANK_WIDTH = 8
+TCDM_BANK_WIDTH = 4
 
 
 @dataclass
