@@ -66,6 +66,29 @@ class TiledStride:
         """
         return enumerate(self.strides)
 
+    def resample(self, bounds: tuple[int, ...]) -> Self:
+        strides: list[Stride] = []
+        bounds_list = [x for x in bounds]
+
+        while len(bounds_list):
+            # TODO: make less dynamic
+            existing_bound = self.strides[-1].bound or 0
+            new_bound = bounds_list[-1]
+            if existing_bound == new_bound:
+                strides.insert(0, self.strides.pop())
+                bounds_list.pop()
+            elif existing_bound > new_bound and existing_bound % new_bound == 0:
+                strides.insert(0, Stride(self.strides[-1].step, new_bound))
+                self.strides[-1].bound = existing_bound // new_bound
+                if self.strides[-1].step is not None:
+                    self.strides[-1].step = self.strides[-1].step * new_bound
+                bounds_list.pop()
+            else:
+                raise RuntimeError("Failed to resample stride set")
+        while len(self.strides):
+            strides.insert(0, self.strides.pop())
+        return type(self)(strides)
+
     def canonicalize(self) -> Self:
         strides: list[Stride] = []
         for stride in reversed(self.strides):
