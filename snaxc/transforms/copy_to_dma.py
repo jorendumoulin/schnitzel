@@ -1,4 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import cast
 
 from xdsl.context import Context
 from xdsl.dialects.arith import ConstantOp, DivUIOp, MuliOp
@@ -15,8 +17,8 @@ from xdsl.dialects.memref import (
     DimOp,
     ExtractAlignedPointerAsIndexOp,
 )
-from xdsl.ir import Block, Region
-from xdsl.parser import StringAttr
+from xdsl.ir import Block, Operation, Region, SSAValue
+from xdsl.parser import NoneAttr, StringAttr
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     PatternRewriter,
@@ -29,9 +31,14 @@ from xdsl.utils.hints import isa
 
 from snaxc.dialects.accfg import SetupOp
 from snaxc.dialects.snax_stream import StreamingRegionOp, StridePattern
+from snaxc.dialects.tsl import TiledStridedLayoutAttr
 from snaxc.hw.acc_context import AccContext
 from snaxc.hw.accelerators.dma import Dma
+from snaxc.hw.streamers.streamers import Streamer
 from snaxc.hw.system import Cluster, System
+from snaxc.ir.tsl.stride import Stride
+from snaxc.ir.tsl.tiled_stride import TiledStride
+from snaxc.ir.tsl.tiled_strided_layout import TiledStridedLayout
 
 
 def find_dma(system: System, source: StringAttr, dest: StringAttr) -> tuple[Dma, bool] | None:
@@ -91,19 +98,6 @@ class CopyToDmaPattern(RewritePattern):
             return
         dma, reverse_ops = result
 
-        # Compute total size of the transfer:
-        total_size_op = ConstantOp.from_int_and_width(element_type.size, IndexType())
-        rewriter.insert_op(total_size_op, InsertPoint.before(op))
-        for dim in range(op.source.type.get_num_dims()):
-            const_op = ConstantOp.from_int_and_width(dim, IndexType())
-            dim_op = DimOp.from_source_and_index(op.source, const_op.result)
-            total_size_op = MuliOp(total_size_op.result, dim_op.result, IndexType())
-            rewriter.insert_op((const_op, dim_op, total_size_op), InsertPoint.before(op))
-        # Divide this by the size of the streamer to find the required temporal stride:
-        const_op = ConstantOp.from_int_and_width(dma.streamers.streamers[0].full_width, IndexType())
-        total_size_op = DivUIOp(total_size_op.result, const_op.result, IndexType())
-        rewriter.insert_op((const_op, total_size_op), InsertPoint.before(op))
-
         # Extract source and destination pointers
         source_ptr_op = ExtractAlignedPointerAsIndexOp.get(op.source)
         dest_ptr_op = ExtractAlignedPointerAsIndexOp.get(op.destination)
@@ -120,20 +114,15 @@ class CopyToDmaPattern(RewritePattern):
             # L3→L1: source is L3 (AXI), dest is L1 (TCDM)
             tcdm_ptr_op, axi_ptr_op = dest_ptr_op, source_ptr_op
 
-        # Create simple stride patterns:
-        # Unused temporal dims get bound=0 (hardware skips them)
-        source_streamer = dma.streamers.streamers[0]
-        source_pattern = StridePattern(
-            upper_bounds=[0] * (source_streamer.temporal_dims - 1) + [DYNAMIC_INDEX],
-            temporal_strides=[0] * (source_streamer.temporal_dims - 1) + [source_streamer.full_width],
-            spatial_strides=source_streamer.byte_offsets,
-        )
-        dest_streamer = dma.streamers.streamers[1]
-        dest_pattern = StridePattern(
-            upper_bounds=[0] * (dest_streamer.temporal_dims - 1) + [DYNAMIC_INDEX],
-            temporal_strides=[0] * (dest_streamer.temporal_dims - 1) + [dest_streamer.full_width],
-            spatial_strides=dest_streamer.byte_offsets,
-        )
+        # Determine streamer patterns:
+        dynamic_operands: Sequence[Operation | SSAValue]
+        if DYNAMIC_INDEX in op.source.type.get_shape():
+            if op.source.type.layout != NoneAttr or op.destination.type.layout != NoneAttr:
+                raise NotImplementedError("Transformations not supported for dynamic transfers")
+            tcdm_pattern, axi_pattern, dynamic_operands = self.dynamic_1d_patterns(op, rewriter, dma, element_type)
+        else:
+            tcdm_pattern, axi_pattern = self.static_transform_pattern(op, rewriter, dma, element_type, reverse_ops)
+            dynamic_operands = []
 
         # set other dma params directly with accfg:
         dir_val = ConstantOp.from_int_and_width(1 if reverse_ops else 0, i32)
@@ -144,13 +133,135 @@ class CopyToDmaPattern(RewritePattern):
         new_op = StreamingRegionOp(
             inputs=[tcdm_ptr_op.aligned_pointer],
             outputs=[axi_ptr_op.aligned_pointer],
-            stride_patterns=(source_pattern, dest_pattern),
-            dynamic_operands=[total_size_op, total_size_op],
+            stride_patterns=(tcdm_pattern, axi_pattern),
+            dynamic_operands=dynamic_operands,
             accelerator=dma.name,
             body=Region(Block([dir_val, dir_op])),
         )
 
         rewriter.replace_op(op, (source_ptr_op, dest_ptr_op, new_op))  # both ptr ops needed for their SSA values
+
+    def dynamic_1d_patterns(
+        self, op: CopyOp, rewriter: PatternRewriter, dma: Dma, element_type: FixedBitwidthType
+    ) -> tuple[StridePattern, StridePattern, Sequence[SSAValue | Operation]]:
+        assert isa(op.source.type, MemRefType[FixedBitwidthType])
+        # Compute total size of the transfer:
+        total_size_op = ConstantOp.from_int_and_width(element_type.size, IndexType())
+        rewriter.insert_op(total_size_op, InsertPoint.before(op))
+        for dim in range(op.source.type.get_num_dims()):
+            const_op = ConstantOp.from_int_and_width(dim, IndexType())
+            dim_op = DimOp.from_source_and_index(op.source, const_op.result)
+            total_size_op = MuliOp(total_size_op.result, dim_op.result, IndexType())
+            rewriter.insert_op((const_op, dim_op, total_size_op), InsertPoint.before(op))
+        # Divide this by the size of the streamer to find the required temporal stride:
+        const_op = ConstantOp.from_int_and_width(dma.streamers.streamers[0].full_width, IndexType())
+        total_size_op = DivUIOp(total_size_op.result, const_op.result, IndexType())
+        rewriter.insert_op((const_op, total_size_op), InsertPoint.before(op))
+        # Create simple stride patterns:
+        # Unused temporal dims get bound=0 (hardware skips them)
+        tcdm_streamer = dma.streamers.streamers[0]
+        tcdm_pattern = StridePattern(
+            upper_bounds=[DYNAMIC_INDEX] + [0] * (tcdm_streamer.temporal_dims - 1),
+            temporal_strides=[tcdm_streamer.full_width] + [0] * (tcdm_streamer.temporal_dims - 1),
+            spatial_strides=tcdm_streamer.byte_offsets,
+        )
+        axi_streamer = dma.streamers.streamers[1]
+        axi_pattern = StridePattern(
+            upper_bounds=[DYNAMIC_INDEX] + [0] * (axi_streamer.temporal_dims - 1),
+            temporal_strides=[axi_streamer.full_width] + [0] * (axi_streamer.temporal_dims - 1),
+            spatial_strides=axi_streamer.byte_offsets,
+        )
+        return tcdm_pattern, axi_pattern, (total_size_op, total_size_op)
+
+    def static_transform_pattern(
+        self,
+        op: CopyOp,
+        rewriter: PatternRewriter,
+        dma: Dma,
+        element_type: FixedBitwidthType,
+        reverse_ops: bool,
+    ) -> tuple[StridePattern, StridePattern]:
+        # extract layout attributes
+        tcdm_op, axi_op = (op.source, op.destination) if reverse_ops else (op.destination, op.source)
+        assert isa(axi_op.type, MemRefType[FixedBitwidthType])
+        assert isa(tcdm_op.type, MemRefType[FixedBitwidthType])
+        axi_layout = axi_op.type.layout
+        tcdm_layout = tcdm_op.type.layout
+
+        # construct tiled strided layouts with equal tile size
+        if not isinstance(tcdm_layout, TiledStridedLayoutAttr):
+            assert isa(strides := tcdm_op.type.get_strides(), Sequence[int])
+            assert isinstance(axi_layout, TiledStridedLayoutAttr)
+            tcdm_layout = TiledStridedLayoutAttr(
+                TiledStridedLayout.from_strides(strides, axi_layout.data.tile_bounds(), 0)
+            )
+        if not isinstance(axi_layout, TiledStridedLayoutAttr):
+            assert isa(strides := axi_op.type.get_strides(), Sequence[int])
+            assert isinstance(tcdm_layout, TiledStridedLayoutAttr)
+            axi_layout = TiledStridedLayoutAttr(
+                TiledStridedLayout.from_strides(strides, tcdm_layout.data.tile_bounds(), 0)
+            )
+
+        # extract stride pairs
+        tcdm_strides = tuple(x for _, _, x in tcdm_layout.data)
+        axi_strides = tuple(x for _, _, x in axi_layout.data)
+
+        # multiply by element width:
+        tcdm_strides = tuple(Stride(cast(int, x.step) * element_type.size, x.bound) for x in tcdm_strides)
+        tcdm_strides += (Stride(1, element_type.size),)
+        axi_strides = tuple(Stride(cast(int, x.step) * element_type.size, x.bound) for x in axi_strides)
+        axi_strides += (Stride(1, element_type.size),)
+
+        # order by axi strides
+        sorted_strides = sorted(zip(tcdm_strides, axi_strides), key=lambda x: x[1].step or 0, reverse=True)
+        tcdm_tiled_stride = TiledStride([x[0] for x in sorted_strides])
+        axi_tiled_stride = TiledStride([x[1] for x in sorted_strides])
+
+        # resample to spatial bounds of the streamers and create stride patterns
+
+        def create_stride_pattern(streamer: Streamer, strides: list[Stride]):
+
+            # innermost stride is the inherent access width
+            assert len(strides) > 1
+            strides.pop()
+
+            # should at least be able to fill the spatial strides
+            spatial_dim = streamer.spatial_dim
+            assert len(strides) >= streamer.spatial_dim
+
+            # innermost are spatial strides
+            spatial_strides = [x.step for x in strides[len(strides) - spatial_dim :]]
+            assert isa(spatial_strides, list[int])
+
+            # should fit in the temporal strides
+            assert len(strides) <= streamer.spatial_dim + streamer.temporal_dim + 1
+
+            # outermost are temporal stuff
+            temporal_strides = [x.step for x in strides[: len(strides) - spatial_dim]]
+            assert isa(temporal_strides, list[int])
+            temporal_bounds = [x.bound for x in strides[: len(strides) - spatial_dim]]
+            assert isa(temporal_bounds, list[int])
+
+            # stride is outermost-> innnermost, stride pattern is innermost -> outermost
+            return StridePattern(
+                upper_bounds=temporal_bounds[::-1] + [0] * (streamer.temporal_dim - len(temporal_bounds)),
+                temporal_strides=temporal_strides[::-1] + [0] * (streamer.temporal_dim - len(temporal_strides)),
+                spatial_strides=spatial_strides[::-1],
+            )
+
+        tcdm_streamer = dma.streamers.streamers[0]
+        tcdm_tiled_stride = tcdm_tiled_stride.canonicalize().resample(
+            tcdm_streamer.spatial_dims + (tcdm_streamer.access_width,)
+        )
+        tcdm_pattern = create_stride_pattern(tcdm_streamer, tcdm_tiled_stride.strides)
+
+        axi_streamer = dma.streamers.streamers[1]
+        axi_tiled_stride = axi_tiled_stride.canonicalize().resample(
+            axi_streamer.spatial_dims + (axi_streamer.access_width,)
+        )
+        axi_pattern = create_stride_pattern(axi_streamer, axi_tiled_stride.strides)
+
+        return tcdm_pattern, axi_pattern
 
 
 @dataclass(frozen=True)
