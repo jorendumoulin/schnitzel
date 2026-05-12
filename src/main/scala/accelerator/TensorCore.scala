@@ -45,6 +45,7 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   aStreamer.io.readData.ready := bStreamer.io.readData.valid && cStreamer.io.readData.valid && cStreamer.io.writeData.ready
 
   val aMat = aStreamer.io.readData.bits.asTypeOf(Vec(4, Vec(4, SInt(8.W))))
+  dontTouch(aMat)
 
   bStreamer.io.tcdmReqs <> io.bData
   bStreamer.io.config := csrVals.bStreamerConfig
@@ -54,19 +55,22 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   bStreamer.io.dir := StreamerDir.read
   bStreamer.io.readData.ready := aStreamer.io.readData.valid && cStreamer.io.readData.valid && cStreamer.io.writeData.ready
 
-  val bMat = cStreamer.io.readData.bits.asTypeOf(Vec(4, Vec(4, SInt(8.W))))
+  val bMat = bStreamer.io.readData.bits.asTypeOf(Vec(4, Vec(4, SInt(8.W))))
+  dontTouch(bMat)
 
   cStreamer.io.tcdmReqs <> io.cData
   cStreamer.io.config := csrVals.cStreamerConfig
   cStreamer.io.spatialDimMask := VecInit(Seq.fill(2)(true.B))
   cStreamer.io.start := csrItf.io.start
   cStreamer.io.dir := StreamerDir.readWrite
-  cStreamer.io.readData.ready := aStreamer.io.readData.valid && cStreamer.io.readData.valid && cStreamer.io.writeData.ready
+  cStreamer.io.readData.ready := aStreamer.io.readData.valid && bStreamer.io.readData.valid && cStreamer.io.writeData.ready
   cStreamer.io.writeData.valid := aStreamer.io.readData.fire && bStreamer.io.readData.fire && cStreamer.io.readData.fire
 
   val cMat = cStreamer.io.readData.bits.asTypeOf(Vec(4, Vec(4, SInt(32.W))))
+  dontTouch(cMat)
 
   val dMat = Wire(Vec(4, Vec(4, SInt(32.W))))
+  dontTouch(dMat)
 
   // Transpose B:
   val bMatT = Wire(Vec(4, Vec(4, SInt(32.W))))
@@ -75,6 +79,7 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
       bMatT(n)(k) := bMat(k)(n);
     }
   }
+  dontTouch(bMatT)
 
   // Compute GeMM:
   for (n <- 0 until 4) {
