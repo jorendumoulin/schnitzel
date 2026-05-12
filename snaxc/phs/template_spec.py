@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import itertools
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from xdsl.dialects.builtin import AffineMapAttr, ArrayAttr, DenseArrayBase
 from xdsl.ir.affine import AffineDimExpr, AffineMap
@@ -212,6 +212,34 @@ class TemplateSpec:
         template = [*self.input_maps[: self.num_pure_inputs], *self.output_maps]
         template_bounds = self.template_bounds
         return Template(TemplatePattern(template_bounds, tp) for tp in template)
+
+    def get_dart_template_for_maps(self, operand_maps: Sequence[AffineMap]) -> Template:
+        """Return the per-mode dart template matching the given operand maps.
+
+        ``operand_maps`` is the candidate kernel's [ins..., outs...] access-map
+        list (as on a ``dart.OperationOp.patterns``). The dart scheduler's
+        ``TemplatePattern.matches`` requires the schedule's nonzero singular
+        vectors to equal the template's, so a candidate that uses a narrower
+        mode's access pattern (e.g. matmul broadcast inputs) never matches the
+        unioned template — its rank is lower. Returning the per-mode template
+        gives the scheduler the right reference for the mode the candidate
+        was dispatched against. Falls back to ``get_dart_template`` (the
+        unioned view) when no mode matches: legacy single-mode PEs whose
+        per-mode tracking matches the union land there, as do candidates
+        that arrive widened. Also falls back when a per-mode map's iter
+        dim count exceeds ``template_bounds`` (the dart scheduler tiles
+        the extra dims and the spatial-cycle pattern comes from the union).
+        """
+        target = tuple(operand_maps)
+        num_dims = len(self.template_bounds)
+        for in_maps, out_maps in zip(self.per_mode_input_maps, self.per_mode_output_maps):
+            if in_maps + out_maps != target:
+                continue
+            if any(m.num_dims != num_dims for m in in_maps + out_maps):
+                continue
+            template = [*in_maps, *out_maps]
+            return Template(TemplatePattern(self.template_bounds, tp) for tp in template)
+        return self.get_dart_template()
 
     @staticmethod
     def derive_template_spec(pe: phs.PEOp, bounds: tuple[int, ...]) -> TemplateSpec:

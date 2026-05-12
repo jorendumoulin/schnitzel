@@ -164,4 +164,13 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
         )
 
     def get_template(self, op: dart.StreamingRegionOpBase) -> Template:
+        # On a multi-mode PE the unioned template covers all modes' shapes
+        # together, but each dispatched kernel uses just one mode's access
+        # pattern. Picking the per-mode template here lets the dart scheduler's
+        # singular-vector match accept the narrower (broadcast-input) shapes
+        # of modes like matmul-via-temporal-carry; runtime broadcasting is
+        # handled by per-mode streamer stride config later.
+        if isinstance(op, dart.OperationOp):
+            operand_maps = tuple(p.data for p in op.patterns.data)
+            return self.template_spec.get_dart_template_for_maps(operand_maps)
         return self.template_spec.get_dart_template()
