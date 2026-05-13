@@ -1,6 +1,7 @@
 import warnings
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence, cast
+from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -16,7 +17,7 @@ from xdsl.pattern_rewriter import (
 )
 
 from snaxc.dialects import dart, snax_stream
-from snaxc.dialects.accfg import LaunchOp, SetupOp
+from snaxc.dialects.accfg import SetupOp
 from snaxc.hw import AccContext
 from snaxc.hw.accelerators.tensorcore import TensorCore
 from snaxc.ir.dart.affine_transform import AffineTransform
@@ -40,7 +41,7 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
         accelerator = self.ctx.system.find_accelerator(op.accelerator)
         assert isinstance(accelerator, TensorCore)
         template = accelerator.get_template(op)
-        streamers = accelerator.streamers.streamers
+        streamers = accelerator.streamers
 
         snax_stride_patterns: list[snax_stream.StridePattern] = []
 
@@ -131,7 +132,7 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
 
         snax_stride_patterns = [
             pattern.canonicalize().legalize(streamer)
-            for (pattern, streamer) in zip(snax_stride_patterns, accelerator.streamers.streamers)
+            for (pattern, streamer) in zip(snax_stride_patterns, accelerator.streamers)
         ]
 
         # only keep setup ops from dart body:

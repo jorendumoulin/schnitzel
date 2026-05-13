@@ -88,5 +88,15 @@ class TensorCore(addrWidth: Int, dataWidth: Int, M: Int = 4, N: Int = 4, K: Int 
 
   csrItf.io.done := cStreamer.io.done
 
-  def getConfig = AcceleratorConfig("tensorcore", Map.empty)
+  def getConfig = AcceleratorConfig(
+    "tensorcore",
+    Map(
+      "M" -> ujson.Num(M),
+      "N" -> ujson.Num(N),
+      "K" -> ujson.Num(K),
+      "a" -> aStreamer.getConfig,
+      "b" -> bStreamer.getConfig,
+      "c" -> cStreamer.getConfig
+    )
+  )
 }
