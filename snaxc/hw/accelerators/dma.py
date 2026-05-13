@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, Self, Sequence
 
 from snaxc.hw.streamers.streamers import (
     Streamer,
-    StreamerConfiguration,
 )
 from snaxc.hw.system import Accelerator
 
@@ -23,6 +22,10 @@ class Dma(Accelerator):
         tcdm = Streamer.from_params(params["tcdm"], "tcdm")
         axi = Streamer.from_params(params["axi"], "axi")
         return cls(tcdm, axi)
+
+    @property
+    def streamers(self) -> Sequence[Streamer]:
+        return (self.tcdm, self.axi)
 
     def dir_param(self) -> str:
         return "dir"

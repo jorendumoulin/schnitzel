@@ -1,10 +1,11 @@
 from dataclasses import dataclass
+from typing import Sequence
 
 import numpy as np
 from xdsl.ir import Operation
 from xdsl.ir.affine import AffineDimExpr, AffineMap
 
-from snaxc.hw.streamers.streamers import Streamer, StreamerConfiguration
+from snaxc.hw.streamers.streamers import Streamer
 from snaxc.hw.system import Accelerator
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern, Template, TemplatePattern
 from snaxc.ir.dart.affine_transform import AffineTransform
@@ -17,13 +18,13 @@ class TensorCore(Accelerator):
     """
 
     name = "tensorcore"
-    streamers = StreamerConfiguration(
-        [
-            Streamer(4, 6, (4,), "a"),
-            Streamer(4, 6, (4,), "b"),
-            Streamer(4, 6, (4, 4), "c"),
-        ]
-    )
+    a = Streamer(4, 6, (4,), "a")
+    b = Streamer(4, 6, (4,), "b")
+    c = Streamer(4, 6, (4, 4), "c")
+
+    @property
+    def streamers(self) -> Sequence[Streamer]:
+        return (self.a, self.b, self.c)
 
     def launch_param(self) -> str:
         return "start"
@@ -31,7 +32,7 @@ class TensorCore(Accelerator):
     def param_values(self) -> dict[str, int]:
         base = 0x900
         csrs: list[str] = []
-        for streamer in self.streamers.streamers:
+        for streamer in self.streamers:
             csrs.append(streamer.addr_params())
             csrs.extend(streamer.ts_params())
             csrs.extend(streamer.ub_params())
