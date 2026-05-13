@@ -8,29 +8,35 @@ import csr.CsrInterface
 import datapath.AluArray
 import config.AcceleratorConfig
 
-class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
+class TensorCore(addrWidth: Int, dataWidth: Int, M: Int = 4, N: Int = 4, K: Int = 4) extends Module {
 
-  // warning: using this to reinterpret the vec of values, results in the
-  // opposite ordering of signals as they are presented here:
-  // additionally, all signals here should be 32 bits.
+  // Automatically determine port sizes based on array width and data width
+  var aports = Seq(M)
+  if (K > dataWidth / 8) aports = aports :+ K / (dataWidth / 8)
+  var bports = Seq(K)
+  if (N > dataWidth / 8) bports = bports :+ N / (dataWidth / 8)
+  var cports = Seq(M)
+  if (N > dataWidth / 32) cports = cports :+ N / (dataWidth / 32)
+
+  // CSR interface:
   class CsrVals extends Bundle {
-    val aStreamerConfig = new AffineAguConfig(6, Seq(4))
-    val bStreamerConfig = new AffineAguConfig(6, Seq(4))
-    val cStreamerConfig = new AffineAguConfig(6, Seq(4, 4))
+    val aStreamerConfig = new AffineAguConfig(6, aports)
+    val bStreamerConfig = new AffineAguConfig(6, bports)
+    val cStreamerConfig = new AffineAguConfig(6, cports)
     def numRegs = aStreamerConfig.numRegs + bStreamerConfig.numRegs + cStreamerConfig.numRegs
   }
+  val csrItf = Module(new CsrInterface((new CsrVals).numRegs, 0x900))
+  val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
 
+  // IO definitions:
   val io = IO(new Bundle {
-    val aData = Vec(4, new DecoupledBusIO(addrWidth, dataWidth));
-    val bData = Vec(4, new DecoupledBusIO(addrWidth, dataWidth));
-    val cData = Vec(16, new DecoupledBusIO(addrWidth, dataWidth));
+    val aData = Vec(csrVals.aStreamerConfig.numPorts, new DecoupledBusIO(addrWidth, dataWidth));
+    val bData = Vec(csrVals.bStreamerConfig.numPorts, new DecoupledBusIO(addrWidth, dataWidth));
+    val cData = Vec(csrVals.cStreamerConfig.numPorts, new DecoupledBusIO(addrWidth, dataWidth));
     val csr = Flipped(new CsrIO)
   })
 
-  val csrItf = Module(new CsrInterface((new CsrVals).numRegs, 0x900))
   csrItf.io.csr <> io.csr
-  val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
-  dontTouch(csrVals)
 
   val aStreamer = Module(new Streamer(csrVals.aStreamerConfig, 6, dataWidth));
   val bStreamer = Module(new Streamer(csrVals.bStreamerConfig, 6, dataWidth));
@@ -42,10 +48,7 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   aStreamer.io.start := csrItf.io.start
   aStreamer.io.writeData := DontCare
   aStreamer.io.dir := StreamerDir.read
-  aStreamer.io.readData.ready := bStreamer.io.readData.valid && cStreamer.io.readData.valid && cStreamer.io.writeData.ready
-
-  val aMat = aStreamer.io.readData.bits.asTypeOf(Vec(4, Vec(4, SInt(8.W))))
-  dontTouch(aMat)
+  val aMat = aStreamer.io.readData.bits.asTypeOf(Vec(M, Vec(K, SInt(8.W))))
 
   bStreamer.io.tcdmReqs <> io.bData
   bStreamer.io.config := csrVals.bStreamerConfig
@@ -53,43 +56,35 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   bStreamer.io.start := csrItf.io.start
   bStreamer.io.writeData := DontCare
   bStreamer.io.dir := StreamerDir.read
-  bStreamer.io.readData.ready := aStreamer.io.readData.valid && cStreamer.io.readData.valid && cStreamer.io.writeData.ready
-
-  val bMat = bStreamer.io.readData.bits.asTypeOf(Vec(4, Vec(4, SInt(8.W))))
-  dontTouch(bMat)
+  val bMat = bStreamer.io.readData.bits.asTypeOf(Vec(K, Vec(N, SInt(8.W))))
 
   cStreamer.io.tcdmReqs <> io.cData
   cStreamer.io.config := csrVals.cStreamerConfig
   cStreamer.io.spatialDimMask := VecInit(Seq.fill(2)(true.B))
   cStreamer.io.start := csrItf.io.start
   cStreamer.io.dir := StreamerDir.readWrite
-  cStreamer.io.readData.ready := aStreamer.io.readData.valid && bStreamer.io.readData.valid && cStreamer.io.writeData.ready
-  cStreamer.io.writeData.valid := aStreamer.io.readData.fire && bStreamer.io.readData.fire && cStreamer.io.readData.fire
+  val cMat = cStreamer.io.readData.bits.asTypeOf(Vec(M, Vec(N, SInt(32.W))))
 
-  val cMat = cStreamer.io.readData.bits.asTypeOf(Vec(4, Vec(4, SInt(32.W))))
-  dontTouch(cMat)
+  // Produce output result:
+  val dMat = Wire(Vec(M, Vec(N, SInt(32.W))))
 
-  val dMat = Wire(Vec(4, Vec(4, SInt(32.W))))
-  dontTouch(dMat)
-
-  // Transpose B:
-  val bMatT = Wire(Vec(4, Vec(4, SInt(32.W))))
-  for (k <- 0 until 4) {
-    for (n <- 0 until 4) {
-      bMatT(n)(k) := bMat(k)(n);
-    }
-  }
-  dontTouch(bMatT)
-
-  // Compute GeMM:
-  for (n <- 0 until 4) {
-    for (m <- 0 until 4) {
-      val prod = (aMat(m) zip bMatT(n)).map { case (x, y) => (x * y).asSInt }
-      val dot = prod.reduce(_ +& _)
+  for (m <- 0 until M) {
+    for (n <- 0 until N) {
+      val dot = (0 until K)
+        .map(k => aMat(m)(k) * bMat(k)(n))
+        .reduce(_ +& _)
       dMat(m)(n) := dot + cMat(m)(n)
     }
   }
   cStreamer.io.writeData.bits := dMat.asUInt
+
+  // Flow control
+  val go =
+    aStreamer.io.readData.valid && bStreamer.io.readData.valid && cStreamer.io.readData.valid && cStreamer.io.writeData.ready
+  aStreamer.io.readData.ready := go
+  bStreamer.io.readData.ready := go
+  cStreamer.io.readData.ready := go
+  cStreamer.io.writeData.valid := go
 
   csrItf.io.done := cStreamer.io.done
 
