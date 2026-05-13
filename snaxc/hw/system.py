@@ -1,7 +1,7 @@
 from abc import ABC
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional, Self
 
 from xdsl.dialects.builtin import StringAttr
 from xdsl.ir import Operation
@@ -80,6 +80,10 @@ class Accelerator(ABC):
         accelerator configuration.
         """
         raise NotImplementedError()
+
+    @classmethod
+    def from_params(cls, params: dict[str, Any]) -> Self:
+        return cls()
 
 
 @dataclass

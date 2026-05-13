@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any, Self
 
 from snaxc.hw.streamers.streamers import (
     Streamer,
@@ -14,12 +15,14 @@ class Dma(Accelerator):
     """
 
     name = "dma"
-    streamers = StreamerConfiguration(
-        [
-            Streamer(4, 4, (2, 2, 2, 2), "tcdm"),
-            Streamer(64, 4, tuple(), "axi"),
-        ]
-    )
+    tcdm: Streamer
+    axi: Streamer
+
+    @classmethod
+    def from_params(cls, params: dict[str, Any]) -> Self:
+        tcdm = Streamer.from_params(params["tcdm"], "tcdm")
+        axi = Streamer.from_params(params["axi"], "axi")
+        return cls(tcdm, axi)
 
     def dir_param(self) -> str:
         return "dir"
@@ -30,7 +33,7 @@ class Dma(Accelerator):
     def param_values(self) -> dict[str, int]:
         base = 0x900
         csrs: list[str] = []
-        for streamer in self.streamers.streamers:
+        for streamer in (self.tcdm, self.axi):
             csrs.append(streamer.addr_params())
             csrs.extend(streamer.ts_params())
             csrs.extend(streamer.ub_params())
