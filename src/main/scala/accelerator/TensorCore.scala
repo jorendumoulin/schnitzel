@@ -32,9 +32,9 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
   val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
   dontTouch(csrVals)
 
-  val aStreamer = Module(new Streamer(6, Seq(4), 6, addrWidth, dataWidth));
-  val bStreamer = Module(new Streamer(6, Seq(4), 6, addrWidth, dataWidth));
-  val cStreamer = Module(new Streamer(6, Seq(4, 4), 6, addrWidth, dataWidth));
+  val aStreamer = Module(new Streamer(csrVals.aStreamerConfig, 6, dataWidth));
+  val bStreamer = Module(new Streamer(csrVals.bStreamerConfig, 6, dataWidth));
+  val cStreamer = Module(new Streamer(csrVals.cStreamerConfig, 6, dataWidth));
 
   aStreamer.io.tcdmReqs <> io.aData
   aStreamer.io.config := csrVals.aStreamerConfig

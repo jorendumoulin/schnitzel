@@ -11,23 +11,26 @@ import axi.DecoupledIOToAXI
 import csr.CsrIO
 import csr.CsrInterface
 import streamer.StreamerDir
-import chisel3.simulator.PeekPokeAPI.TestableData
 import config.DmaConfig
+import chisel3.util.log2Up
 
 object DmaDir extends ChiselEnum { val readAxi, writeAxi = Value; }
 
 // DMA instantiates streamer <-> AXI bus
 class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends Module {
 
+  // Calculate number of tcdm ports to match axi bandwidth
   val numPorts = axiConfig.dataWidth / dataWidth;
 
-  // warning: using this to reinterpret the vec of values, results in the
-  // opposite ordering of signals as they are presented here:
-  // additionally, all signals here should be 32 bits.
+  // use spatial dims of size 2 until reaching the required number of ports
+  val numSpatialDims = log2Up(numPorts)
+  assert(math.pow(2, numSpatialDims) == numPorts, "Number of DMA ports should be a power of 2")
+
   class CsrVals extends Bundle {
-    val streamerConfig = new AffineAguConfig(4, Seq(2, 2, 2, 2)) // fetches 16 elements
+    val streamerConfig = new AffineAguConfig(4, Seq.fill(numSpatialDims)(2)) // fetches 16 elements
     val axiStreamerConfig = new AffineAguConfig(4, Seq()) // Writes 16x32b (512b) elements in one go ~ wide AXI
     val dir = UInt(32.W)
+    val numRegs = streamerConfig.numRegs + axiStreamerConfig.numRegs + 1
   }
 
   val io = IO(new Bundle {
@@ -36,21 +39,21 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
     val csr = Flipped(new CsrIO)
   })
 
-  val csrItf = Module(new CsrInterface(13 + 9 + 1, 0x900))
+  val csrItf = Module(new CsrInterface((new CsrVals).numRegs, 0x900))
   csrItf.io.csr <> io.csr
   val csrVals = VecInit(csrItf.io.vals.reverse).asTypeOf(new CsrVals)
   dontTouch(csrVals)
   val dir = csrVals.dir(0).asTypeOf(DmaDir())
 
   // Use streamer for tcdm requests
-  val streamer = Module(new Streamer(4, Seq(2, 2, 2, 2), 3, addrWidth, dataWidth));
+  val streamer = Module(new Streamer(csrVals.streamerConfig, 3, dataWidth));
   streamer.io.tcdmReqs <> io.data
   streamer.io.config := csrVals.streamerConfig
-  streamer.io.spatialDimMask := VecInit(Seq.fill(4)(true.B))
+  streamer.io.spatialDimMask := VecInit(Seq.fill(csrVals.streamerConfig.spatialDimSizes.length)(true.B))
   streamer.io.start := csrItf.io.start
 
   // Use affine agu for AXI address generation
-  val axiAgu = Module(new AffineAgu(4, Seq(), 2))
+  val axiAgu = Module(new AffineAgu(csrVals.axiStreamerConfig))
   axiAgu.io.config := csrVals.axiStreamerConfig;
   axiAgu.io.start := csrItf.io.start;
 

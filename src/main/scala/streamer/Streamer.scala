@@ -5,28 +5,25 @@ import chisel3.util.Queue
 import core.DecoupledBusIO
 import chisel3.util.{Decoupled, RRArbiter, log2Ceil}
 import dataclass.data
-import streamer.AguOutput
+import streamer.{AguOutput, AffineAguConfig}
 import core.BusReq
 import streamer.StreamerDir.write
 
 object StreamerDir extends ChiselEnum { val read, write, readWrite = Value }
 
 class Streamer(
-    nTemporalDims: Int,
-    spatialDimSizes: Seq[Int],
+    affineConfig: AffineAguConfig,
     queueDepth: Int = 2,
-    addrWidth: Int = 32,
     dataWidth: Int = 64
 ) extends Module {
 
-  val numPorts = spatialDimSizes.fold(1)(_ * _)
-  val streamerDataType = UInt((numPorts * dataWidth).W)
+  val streamerDataType = UInt((affineConfig.numPorts * dataWidth).W)
 
   val io = IO(new Bundle {
     val start = Input(Bool())
-    val config = Input(new AffineAguConfig(nTemporalDims, spatialDimSizes))
-    val spatialDimMask = Input(Vec(spatialDimSizes.length, Bool()))
-    val tcdmReqs = Vec(numPorts, new DecoupledBusIO(addrWidth, dataWidth))
+    val config = Input(chiselTypeOf(affineConfig))
+    val spatialDimMask = Input(Vec(affineConfig.spatialDimSizes.length, Bool()))
+    val tcdmReqs = Vec(affineConfig.numPorts, new DecoupledBusIO(affineConfig.addrWidth, dataWidth))
     val dir = Input(StreamerDir())
     val readData = Decoupled(streamerDataType)
     val writeData = Flipped(Decoupled(streamerDataType))
@@ -35,7 +32,7 @@ class Streamer(
 
   dontTouch(io.config)
 
-  val agu = Module(new AffineAgu(nTemporalDims, spatialDimSizes, queueDepth));
+  val agu = Module(new AffineAgu(affineConfig));
   agu.io.start := io.start
   agu.io.config := io.config
 
@@ -50,8 +47,8 @@ class Streamer(
   val readQueuesReady, writeQueuesReady = WireInit(false.B)
 
   // read queues:
-  val readReqQueues = (0 until numPorts).map { i =>
-    val queue = Module(new Queue(UInt(addrWidth.W), queueDepth))
+  val readReqQueues = (0 until affineConfig.numPorts).map { i =>
+    val queue = Module(new Queue(UInt(affineConfig.addrWidth.W), queueDepth))
     queue.io.enq.bits := agu.io.addrs.bits.addrs(i)
     // can enqueue read request if it is valid, if both read and write, also wait for write queues
     queue.io.enq.valid := agu.io.addrs.valid && readReq && readQueuesReady && (!writeReq || writeQueuesReady);
@@ -60,8 +57,8 @@ class Streamer(
   readQueuesReady := readReqQueues.map { q => q.io.enq.ready }.reduce(_ && _);
 
   // write queues:
-  val writeReqQueues = (0 until numPorts).map { i =>
-    val queue = Module(new Queue(UInt(addrWidth.W), queueDepth))
+  val writeReqQueues = (0 until affineConfig.numPorts).map { i =>
+    val queue = Module(new Queue(UInt(affineConfig.addrWidth.W), queueDepth))
     queue.io.enq.bits := agu.io.addrs.bits.addrs(i)
     // can enqueue write request if it is valid, if both read and write, also wait for read queues
     queue.io.enq.valid := agu.io.addrs.valid && writeReq && writeQueuesReady && (!readReq || readQueuesReady);
@@ -79,15 +76,15 @@ class Streamer(
   agu.io.addrs.ready := (readQueuesReady || ~readReq) && (writeQueuesReady || ~writeReq)
 
   // Step 2: Couple write requests with actual write data and put into new queue:
-  val writeVec = io.writeData.bits.asTypeOf(Vec(numPorts, UInt(dataWidth.W)))
+  val writeVec = io.writeData.bits.asTypeOf(Vec(affineConfig.numPorts, UInt(dataWidth.W)))
 
   // The last write goes into a queue:
-  val writeDataQueues = (0 until numPorts).map { i =>
+  val writeDataQueues = (0 until affineConfig.numPorts).map { i =>
     val queue = Module(
       new Queue(
         new Bundle {
           val data = UInt(dataWidth.W)
-          val addr = UInt(addrWidth.W)
+          val addr = UInt(affineConfig.addrWidth.W)
         },
         queueDepth
       )
@@ -109,7 +106,7 @@ class Streamer(
   val writeDataQueuesFire = writeDataQueues.map { q => q.io.enq.fire }.reduce(_ && _);
 
   // Other writes go into the bypass buffer
-  val bypassBuffer = Module(new Queue(Vec(numPorts, UInt(dataWidth.W)), 1, pipe = true))
+  val bypassBuffer = Module(new Queue(Vec(affineConfig.numPorts, UInt(dataWidth.W)), 1, pipe = true))
   bypassBuffer.io.enq.bits := writeVec
   bypassBuffer.io.enq.valid :=
     // We are not writing to the last element
@@ -139,11 +136,11 @@ class Streamer(
   // Step 3: arbitrate read and write requests to the TCDM
 
   // signal to check if we can accept new responses
-  val roomForRsp = VecInit(Seq.fill(numPorts)(false.B))
+  val roomForRsp = VecInit(Seq.fill(affineConfig.numPorts)(false.B))
   dontTouch(roomForRsp)
 
-  val reqArbiters = (0 until numPorts).map { i =>
-    val reqArbiter = Module(new RRArbiter(new BusReq(addrWidth, dataWidth), 2))
+  val reqArbiters = (0 until affineConfig.numPorts).map { i =>
+    val reqArbiter = Module(new RRArbiter(new BusReq(affineConfig.addrWidth, dataWidth), 2))
     // Attach each arbiters output to the req part of a TCDM port
     io.tcdmReqs(i).req <> reqArbiter.io.out
 
@@ -169,10 +166,10 @@ class Streamer(
   // Step 4: collect responses from tcdm
 
   // only collect read requests
-  val readPending = (0 until numPorts).map { i =>
+  val readPending = (0 until affineConfig.numPorts).map { i =>
     RegNext(io.tcdmReqs(i).req.fire && ~io.tcdmReqs(i).req.bits.wen)
   }
-  val rspQueues = (0 until numPorts).map { i =>
+  val rspQueues = (0 until affineConfig.numPorts).map { i =>
     val rspQueue = Module(new Queue(UInt(dataWidth.W), queueDepth))
     rspQueue.io.enq.bits := io.tcdmReqs(i).rsp.bits.data
     rspQueue.io.enq.valid := io.tcdmReqs(i).rsp.valid && readPending(i)
@@ -189,7 +186,7 @@ class Streamer(
   val allRspQueuesValid = rspQueues.map { q => q.io.deq.valid }.reduce(_ && _);
 
   // Step 5: send response to the outside
-  val readVec = Wire(Vec(numPorts, UInt(dataWidth.W)))
+  val readVec = Wire(Vec(affineConfig.numPorts, UInt(dataWidth.W)))
   io.readData.bits := readVec.asTypeOf(streamerDataType)
 
   bypassBuffer.io.deq.ready := false.B

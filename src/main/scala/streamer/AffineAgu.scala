@@ -12,20 +12,19 @@ import chisel3.util.{Decoupled}
   * @param addressWidth
   *   bitwidth of addresses.
   */
-class AffineAguConfig(val nTemporalDims: Int, val spatialDimSizes: Seq[Int], val addressWidth: Int = 32)
-    extends Bundle {
+class AffineAguConfig(val nTemporalDims: Int, val spatialDimSizes: Seq[Int], val addrWidth: Int = 32) extends Bundle {
 
   /** The starting memory address for the affine sequence. */
-  val baseAddr = UInt(addressWidth.W)
+  val baseAddr = UInt(addrWidth.W)
 
   /** The step size for each temporal dimension. */
-  val temporalStrides = Vec(nTemporalDims, UInt(addressWidth.W))
+  val temporalStrides = Vec(nTemporalDims, UInt(addrWidth.W))
 
   /** The loop bounds (maximum iterations) for each temporal dimension. */
-  val temporalBounds = Vec(nTemporalDims, UInt(addressWidth.W))
+  val temporalBounds = Vec(nTemporalDims, UInt(addrWidth.W))
 
   /** The step size for each spatial dimension in the output vector. */
-  val spatialStrides = Vec(spatialDimSizes.length, UInt(addressWidth.W))
+  val spatialStrides = Vec(spatialDimSizes.length, UInt(addrWidth.W))
 
   /** Calculates the total number of 32-bit words required for this config. Useful for memory-mapping and CSR offset
     * calculations.
@@ -33,6 +32,9 @@ class AffineAguConfig(val nTemporalDims: Int, val spatialDimSizes: Seq[Int], val
   def numRegs: Int = {
     1 + (nTemporalDims * 2) + spatialDimSizes.length
   }
+
+  /** Calculates the number of ports (= nb spatial addresses) for this config. */
+  def numPorts: Int = spatialDimSizes.fold(1)(_ * _)
 }
 
 class AguOutput(val addressWidth: Int, val numSpatialOutputs: Int) extends Bundle {
@@ -51,15 +53,10 @@ class AguOutput(val addressWidth: Int, val numSpatialOutputs: Int) extends Bundl
   * @param queueDepth
   *   The depth of the internal Decoupled queues for each address output.
   */
-class AffineAgu(
-    nTemporalDims: Int,
-    spatialDimSizes: Seq[Int],
-    queueDepth: Int = 2,
-    addressWidth: Int = 32
-) extends Module {
+class AffineAgu(affineConfig: AffineAguConfig) extends Module {
 
   /** Total number of parallel address outputs calculated as the product of all spatial dimensions. */
-  val numSpatialOutputs = spatialDimSizes.fold(1)(_ * _)
+  val numSpatialOutputs = affineConfig.spatialDimSizes.fold(1)(_ * _)
 
   val io = IO(new Bundle {
 
@@ -67,10 +64,10 @@ class AffineAgu(
     val start = Input(Bool())
 
     /** Runtime configuration for strides, bounds, and base address. */
-    val config = Input(new AffineAguConfig(nTemporalDims, spatialDimSizes, addressWidth))
+    val config = Input(chiselTypeOf(affineConfig))
 
     /** Vector of Decoupled interfaces providing calculated addresses. */
-    val addrs = Decoupled(new AguOutput(addressWidth, numSpatialOutputs))
+    val addrs = Decoupled(new AguOutput(affineConfig.addrWidth, numSpatialOutputs))
 
     /** High when the AGU is idle and has finished its current iteration bounds. */
     val done = Output(Bool())
@@ -83,7 +80,7 @@ class AffineAgu(
   when(state === State.idle && io.start) { state := State.busy; }
 
   // Counter registers for each temporal dimension
-  val temporalCounters = RegInit(VecInit(Seq.fill(nTemporalDims)(0.U(addressWidth.W))))
+  val temporalCounters = RegInit(VecInit(Seq.fill(affineConfig.nTemporalDims)(0.U(affineConfig.addrWidth.W))))
 
   // Calculate the result of the temporal address
   val temporalAddress = io.config.baseAddr + temporalCounters
@@ -94,11 +91,11 @@ class AffineAgu(
   // Calculate final addresses by applying spatial strides
   val addresses = VecInit(
     for (outputIdx <- 0 until numSpatialOutputs) yield {
-      var addrOffset = 0.U(addressWidth.W)
-      var multiplier = 1.U(addressWidth.W)
+      var addrOffset = 0.U(affineConfig.addrWidth.W)
+      var multiplier = 1.U(affineConfig.addrWidth.W)
 
-      for (dim <- spatialDimSizes.indices) {
-        val dimSize = spatialDimSizes(dim)
+      for (dim <- affineConfig.spatialDimSizes.indices) {
+        val dimSize = affineConfig.spatialDimSizes(dim)
         val dimIndex = (outputIdx.U / multiplier) % dimSize.U
         addrOffset = addrOffset + (dimIndex * io.config.spatialStrides(dim))
         multiplier = multiplier * dimSize.U
@@ -143,9 +140,9 @@ class AffineAgu(
 
   // Function to increment counters in nested loop fashion
   def incrementCounters(): Unit = {
-    val carries = Wire(Vec(nTemporalDims + 1, Bool()))
+    val carries = Wire(Vec(affineConfig.nTemporalDims + 1, Bool()))
     carries(0) := true.B
-    for (i <- 0 until nTemporalDims) {
+    for (i <- 0 until affineConfig.nTemporalDims) {
       val wraps = io.config.temporalBounds(i) <= 1.U || temporalCounters(i) === io.config.temporalBounds(i) - 1.U
       when(carries(i)) {
         when(io.config.temporalBounds(i) <= 1.U) {
