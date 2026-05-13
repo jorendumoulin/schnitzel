@@ -13,7 +13,7 @@ def _parse_accelerator(accelerator: dict[str, Any]) -> Accelerator:
         from snaxc.hw.accelerators.phs import Phs
 
         return Phs.from_config(accelerator)
-    return get_all_accelerators()[acc_type]()()
+    return get_all_accelerators()[acc_type]().from_params(accelerator["params"])
 
 
 def parse_config(config: Any) -> System:

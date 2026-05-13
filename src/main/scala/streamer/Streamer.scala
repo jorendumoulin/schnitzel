@@ -207,4 +207,8 @@ class Streamer(
 
   val allRspEmpty = rspQueues.map(_.io.count === 0.U).reduce(_ && _)
   io.done := agu.io.done && allRspEmpty
+
+  def getConfig = Map(
+    "access_width" -> ujson.Num(dataWidth)
+  ) ++ affineConfig.getConfig
 }

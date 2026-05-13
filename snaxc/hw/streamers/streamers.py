@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from math import prod
+from typing import Any, Self
 
 
 @dataclass
@@ -25,6 +26,16 @@ class Streamer:
     other writers' writeData.valid on this streamer's readData.valid (otherwise
     the handshake deadlocks because the carry data never gets "consumed").
     """
+
+    @classmethod
+    def from_params(cls, params: dict[str, Any], name_base: str) -> Self:
+        # TODO: could also be handled with dacite
+        return cls(
+            params["access_width"],
+            params["temporal_dims"],
+            tuple(params["spatial_dims"]),
+            name_base,
+        )
 
     def addr_params(self) -> str:
         return f"{self.name_base}_addr"
