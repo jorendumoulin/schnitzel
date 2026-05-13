@@ -11,8 +11,9 @@ import axi.DecoupledIOToAXI
 import csr.CsrIO
 import csr.CsrInterface
 import streamer.StreamerDir
-import config.DmaConfig
 import chisel3.util.log2Up
+import ujson.Obj
+import config.AcceleratorConfig
 
 object DmaDir extends ChiselEnum { val readAxi, writeAxi = Value; }
 
@@ -94,6 +95,6 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
 
   csrItf.io.done := axiAgu.io.done && streamer.io.done
 
-  def getConfig = DmaConfig("dma")
+  def getConfig = AcceleratorConfig("dma", Map.empty)
 
 }

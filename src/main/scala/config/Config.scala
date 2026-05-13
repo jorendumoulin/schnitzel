@@ -6,29 +6,37 @@ import upickle.default.{ReadWriter => RW, macroRW}
 case class MemoryConfig(name: String, start: Long, size: Long)
 object MemoryConfig { implicit val rw: RW[MemoryConfig] = macroRW }
 
-// --- Accelerator Config Hierarchy ---
-// Wrapper with type + config fields
-sealed trait Accelerator {}
-
-// Config is just a map of params
-case class AluConfig(`type`: String, width: Int) extends Accelerator
-object AluConfig { implicit val rw: RW[AluConfig] = macroRW }
-
-case class TensorCoreConfig(`type`: String, width: Int) extends Accelerator
-object TensorCoreConfig { implicit val rw: RW[TensorCoreConfig] = macroRW }
-
-case class DmaConfig(`type`: String) extends Accelerator
-object DmaConfig { implicit val rw: RW[DmaConfig] = macroRW }
-
-object Accelerator {
-  implicit val rw: RW[Accelerator] = RW.merge(
-    macroRW[AluConfig],
-    macroRW[TensorCoreConfig],
-    macroRW[DmaConfig]
-  )
+// // --- Accelerator Config Hierarchy ---
+// // Wrapper with type + config fields
+// sealed trait Accelerator {}
+//
+// // Config is just a map of params
+// case class AluConfig(`type`: String, width: Int) extends Accelerator
+// object AluConfig { implicit val rw: RW[AluConfig] = macroRW }
+//
+// case class TensorCoreConfig(`type`: String, width: Int) extends Accelerator
+// object TensorCoreConfig { implicit val rw: RW[TensorCoreConfig] = macroRW }
+//
+// case class DmaConfig(`type`: String) extends Accelerator
+// object DmaConfig { implicit val rw: RW[DmaConfig] = macroRW }
+//
+// object Accelerator {
+//   implicit val rw: RW[Accelerator] = RW.merge(
+//     macroRW[AluConfig],
+//     macroRW[TensorCoreConfig],
+//     macroRW[DmaConfig]
+//   )
+// }
+//
+case class AcceleratorConfig(
+    `type`: String,
+    params: Map[String, ujson.Value]
+)
+object AcceleratorConfig {
+  implicit val rw: RW[AcceleratorConfig] = macroRW
 }
 
-case class CoreConfig(hart_id: Int, accelerators: List[Accelerator])
+case class CoreConfig(hart_id: Int, accelerators: List[AcceleratorConfig])
 object CoreConfig { implicit val rw: RW[CoreConfig] = macroRW }
 
 case class ClusterConfig(memory: MemoryConfig, cores: List[CoreConfig])
