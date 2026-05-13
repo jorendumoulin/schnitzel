@@ -21,7 +21,7 @@ import config.MemoryConfig
 class TensorCluster extends Module {
 
   val wideAxiDataWidth = 512
-  val tcdmDataWidth = CoreConfig.dataWidth
+  val tcdmDataWidth = 32
 
   val io = IO(new Bundle {
     val axi = new AXIBundle(AXIConfig(idWidth = 6, dataWidth = wideAxiDataWidth))
@@ -90,7 +90,7 @@ class TensorCluster extends Module {
 
   // TCDM
   val numBanks = 32
-  val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM.masked(1024, Vec(4, UInt(8.W)), 0, 0, 1)));
+  val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM.masked(1024, Vec(tcdmDataWidth / 8, UInt(8.W)), 0, 0, 1)));
   val tcdm_ports = VecInit(tcdm_sram.map(sram => sram.readwritePorts(0)));
 
   val interconnect = Module(new Interconnect(42, numBanks, CoreConfig.addrWidth, tcdmDataWidth));
@@ -99,10 +99,10 @@ class TensorCluster extends Module {
 
   interconnect.io.outs.zip(tcdm_ports).foreach { case (out, port) =>
     port.enable := out.req.valid
-    port.address := out.req.bits.addr(CoreConfig.addrWidth - 1, log2Up(numBanks) + log2Up(CoreConfig.dataWidth / 8))
+    port.address := out.req.bits.addr(CoreConfig.addrWidth - 1, log2Up(numBanks) + log2Up(tcdmDataWidth / 8))
     port.isWrite := out.req.bits.wen
     port.mask.foreach { _ := out.req.bits.ben.asBools }
-    port.writeData := out.req.bits.wdata.asTypeOf(Vec(4, UInt(8.W)))
+    port.writeData := out.req.bits.wdata.asTypeOf(Vec(tcdmDataWidth / 8, UInt(8.W)))
     out.rsp.bits.data := port.readData.asUInt
     out.req.ready := true.B
     val prevReq = RegNext(out.req.fire)
