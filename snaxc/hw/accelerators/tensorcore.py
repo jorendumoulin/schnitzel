@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, Self, Sequence
 
 import numpy as np
 from xdsl.ir import Operation
@@ -18,9 +18,22 @@ class TensorCore(Accelerator):
     """
 
     name = "tensorcore"
-    a = Streamer(4, 6, (4,), "a")
-    b = Streamer(4, 6, (4,), "b")
-    c = Streamer(4, 6, (4, 4), "c")
+    m: int
+    n: int
+    k: int
+    a: Streamer
+    b: Streamer
+    c: Streamer
+
+    @classmethod
+    def from_params(cls, params: dict[str, Any]) -> Self:
+        m = params["M"]
+        n = params["N"]
+        k = params["K"]
+        a = Streamer.from_params(params["a"], "a")
+        b = Streamer.from_params(params["b"], "b")
+        c = Streamer.from_params(params["c"], "c")
+        return cls(m, n, k, a, b, c)
 
     @property
     def streamers(self) -> Sequence[Streamer]:

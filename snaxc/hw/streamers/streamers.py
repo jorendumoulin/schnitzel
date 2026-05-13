@@ -31,7 +31,7 @@ class Streamer:
     def from_params(cls, params: dict[str, Any], name_base: str) -> Self:
         # TODO: could also be handled with dacite
         return cls(
-            params["access_width"],
+            params["access_width"] // 8,
             params["temporal_dims"],
             tuple(params["spatial_dims"]),
             name_base,
