@@ -32,7 +32,7 @@ class ConvertStreamToAccfgPattern(RewritePattern):
         setup_vals: dict[str, SSAValue | Operation] = {}
         ops_to_add: list[Operation] = []
         for operand, pattern, streamer in zip(
-            (*op.inputs, *op.outputs), op.stride_patterns.data, accelerator.streamers.streamers
+            (*op.inputs, *op.outputs), op.stride_patterns.data, accelerator.streamers
         ):
             # address:
             setup_vals[streamer.addr_params()] = operand

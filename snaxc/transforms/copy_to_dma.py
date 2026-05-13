@@ -117,7 +117,7 @@ class CopyToDmaPattern(RewritePattern):
         # Determine streamer patterns:
         dynamic_operands: Sequence[Operation | SSAValue]
         if DYNAMIC_INDEX in op.source.type.get_shape():
-            if op.source.type.layout != NoneAttr or op.destination.type.layout != NoneAttr:
+            if op.source.type.layout != NoneAttr() or op.destination.type.layout != NoneAttr():
                 raise NotImplementedError("Transformations not supported for dynamic transfers")
             tcdm_pattern, axi_pattern, dynamic_operands = self.dynamic_1d_patterns(op, rewriter, dma, element_type)
         else:
@@ -154,22 +154,20 @@ class CopyToDmaPattern(RewritePattern):
             total_size_op = MuliOp(total_size_op.result, dim_op.result, IndexType())
             rewriter.insert_op((const_op, dim_op, total_size_op), InsertPoint.before(op))
         # Divide this by the size of the streamer to find the required temporal stride:
-        const_op = ConstantOp.from_int_and_width(dma.streamers.streamers[0].full_width, IndexType())
+        const_op = ConstantOp.from_int_and_width(dma.tcdm.full_width, IndexType())
         total_size_op = DivUIOp(total_size_op.result, const_op.result, IndexType())
         rewriter.insert_op((const_op, total_size_op), InsertPoint.before(op))
         # Create simple stride patterns:
         # Unused temporal dims get bound=0 (hardware skips them)
-        tcdm_streamer = dma.streamers.streamers[0]
         tcdm_pattern = StridePattern(
-            upper_bounds=[DYNAMIC_INDEX] + [0] * (tcdm_streamer.temporal_dims - 1),
-            temporal_strides=[tcdm_streamer.full_width] + [0] * (tcdm_streamer.temporal_dims - 1),
-            spatial_strides=tcdm_streamer.byte_offsets,
+            upper_bounds=[DYNAMIC_INDEX] + [0] * (dma.tcdm.temporal_dims - 1),
+            temporal_strides=[dma.tcdm.full_width] + [0] * (dma.tcdm.temporal_dims - 1),
+            spatial_strides=dma.tcdm.byte_offsets,
         )
-        axi_streamer = dma.streamers.streamers[1]
         axi_pattern = StridePattern(
-            upper_bounds=[DYNAMIC_INDEX] + [0] * (axi_streamer.temporal_dims - 1),
-            temporal_strides=[axi_streamer.full_width] + [0] * (axi_streamer.temporal_dims - 1),
-            spatial_strides=axi_streamer.byte_offsets,
+            upper_bounds=[DYNAMIC_INDEX] + [0] * (dma.axi.temporal_dims - 1),
+            temporal_strides=[dma.axi.full_width] + [0] * (dma.axi.temporal_dims - 1),
+            spatial_strides=dma.axi.byte_offsets,
         )
         return tcdm_pattern, axi_pattern, (total_size_op, total_size_op)
 
@@ -249,17 +247,11 @@ class CopyToDmaPattern(RewritePattern):
                 spatial_strides=spatial_strides[::-1],
             )
 
-        tcdm_streamer = dma.streamers.streamers[0]
-        tcdm_tiled_stride = tcdm_tiled_stride.canonicalize().resample(
-            tcdm_streamer.spatial_dims + (tcdm_streamer.access_width,)
-        )
-        tcdm_pattern = create_stride_pattern(tcdm_streamer, tcdm_tiled_stride.strides)
+        tcdm_tiled_stride = tcdm_tiled_stride.canonicalize().resample(dma.tcdm.spatial_dims + (dma.tcdm.access_width,))
+        tcdm_pattern = create_stride_pattern(dma.tcdm, tcdm_tiled_stride.strides)
 
-        axi_streamer = dma.streamers.streamers[1]
-        axi_tiled_stride = axi_tiled_stride.canonicalize().resample(
-            axi_streamer.spatial_dims + (axi_streamer.access_width,)
-        )
-        axi_pattern = create_stride_pattern(axi_streamer, axi_tiled_stride.strides)
+        axi_tiled_stride = axi_tiled_stride.canonicalize().resample(dma.axi.spatial_dims + (dma.axi.access_width,))
+        axi_pattern = create_stride_pattern(dma.axi, axi_tiled_stride.strides)
 
         return tcdm_pattern, axi_pattern
 
