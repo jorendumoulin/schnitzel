@@ -10,10 +10,10 @@ import csr.CsrInterface
 /** BlackBox wrapper for PHS-generated SystemVerilog datapath.
   *
   * Port naming matches the PHS compiler output convention:
-  *   - data_{readerIdx}_{elementIdx} : input  [dataWidth-1:0]
-  *   - switch_{idx}                  : input  [bitwidth-1:0]
-  *   - out_{writerIdx}_{elementIdx}  : output [dataWidth-1:0]
-  *   - mask_{streamerIdx}            : output [maskBitwidth-1:0]
+  *   - data_{readerIdx}_{elementIdx} : input [dataWidth-1:0]
+  *   - switch_{idx} : input [bitwidth-1:0]
+  *   - out_{writerIdx}_{elementIdx} : output [dataWidth-1:0]
+  *   - mask_{streamerIdx} : output [maskBitwidth-1:0]
   *
   * Each mask is per physical streamer: one bit per spatial dimension (min 1 bit). Bit k enables spatial dim k; when
   * cleared, that dim collapses to size 1 so the streamer only issues TCDM requests for its "dimIndex == 0"
@@ -92,7 +92,8 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
   var tcdmPortIdx = 0
 
   val streamers = config.streamers.map { sc =>
-    val s = Module(new Streamer(sc.nTemporalDims, sc.spatialDimSizes, queueDepth, addrWidth, dataWidth))
+    val s =
+      Module(new Streamer(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes, addrWidth), queueDepth, dataWidth))
     val numPorts = sc.numTcdmPorts
     val numRegs = sc.numCsrRegs
 
@@ -165,11 +166,17 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
   // A readWrite streamer participates in both sides: its read path provides
   // data_{rIdx}_* to the blackbox, its write path consumes out_{wIdx}_*.
   val readStreamers =
-    streamers.zip(config.streamers).filter { case (_, c) => c.streamType == "read" || c.streamType == "readWrite" }.map(_._1)
+    streamers
+      .zip(config.streamers)
+      .filter { case (_, c) => c.streamType == "read" || c.streamType == "readWrite" }
+      .map(_._1)
   val readStreamerConfigs =
     config.streamers.filter(c => c.streamType == "read" || c.streamType == "readWrite")
   val writeStreamers =
-    streamers.zip(config.streamers).filter { case (_, c) => c.streamType == "write" || c.streamType == "readWrite" }.map(_._1)
+    streamers
+      .zip(config.streamers)
+      .filter { case (_, c) => c.streamType == "write" || c.streamType == "readWrite" }
+      .map(_._1)
 
   // ---- Datapath (PHS-generated SystemVerilog BlackBox) ----
   val bb = Module(new PhsDatapathBlackBox(config, dataWidth))
