@@ -35,6 +35,11 @@ class AffineAguConfig(val nTemporalDims: Int, val spatialDimSizes: Seq[Int], val
 
   /** Calculates the number of ports (= nb spatial addresses) for this config. */
   def numPorts: Int = spatialDimSizes.fold(1)(_ * _)
+
+  def getConfig = Map(
+    "temporal_dims" -> ujson.Num(nTemporalDims),
+    "spatial_dims" -> ujson.Arr.from(spatialDimSizes.map(ujson.Num(_)))
+  )
 }
 
 class AguOutput(val addressWidth: Int, val numSpatialOutputs: Int) extends Bundle {

@@ -95,6 +95,14 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
 
   csrItf.io.done := axiAgu.io.done && streamer.io.done
 
-  def getConfig = AcceleratorConfig("dma", Map.empty)
+  def getConfig = AcceleratorConfig(
+    "dma",
+    Map(
+      "tcdm" -> streamer.getConfig,
+      "axi" -> (csrVals.axiStreamerConfig.getConfig ++ Map(
+        "access_width" -> ujson.Num(axiConfig.dataWidth)
+      ))
+    )
+  )
 
 }
