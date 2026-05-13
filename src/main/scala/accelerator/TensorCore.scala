@@ -6,7 +6,7 @@ import streamer.{Streamer, AffineAguConfig, StreamerDir}
 import csr.CsrIO
 import csr.CsrInterface
 import datapath.AluArray
-import config.TensorCoreConfig
+import config.AcceleratorConfig
 
 class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
 
@@ -93,5 +93,5 @@ class TensorCore(addrWidth: Int, dataWidth: Int) extends Module {
 
   csrItf.io.done := cStreamer.io.done
 
-  def getConfig = TensorCoreConfig("tensorcore", 234)
+  def getConfig = AcceleratorConfig("tensorcore", Map.empty)
 }

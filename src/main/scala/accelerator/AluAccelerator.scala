@@ -6,7 +6,7 @@ import streamer.{Streamer, AffineAguConfig, StreamerDir}
 import csr.CsrIO
 import csr.CsrInterface
 import datapath.AluArray
-import config.AluConfig
+import config.AcceleratorConfig
 
 // ALU Accelerator: streamer <-> datapath <-> streamer
 // Supports normal mode (C = f(A, B)) and readWrite mode (C = f(A, C_old)) for reductions
@@ -110,6 +110,6 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   csrItf.io.done := cStreamer.io.done
 
   // In AluAccelerator.scala
-  def getConfig = AluConfig("alu", 234)
+  def getConfig = AcceleratorConfig("alu", Map.empty)
   // def getConfig: AcceleratorWrapper = AluWrapper: AcceleratorWrapper
 }
