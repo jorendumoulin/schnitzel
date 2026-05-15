@@ -10,6 +10,7 @@ from xdsl.dialects.builtin import ModuleOp
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
+from xdsl.transforms.approximate_math_with_bitcast import ApproximateMathWithBitcastPass
 from xdsl.transforms.common_subexpression_elimination import CommonSubexpressionElimination
 from xdsl.transforms.mlir_opt import MLIROptPass
 
@@ -28,6 +29,7 @@ from snaxc.transforms.hardfloat.split_round import SplitHardfloatRoundersPass
 from snaxc.transforms.phs.convert_float_to_int import PhsConvertFloatToInt
 from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
 from snaxc.transforms.phs.divf_constant_to_mul import PhsDivfConstantToMulPass
+from snaxc.transforms.phs.divf_to_reciprocal_bitcast import PhsDivfToReciprocalBitcastPass
 from snaxc.transforms.phs.encode import PhsEncodePass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
@@ -255,6 +257,14 @@ class PHSCMain(SNAXCMain):
         # before PHS encoding so the rewrite operates on plain linalg/arith
         # IR. Assumes reciprocal accuracy is acceptable for NN inference.
         input_pass_pipeline.append(PhsDivfConstantToMulPass())
+        # Replace `math.exp`/`math.log` with bitcast-trick approximations. The
+        # PHS hardware path has no transcendental ops; this lowers them to
+        # mul/add/fptosi/bitcast which already lower through hardfloat.
+        input_pass_pipeline.append(ApproximateMathWithBitcastPass())
+        # Approximate any remaining `arith.divf` (e.g. softmax 1/sum_exp) as
+        # `%a * recip(%b)` via the Schraudolph bitcast trick plus one Newton
+        # iteration.
+        input_pass_pipeline.append(PhsDivfToReciprocalBitcastPass())
         input_pass_pipeline.append(PhsEncodePass())
         # Drops carry-input slots whose data is unused in the merged PE body
         # (lowering them from `readWrite` to plain `write`). Defense-in-depth:
