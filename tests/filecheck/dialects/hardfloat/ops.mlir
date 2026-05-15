@@ -25,6 +25,16 @@ func.func @test_hardfloat_roundtrip(%a : i33, %b : i33, %val_i32 : i32) {
   // Note: exceptionFlags is i3 for this op
   %r2i, %r2i_flags = hardfloat.rec_fn_to_in<24, 8, 32>(%rec, %rm, %true) : (i33, i3, i1) -> (i32, i3)
 
+  // 7. Compare: (a, b, signaling) -> (lt, eq, gt, flags)
+  %lt, %eq, %gt, %c_flags = hardfloat.compare_rec_fn<24, 8>(%a, %b, %false) : (i33, i33, i1) -> (i1, i1, i1, i5)
+
+  // 8. Rec_fn_to_rec_fn (f32 recoded -> f16 recoded), 4 widths in angle brackets
+  %r16, %r2r_flags = hardfloat.rec_fn_to_rec_fn<24, 8, 11, 5>(%a, %rm, %false) : (i33, i3, i1) -> (i17, i5)
+
+  // 9. Fused multiply-add: (op, a, b, c, rm, tininess) -> (out, flags)
+  %fma_op = arith.constant 0 : i2
+  %fma, %fma_flags = hardfloat.mul_add_rec_fn<24, 8>(%fma_op, %a, %b, %a, %rm, %false) : (i2, i33, i33, i33, i3, i1) -> (i33, i5)
+
   func.return
 }
 
@@ -38,5 +48,9 @@ func.func @test_hardfloat_roundtrip(%a : i33, %b : i33, %val_i32 : i32) {
 // CHECK-NEXT:    %f_out = hardfloat.rec_fn_to_fn<24, 8>(%rec) : (i33) -> i32
 // CHECK-NEXT:    %i2r, %i2r_flags = hardfloat.in_to_rec_fn<24, 8, 32>(%false, %val_i32, %rm, %false) : (i1, i32, i3, i1) -> (i33, i5)
 // CHECK-NEXT:    %r2i, %r2i_flags = hardfloat.rec_fn_to_in<24, 8, 32>(%rec, %rm, %true) : (i33, i3, i1) -> (i32, i3)
+// CHECK-NEXT:    %lt, %eq, %gt, %c_flags = hardfloat.compare_rec_fn<24, 8>(%a, %b, %false) : (i33, i33, i1) -> (i1, i1, i1, i5)
+// CHECK-NEXT:    %r16, %r2r_flags = hardfloat.rec_fn_to_rec_fn<24, 8, 11, 5>(%a, %rm, %false) : (i33, i3, i1) -> (i17, i5)
+// CHECK-NEXT:    %fma_op = arith.constant 0 : i2
+// CHECK-NEXT:    %fma, %fma_flags = hardfloat.mul_add_rec_fn<24, 8>(%fma_op, %a, %b, %a, %rm, %false) : (i2, i33, i33, i33, i3, i1) -> (i33, i5)
 // CHECK-NEXT:    return
 // CHECK-NEXT:  }
