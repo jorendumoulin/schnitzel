@@ -6,12 +6,17 @@
 #define T 4
 #define I 4
 
-// f32 fully-connected-style reduction:  C[i] += sum_t A[t, i] * W[t, i].
+// Two-stage f32 kernel, all stages handled by the same PHS accelerator:
+//   1. FC-style reduction:  C[i] += sum_t A[t, i] * W[t, i]
+//   2. Clamp activation:    C[i]  = max(min(C[i], HI[i]), LO[i])
+//
 // Ibex has no FPU, so we keep all data as uint32_t bit patterns and only
 // reinterpret to float* at the memref-descriptor boundary.
 extern "C" void _mlir_ciface_streamer_ad01(MemRefDescriptor<float, 2> *A,
                                            MemRefDescriptor<float, 2> *W,
-                                           MemRefDescriptor<float, 1> *C);
+                                           MemRefDescriptor<float, 1> *C,
+                                           MemRefDescriptor<float, 1> *HI,
+                                           MemRefDescriptor<float, 1> *LO);
 
 // A[t, i] = t * 4 + i + 1   (i.e. 1..16 row-major)
 alignas(64) uint32_t A[T][I] = {
@@ -21,7 +26,7 @@ alignas(64) uint32_t A[T][I] = {
     {0x41500000, 0x41600000, 0x41700000, 0x41800000}, // 13, 14, 15, 16
 };
 
-// W[t, i] = 1.0 for all entries — reduces the test to column-sum of A.
+// W[t, i] = 1.0 for all entries — reduces the FC to column-sum of A.
 alignas(64) uint32_t W[T][I] = {
     {0x3f800000, 0x3f800000, 0x3f800000, 0x3f800000},
     {0x3f800000, 0x3f800000, 0x3f800000, 0x3f800000},
@@ -31,12 +36,16 @@ alignas(64) uint32_t W[T][I] = {
 
 alignas(64) uint32_t C[I] = {0, 0, 0, 0};
 
-// Expected column sums:
-//   col 0:  1 +  5 +  9 + 13 = 28 = 0x41e00000
-//   col 1:  2 +  6 + 10 + 14 = 32 = 0x42000000
-//   col 2:  3 +  7 + 11 + 15 = 36 = 0x42100000
-//   col 3:  4 +  8 + 12 + 16 = 40 = 0x42200000
-uint32_t G[I] = {0x41e00000, 0x42000000, 0x42100000, 0x42200000};
+// Clamp thresholds (broadcast across all output channels).
+alignas(64) uint32_t HI[I] = {0x41f00000, 0x41f00000, 0x41f00000, 0x41f00000}; // 30.0
+alignas(64) uint32_t LO[I] = {0, 0, 0, 0};                                     //  0.0
+
+// Expected column sums clamped to [0.0, 30.0]:
+//   col 0:  1 +  5 +  9 + 13 = 28  -> 28 = 0x41e00000
+//   col 1:  2 +  6 + 10 + 14 = 32  -> 30 = 0x41f00000
+//   col 2:  3 +  7 + 11 + 15 = 36  -> 30 = 0x41f00000
+//   col 3:  4 +  8 + 12 + 16 = 40  -> 30 = 0x41f00000
+uint32_t G[I] = {0x41e00000, 0x41f00000, 0x41f00000, 0x41f00000};
 
 int main() {
   int hart = hart_id();
@@ -44,13 +53,18 @@ int main() {
   float *Af = reinterpret_cast<float *>(A[0]);
   float *Wf = reinterpret_cast<float *>(W[0]);
   float *Cf = reinterpret_cast<float *>(C);
+  float *HIf = reinterpret_cast<float *>(HI);
+  float *LOf = reinterpret_cast<float *>(LO);
 
   MemRefDescriptor<float, 2> memrefA = {Af, Af, 0, {T, I}, {I, 1}};
   MemRefDescriptor<float, 2> memrefW = {Wf, Wf, 0, {T, I}, {I, 1}};
   MemRefDescriptor<float, 1> memrefC = {Cf, Cf, 0, {I}, {1}};
+  MemRefDescriptor<float, 1> memrefHI = {HIf, HIf, 0, {I}, {1}};
+  MemRefDescriptor<float, 1> memrefLO = {LOf, LOf, 0, {I}, {1}};
 
   unsigned long cycle_start = read_csr(0xb00);
-  _mlir_ciface_streamer_ad01(&memrefA, &memrefW, &memrefC);
+  _mlir_ciface_streamer_ad01(&memrefA, &memrefW, &memrefC, &memrefHI,
+                             &memrefLO);
   unsigned long cycle_end = read_csr(0xb00);
 
   cluster_sync();
