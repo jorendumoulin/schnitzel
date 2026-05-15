@@ -12,11 +12,11 @@ class TensorCore(addrWidth: Int, dataWidth: Int, M: Int = 4, N: Int = 4, K: Int 
 
   // Automatically determine port sizes based on array width and data width
   var aports = Seq(M)
-  if (K > dataWidth / 8) aports = aports :+ K / (dataWidth / 8)
+  if (K > dataWidth / 8) aports = K / (dataWidth / 8) +: aports
   var bports = Seq(K)
-  if (N > dataWidth / 8) bports = bports :+ N / (dataWidth / 8)
+  if (N > dataWidth / 8) bports = N / (dataWidth / 8) +: bports
   var cports = Seq(M)
-  if (N > dataWidth / 32) cports = cports :+ N / (dataWidth / 32)
+  if (N > dataWidth / 32) cports = N / (dataWidth / 32) +: cports
 
   // CSR interface:
   class CsrVals extends Bundle {

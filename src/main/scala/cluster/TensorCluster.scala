@@ -22,7 +22,7 @@ import memory.MemWidthConverter
 class TensorCluster extends Module {
 
   val wideAxiDataWidth = 512
-  val tcdmDataWidth = 32
+  val tcdmDataWidth = 64
 
   val io = IO(new Bundle {
     val axi = new AXIBundle(AXIConfig(idWidth = 6, dataWidth = wideAxiDataWidth))
@@ -73,7 +73,9 @@ class TensorCluster extends Module {
   csrDemux_1.io.in <> core_1.io.csr
 
   // Attach accelerator to second core:
-  val tensorCore = Module(new TensorCore(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth))
+  val tensorCore = Module(
+    new TensorCore(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, M = 8, N = 8, K = 8)
+  )
   tensorCore.io.csr <> csrDemux_1.io.outs(2)
 
   // Global synchronization CSR (0x800) - coupled and sent externally
@@ -98,7 +100,7 @@ class TensorCluster extends Module {
   val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM.masked(1024, Vec(tcdmDataWidth / 8, UInt(8.W)), 0, 0, 1)));
   val tcdm_ports = VecInit(tcdm_sram.map(sram => sram.readwritePorts(0)));
 
-  val interconnect = Module(new Interconnect(42, numBanks, CoreConfig.addrWidth, tcdmDataWidth));
+  val interconnect = Module(new Interconnect(58, numBanks, CoreConfig.addrWidth, tcdmDataWidth));
 
   interconnect.io.ins <> VecInit(Seq(memWidthConverter_0.io.out, memWidthConverter_1.io.out)) ++ dma.io.data ++ accPorts
 

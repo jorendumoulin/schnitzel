@@ -33,7 +33,7 @@ class Streamer:
         return cls(
             params["access_width"] // 8,
             params["temporal_dims"],
-            tuple(params["spatial_dims"]),
+            tuple(params["spatial_dims"])[::-1],
             name_base,
         )
 
