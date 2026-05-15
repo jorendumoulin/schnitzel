@@ -64,7 +64,7 @@ class TensorCore(Accelerator):
             AffineMap(3, 0, (k, n)),
             AffineMap(3, 0, (m, n)),
         ]
-        template_bounds = (4, 4, 4)
+        template_bounds = (self.m, self.n, self.k)
         return Template(TemplatePattern(template_bounds, tp) for tp in template)
 
     # Transform the schedule to match with the way data is accessed in the accelerator:
