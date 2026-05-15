@@ -52,8 +52,8 @@ class TiledStride:
         return TiledStride([Stride(step, bound) for step, bound in zip(steps, tile_bounds)])
 
     def __str__(self) -> str:
-        strides = ", ".join(str(stride.step) if stride.step else "?" for stride in self.strides)
-        bounds = ", ".join(str(stride.bound) if stride.bound else "?" for stride in self.strides)
+        strides = ", ".join(str(stride.step) if stride.step is not None else "?" for stride in self.strides)
+        bounds = ", ".join(str(stride.bound) if stride.bound is not None else "?" for stride in self.strides)
         return f"[{bounds}] -> ({strides})"
 
     def __iter__(self) -> Iterator[tuple[int, Stride]]:
