@@ -26,11 +26,12 @@ lose `exceptionFlags` users).
 
 from __future__ import annotations
 
-from typing import cast
+from collections.abc import Sequence
 
 from xdsl.context import Context
 from xdsl.dialects import hw
 from xdsl.dialects.builtin import IntegerType, ModuleOp
+from xdsl.ir import Operation, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -60,7 +61,7 @@ _MUXABLE_OPS: dict[type[HardfloatOperation], tuple[int, ...]] = {
 }
 
 
-def _structural_key(op: HardfloatOperation, mux_idxs: tuple[int, ...]) -> tuple:
+def _structural_key(op: HardfloatOperation, mux_idxs: tuple[int, ...]) -> tuple[object, ...]:
     """SSA-identity tuple of non-muxable operands + widths. Two ops with
     the same key are eligible to be folded into one shared op."""
     keep: list[object] = [id(o) for i, o in enumerate(op.operands) if i not in mux_idxs]
@@ -81,11 +82,16 @@ class SinkRounder(RewritePattern):
             return
 
         # Bucket rounder lanes by (sig, exp, rm_SSA, tn_SSA).
-        groups: dict[tuple, list[tuple[int, RoundRawToRecFnOp]]] = {}
+        groups: dict[tuple[object, ...], list[tuple[int, RoundRawToRecFnOp]]] = {}
         for idx, inp in enumerate(array_create.inputs):
             d = inp.owner
             if isinstance(d, RoundRawToRecFnOp):
-                key = (d.sig_width.data, d.exp_width.data, id(d.roundingMode), id(d.detectTininess))
+                key: tuple[object, ...] = (
+                    d.sig_width.data,
+                    d.exp_width.data,
+                    id(d.roundingMode),
+                    id(d.detectTininess),
+                )
                 groups.setdefault(key, []).append((idx, d))
 
         sharable = {k: v for k, v in groups.items() if len(v) >= 2}
@@ -93,9 +99,9 @@ class SinkRounder(RewritePattern):
             return
 
         n = len(array_create.inputs)
-        new_ops: list = []
-        result_inputs = list(array_create.inputs)
-        erased: list[RoundRawToRecFnOp] = []
+        new_ops: list[Operation] = []
+        result_inputs: list[SSAValue] = list(array_create.inputs)
+        erased: list[HardfloatOperation] = []
 
         for members in sharable.values():
             head = members[0][1]
@@ -135,12 +141,15 @@ class ShareMuxableOp(RewritePattern):
         # Bucket lanes by (op_class, structural_key). Skip lanes whose
         # defining op isn't a registered muxable kind, or whose other
         # results are observed downstream.
-        groups: dict[tuple, list[tuple[int, HardfloatOperation, int]]] = {}
+        groups: dict[
+            tuple[type[HardfloatOperation], tuple[object, ...]],
+            list[tuple[int, HardfloatOperation, int]],
+        ] = {}
         for idx, inp in enumerate(array_create.inputs):
             d = inp.owner
             if not isinstance(d, HardfloatOperation):
                 continue
-            cls = type(d)
+            cls: type[HardfloatOperation] = type(d)
             if cls not in _MUXABLE_OPS:
                 continue
             mux_idxs = _MUXABLE_OPS[cls]
@@ -159,19 +168,19 @@ class ShareMuxableOp(RewritePattern):
             return
 
         n = len(array_create.inputs)
-        new_ops: list = []
-        result_inputs = list(array_create.inputs)
+        new_ops: list[Operation] = []
+        result_inputs: list[SSAValue] = list(array_create.inputs)
         erased: list[HardfloatOperation] = []
 
         for (cls, _), members in sharable.items():
             mux_idxs = _MUXABLE_OPS[cls]
             head = members[0][1]
-            by_idx = {idx: r for idx, r, _ in members}
+            by_idx: dict[int, HardfloatOperation] = {idx: r for idx, r, _ in members}
             # Build a muxed value per muxable operand index, defaulting
             # non-member lanes to the head's value (don't-care fill).
-            muxed_operands = list(head.operands)
+            muxed_operands: list[SSAValue] = list(head.operands)
             for mi in mux_idxs:
-                fills = [
+                fills: list[SSAValue] = [
                     by_idx[i].operands[mi] if i in by_idx else head.operands[mi] for i in range(n)
                 ]
                 arr = hw.ArrayCreateOp(*fills)
@@ -179,21 +188,18 @@ class ShareMuxableOp(RewritePattern):
                 new_ops.extend([arr, get])
                 muxed_operands[mi] = get.result
 
-            shared_kwargs: dict = {
-                "sig_width": head.sig_width.data,
-                "exp_width": head.exp_width.data,
-            }
-            if head.int_width is not None:
-                shared_kwargs["int_width"] = head.int_width.data
+            int_width_arg = head.int_width.data if head.int_width is not None else None
             shared = cls(
                 operands=muxed_operands,
                 result_types=[r.type for r in head.results],
-                **shared_kwargs,
+                sig_width=head.sig_width.data,
+                exp_width=head.exp_width.data,
+                int_width=int_width_arg,
             )
             new_ops.append(shared)
 
-            for idx, r, this_idx in members:
-                result_inputs[idx] = shared.results[this_idx]
+            for idx, r, res_idx in members:
+                result_inputs[idx] = shared.results[res_idx]
                 erased.append(r)
 
         _finalize_replace(op, array_create, new_ops, result_inputs, erased, rewriter)
@@ -202,9 +208,9 @@ class ShareMuxableOp(RewritePattern):
 def _finalize_replace(
     op: hw.ArrayGetOp,
     array_create: hw.ArrayCreateOp,
-    new_ops: list,
-    result_inputs: list,
-    erased: list[HardfloatOperation],
+    new_ops: list[Operation],
+    result_inputs: list[SSAValue],
+    erased: Sequence[HardfloatOperation],
     rewriter: PatternRewriter,
 ) -> None:
     if all(v is result_inputs[0] for v in result_inputs):
@@ -233,12 +239,8 @@ class MergeAcrossArrayGetPass(ModulePass):
     name = "merge-across-array-get"
 
     def apply(self, ctx: Context, op: ModuleOp) -> None:
-        # `cast` keeps mypy/pyright happy about the pattern types.
-        patterns = cast(
-            tuple[RewritePattern, ...],
-            (SinkRounder(), ShareMuxableOp()),
-        )
+        patterns: list[RewritePattern] = [SinkRounder(), ShareMuxableOp()]
         PatternRewriteWalker(
-            GreedyRewritePatternApplier(list(patterns)),
+            GreedyRewritePatternApplier(patterns),
             apply_recursively=False,
         ).rewrite_module(op)
