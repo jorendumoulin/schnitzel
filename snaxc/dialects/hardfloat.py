@@ -341,8 +341,7 @@ class RecFnToRecFnOp(HardfloatOperation):
 
     def get_suffix(self) -> str:
         return (
-            f"_is{self.sig_width.data}_ie{self.exp_width.data}"
-            f"_os{self.out_sig_width.data}_oe{self.out_exp_width.data}"
+            f"_is{self.sig_width.data}_ie{self.exp_width.data}_os{self.out_sig_width.data}_oe{self.out_exp_width.data}"
         )
 
 

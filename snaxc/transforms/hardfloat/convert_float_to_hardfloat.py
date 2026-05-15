@@ -303,9 +303,7 @@ class ConvertMaximumMinimumOp(RewritePattern):
         nan_const_float = UnrealizedConversionCastOp.get([nan_const_int], [in_type])
         result = arith.SelectOp(ord_val, pick, nan_const_float.results[0])
 
-        new_ops.extend(
-            [eq_and_tie, pick_lhs, ord_lt_eq, ord_val, pick, nan_const_int, nan_const_float, result]
-        )
+        new_ops.extend([eq_and_tie, pick_lhs, ord_lt_eq, ord_val, pick, nan_const_int, nan_const_float, result])
         rewriter.replace_op(op, new_ops=new_ops, new_results=[result.result])
 
 
