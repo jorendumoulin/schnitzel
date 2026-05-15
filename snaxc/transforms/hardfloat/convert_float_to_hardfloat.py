@@ -32,6 +32,7 @@ from snaxc.dialects.hardfloat import (
     MulRecFnOp,
     RecFnToFnOp,
     RecFnToInOp,
+    RecFnToRecFnOp,
 )
 
 _type_mapping: dict[type[Attribute], tuple[int, int]] = {
@@ -160,6 +161,44 @@ class ConvertFPToIOp(RewritePattern):
             ),
         ]
         rewriter.replace_op(op, new_ops=new_ops, new_results=[rec_fn.results[0]])
+
+
+class ConvertTruncExtfOp(RewritePattern):
+    """
+    Lower arith.truncf / arith.extf via hardfloat.rec_fn_to_rec_fn.
+
+    Sandwich: cast input float→int, recode to input recoded format, dispatch
+    through rec_fn_to_rec_fn to the output recoded format, decode, cast back.
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: arith.ExtFOp | arith.TruncFOp, rewriter: PatternRewriter):
+        in_type = cast(AnyFloat, op.input.type)
+        out_type = cast(AnyFloat, op.result.type)
+        if type(in_type) not in _type_mapping or type(out_type) not in _type_mapping:
+            return
+        in_exp, in_sig = _type_mapping[type(in_type)]
+        out_exp, out_sig = _type_mapping[type(out_type)]
+        in_bw = in_type.bitwidth
+        out_bw = out_type.bitwidth
+
+        new_ops: list[Operation] = [
+            cast_in := UnrealizedConversionCastOp.get([op.input], [IntegerType(in_bw)]),
+            recode := FnToRecFnOp([cast_in], [IntegerType(in_bw + 1)], in_sig, in_exp),
+            rm := hw.ConstantOp(0, 3),
+            tininess := hw.ConstantOp(1, 1),
+            convert := RecFnToRecFnOp(
+                [recode, rm, tininess],
+                [IntegerType(out_bw + 1), IntegerType(5)],
+                in_sig,
+                in_exp,
+                out_sig,
+                out_exp,
+            ),
+            decode := RecFnToFnOp([convert.results[0]], [IntegerType(out_bw)], out_sig, out_exp),
+            cast_out := UnrealizedConversionCastOp.get([decode], [out_type]),
+        ]
+        rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_out.results[0]])
 
 
 class ConvertMaximumMinimumOp(RewritePattern):
@@ -345,6 +384,7 @@ class ConvertFloatToHardfloatPass(ModulePass):
                     ConvertFPToIOp(),
                     ConvertCmpfOp(),
                     ConvertMaximumMinimumOp(),
+                    ConvertTruncExtfOp(),
                 ]
             ),
             apply_recursively=False,

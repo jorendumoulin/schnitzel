@@ -27,10 +27,7 @@ from snaxc.dialects.hardfloat import (
 
 
 def get_suffix(op: HardfloatOperation) -> str:
-    if op.int_width is None:
-        return f"_s{op.sig_width.data}_e{op.exp_width.data}"
-    else:
-        return f"_i{op.int_width.data}_s{op.sig_width.data}_e{op.exp_width.data}"
+    return op.get_suffix()
 
 
 def get_count(counts: dict[HWBlockSpec, int], hw_block: HWBlockSpec) -> int:
