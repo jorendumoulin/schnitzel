@@ -35,6 +35,19 @@ func.func @test_hardfloat_roundtrip(%a : i33, %b : i33, %val_i32 : i32) {
   %fma_op = arith.constant 0 : i2
   %fma, %fma_flags = hardfloat.mul_add_rec_fn<24, 8>(%fma_op, %a, %b, %a, %rm, %false) : (i2, i33, i33, i33, i3, i1) -> (i33, i5)
 
+  // 10. Recoded → raw bus: (in) -> (out). i33 (sig+exp+1) -> i39 (sig+exp+7).
+  %ra = hardfloat.recode_to_raw<24, 8>(%a) : (i33) -> i39
+  %rb = hardfloat.recode_to_raw<24, 8>(%b) : (i33) -> i39
+
+  // 11. Raw add: (subOp, a, b) -> (invalidExc, rawOut). rawOut is sig+exp+9 = i41.
+  %add_raw_inv, %add_raw = hardfloat.add_raw_fn<24, 8>(%false, %ra, %rb) : (i1, i39, i39) -> (i1, i41)
+
+  // 12. Raw multiply: (a, b) -> (invalidExc, rawOut).
+  %mul_raw_inv, %mul_raw = hardfloat.mul_raw_fn<24, 8>(%ra, %rb) : (i39, i39) -> (i1, i41)
+
+  // 13. Round raw → recoded: (invalidExc, raw, rm, tininess) -> (out, flags).
+  %round, %round_flags = hardfloat.round_raw_to_rec_fn<24, 8>(%add_raw_inv, %add_raw, %rm, %false) : (i1, i41, i3, i1) -> (i33, i5)
+
   func.return
 }
 
@@ -52,5 +65,10 @@ func.func @test_hardfloat_roundtrip(%a : i33, %b : i33, %val_i32 : i32) {
 // CHECK-NEXT:    %r16, %r2r_flags = hardfloat.rec_fn_to_rec_fn<24, 8, 11, 5>(%a, %rm, %false) : (i33, i3, i1) -> (i17, i5)
 // CHECK-NEXT:    %fma_op = arith.constant 0 : i2
 // CHECK-NEXT:    %fma, %fma_flags = hardfloat.mul_add_rec_fn<24, 8>(%fma_op, %a, %b, %a, %rm, %false) : (i2, i33, i33, i33, i3, i1) -> (i33, i5)
+// CHECK-NEXT:    %ra = hardfloat.recode_to_raw<24, 8>(%a) : (i33) -> i39
+// CHECK-NEXT:    %rb = hardfloat.recode_to_raw<24, 8>(%b) : (i33) -> i39
+// CHECK-NEXT:    %add_raw_inv, %add_raw = hardfloat.add_raw_fn<24, 8>(%false, %ra, %rb) : (i1, i39, i39) -> (i1, i41)
+// CHECK-NEXT:    %mul_raw_inv, %mul_raw = hardfloat.mul_raw_fn<24, 8>(%ra, %rb) : (i39, i39) -> (i1, i41)
+// CHECK-NEXT:    %round, %round_flags = hardfloat.round_raw_to_rec_fn<24, 8>(%add_raw_inv, %add_raw, %rm, %false) : (i1, i41, i3, i1) -> (i33, i5)
 // CHECK-NEXT:    return
 // CHECK-NEXT:  }
