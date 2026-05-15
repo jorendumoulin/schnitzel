@@ -14,7 +14,7 @@ from xdsl.dialects.builtin import (
     ModuleOp,
     UnrealizedConversionCastOp,
 )
-from xdsl.ir import Attribute, Operation
+from xdsl.ir import Attribute, Operation, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     GreedyRewritePatternApplier,
@@ -208,7 +208,7 @@ class ConvertTruncExtfOp(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: arith.ExtFOp | arith.TruncFOp, rewriter: PatternRewriter):
         in_type = cast(AnyFloat, op.input.type)
-        out_type = cast(AnyFloat, op.result.type)
+        out_type = op.result.type
         if type(in_type) not in _type_mapping or type(out_type) not in _type_mapping:
             return
         in_exp, in_sig = _type_mapping[type(in_type)]
@@ -325,7 +325,7 @@ class ConvertCmpfOp(RewritePattern):
         bitwidth = in_type.bitwidth
         predicate = op.predicate.value.data
 
-        new_ops: list = []
+        new_ops: list[Operation] = []
 
         if predicate == 0:  # false
             const = hw.ConstantOp(0, 1)
@@ -353,7 +353,7 @@ class ConvertCmpfOp(RewritePattern):
 
         lt, eq, gt, _flags = cmp.results
 
-        def or_(a, b):
+        def or_(a: SSAValue, b: SSAValue) -> SSAValue:
             o = arith.OrIOp(a, b)
             new_ops.append(o)
             return o.result

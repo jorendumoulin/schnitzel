@@ -294,7 +294,7 @@ class RecFnToRecFnOp(HardfloatOperation):
 
     def verify_(self) -> None:
         verify_recoded(self, self.in_.type)
-        out_bw = cast(IntegerType, self.out.type).bitwidth
+        out_bw = self.out.type.bitwidth
         if out_bw != self.out_sig_width.data + self.out_exp_width.data + 1:
             raise VerifyException(
                 f"Expect output type ({self.out.type}) to be equal to out_sig_width ({self.out_sig_width.data}) "
