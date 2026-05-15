@@ -218,6 +218,33 @@ class InToRecFnOp(HardfloatOperation):
 
 
 @irdl_op_definition
+class MulAddRecFnOp(HardfloatOperation):
+    """
+    Fused multiply-add on recoded floats. `op` is a 2-bit field selecting
+    a*b+c (0), a*b-c (1), -(a*b)+c (2), -(a*b)-c (3).
+    """
+
+    CHISEL_NAME: ClassVar[str] = "MulAddRecFN"
+    CHISEL_INPUT_NAMES: ClassVar[tuple[str, ...]] = ("op", "a", "b", "c", "roundingMode", "detectTininess")
+    CHISEL_OUTPUT_NAMES: ClassVar[tuple[str, ...]] = ("out", "exceptionFlags")
+    name = "hardfloat.mul_add_rec_fn"
+    op = operand_def(IntegerType(2))
+    a = operand_def(IntegerType)
+    b = operand_def(IntegerType)
+    c = operand_def(IntegerType)
+    roundingMode = operand_def(IntegerType(3))
+    detectTininess = operand_def(IntegerType(1))
+    out = result_def(IntegerType)
+    exceptionFlags = result_def(IntegerType(5))
+
+    def verify_(self) -> None:
+        verify_recoded(self, self.a.type)
+        verify_recoded(self, self.b.type)
+        verify_recoded(self, self.c.type)
+        verify_recoded(self, self.out.type)
+
+
+@irdl_op_definition
 class RecFnToRecFnOp(HardfloatOperation):
     """
     Convert one recoded float format to another (trunc/ext).
@@ -367,5 +394,6 @@ Hardfloat = Dialect(
         RecFnToInOp,
         CompareRecFnOp,
         RecFnToRecFnOp,
+        MulAddRecFnOp,
     ],
 )

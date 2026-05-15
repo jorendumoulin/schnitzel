@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import cast
 
 from xdsl.context import Context
-from xdsl.dialects import arith, hw
+from xdsl.dialects import arith, hw, math
 from xdsl.dialects.builtin import (
     AnyFloat,
     BFloat16Type,
@@ -29,6 +29,7 @@ from snaxc.dialects.hardfloat import (
     CompareRecFnOp,
     FnToRecFnOp,
     InToRecFnOp,
+    MulAddRecFnOp,
     MulRecFnOp,
     RecFnToFnOp,
     RecFnToInOp,
@@ -161,6 +162,39 @@ class ConvertFPToIOp(RewritePattern):
             ),
         ]
         rewriter.replace_op(op, new_ops=new_ops, new_results=[rec_fn.results[0]])
+
+
+class ConvertFmaOp(RewritePattern):
+    """Lower math.fma(a, b, c) = a*b+c via hardfloat.mul_add_rec_fn (op=0)."""
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: math.FmaOp, rewriter: PatternRewriter):
+        in_type = cast(AnyFloat, op.a.type)
+        if type(in_type) not in _type_mapping:
+            return
+        exp_width, sig_width = _type_mapping[type(in_type)]
+        bitwidth = in_type.bitwidth
+
+        new_ops: list[Operation] = [
+            cast_a := UnrealizedConversionCastOp.get([op.a], [IntegerType(bitwidth)]),
+            cast_b := UnrealizedConversionCastOp.get([op.b], [IntegerType(bitwidth)]),
+            cast_c := UnrealizedConversionCastOp.get([op.c], [IntegerType(bitwidth)]),
+            recode_a := FnToRecFnOp([cast_a], [IntegerType(bitwidth + 1)], sig_width, exp_width),
+            recode_b := FnToRecFnOp([cast_b], [IntegerType(bitwidth + 1)], sig_width, exp_width),
+            recode_c := FnToRecFnOp([cast_c], [IntegerType(bitwidth + 1)], sig_width, exp_width),
+            fma_op := hw.ConstantOp(0, 2),
+            rm := hw.ConstantOp(0, 3),
+            tininess := hw.ConstantOp(1, 1),
+            fma := MulAddRecFnOp(
+                [fma_op, recode_a, recode_b, recode_c, rm, tininess],
+                [IntegerType(bitwidth + 1), IntegerType(5)],
+                sig_width,
+                exp_width,
+            ),
+            unrecode := RecFnToFnOp([fma.results[0]], [IntegerType(bitwidth)], sig_width, exp_width),
+            cast_res := UnrealizedConversionCastOp.get([unrecode], [in_type]),
+        ]
+        rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_res.results[0]])
 
 
 class ConvertTruncExtfOp(RewritePattern):
@@ -385,6 +419,7 @@ class ConvertFloatToHardfloatPass(ModulePass):
                     ConvertCmpfOp(),
                     ConvertMaximumMinimumOp(),
                     ConvertTruncExtfOp(),
+                    ConvertFmaOp(),
                 ]
             ),
             apply_recursively=False,
