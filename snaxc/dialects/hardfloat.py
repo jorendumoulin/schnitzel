@@ -132,6 +132,33 @@ def verify_int(op: HardfloatOperation, typ: Attribute):
         raise VerifyException(f"Expect type ({typ}) to have bitwidth given by int_width property ({op.int_width.data})")
 
 
+# Berkeley `RawFloat(expWidth, sigWidth)` bundle:
+#   { isNaN:1, isInf:1, isZero:1, sign:1, sExp:expWidth+2, sig:sigWidth+1 }
+# Total = exp + sig + 7. Used as the raw bus type for op inputs and for
+# `recode_to_raw` outputs.
+def verify_raw_in(op: HardfloatOperation, typ: Attribute) -> None:
+    sig_width, exp_width = (op.sig_width.data, op.exp_width.data)
+    bit_width = cast(IntegerType, typ).bitwidth
+    expected = sig_width + exp_width + 7
+    if bit_width != expected:
+        raise VerifyException(
+            f"Expect raw input type ({typ}) to be i{expected} (sig {sig_width} + exp {exp_width} + 7)"
+        )
+
+
+# `AddRawFN` and `MulRawFN` emit `RawFloat(expWidth, sigWidth + 2)`.
+# Total = exp + sig + 9. Used as the raw output bus and as the input to
+# `round_raw_to_rec_fn`.
+def verify_raw_out(op: HardfloatOperation, typ: Attribute) -> None:
+    sig_width, exp_width = (op.sig_width.data, op.exp_width.data)
+    bit_width = cast(IntegerType, typ).bitwidth
+    expected = sig_width + exp_width + 9
+    if bit_width != expected:
+        raise VerifyException(
+            f"Expect raw output type ({typ}) to be i{expected} (sig {sig_width} + exp {exp_width} + 9)"
+        )
+
+
 @irdl_op_definition
 class MulRecFnOp(HardfloatOperation):
     CHISEL_NAME: ClassVar[str] = "MulRecFN"
@@ -382,6 +409,94 @@ class RecFnToInOp(HardfloatOperation):
         verify_int(self, self.out.type)
 
 
+@irdl_op_definition
+class RecodeToRawOp(HardfloatOperation):
+    """
+    Recoded float → raw float bus. Mirrors Berkeley `rawFloatFromRecFN`.
+    Used to feed `add_raw_fn` / `mul_raw_fn` from existing recoded SSA values
+    without bundling the conversion into the raw-core op itself.
+    """
+
+    CHISEL_NAME: ClassVar[str] = "RecFNToRawFNBus"
+    CHISEL_INPUT_NAMES: ClassVar[tuple[str, ...]] = ("in",)
+    CHISEL_OUTPUT_NAMES: ClassVar[tuple[str, ...]] = ("out",)
+    name = "hardfloat.recode_to_raw"
+    in_ = operand_def(IntegerType)
+    out = result_def(IntegerType)
+
+    def verify_(self) -> None:
+        verify_recoded(self, self.in_.type)
+        verify_raw_in(self, self.out.type)
+
+
+@irdl_op_definition
+class AddRawFnOp(HardfloatOperation):
+    """
+    Berkeley `AddRawFN`: raw-bus add/sub core. Output bus has sig + 2.
+    """
+
+    CHISEL_NAME: ClassVar[str] = "AddRawFNBus"
+    CHISEL_INPUT_NAMES: ClassVar[tuple[str, ...]] = ("subOp", "a", "b")
+    CHISEL_OUTPUT_NAMES: ClassVar[tuple[str, ...]] = ("invalidExc", "rawOut")
+    name = "hardfloat.add_raw_fn"
+    subOp = operand_def(IntegerType(1))
+    a = operand_def(IntegerType)
+    b = operand_def(IntegerType)
+    invalidExc = result_def(IntegerType(1))
+    rawOut = result_def(IntegerType)
+
+    def verify_(self) -> None:
+        verify_raw_in(self, self.a.type)
+        verify_raw_in(self, self.b.type)
+        verify_raw_out(self, self.rawOut.type)
+
+
+@irdl_op_definition
+class MulRawFnOp(HardfloatOperation):
+    """
+    Berkeley `MulRawFN`: raw-bus multiply core. Output bus has sig + 2.
+    """
+
+    CHISEL_NAME: ClassVar[str] = "MulRawFNBus"
+    CHISEL_INPUT_NAMES: ClassVar[tuple[str, ...]] = ("a", "b")
+    CHISEL_OUTPUT_NAMES: ClassVar[tuple[str, ...]] = ("invalidExc", "rawOut")
+    name = "hardfloat.mul_raw_fn"
+    a = operand_def(IntegerType)
+    b = operand_def(IntegerType)
+    invalidExc = result_def(IntegerType(1))
+    rawOut = result_def(IntegerType)
+
+    def verify_(self) -> None:
+        verify_raw_in(self, self.a.type)
+        verify_raw_in(self, self.b.type)
+        verify_raw_out(self, self.rawOut.type)
+
+
+@irdl_op_definition
+class RoundRawToRecFnOp(HardfloatOperation):
+    """
+    Berkeley `RoundRawFNToRecFN`: standalone rounding from a raw-out bus to
+    recoded. Splitting `add_rec_fn` / `mul_rec_fn` into raw-core + this op
+    lets CSE collapse the rounder across mutex `phs.choose` regions when the
+    cores diverge.
+    """
+
+    CHISEL_NAME: ClassVar[str] = "RoundRawFNToRecFNBus"
+    CHISEL_INPUT_NAMES: ClassVar[tuple[str, ...]] = ("invalidExc", "in", "roundingMode", "detectTininess")
+    CHISEL_OUTPUT_NAMES: ClassVar[tuple[str, ...]] = ("out", "exceptionFlags")
+    name = "hardfloat.round_raw_to_rec_fn"
+    invalidExc = operand_def(IntegerType(1))
+    in_ = operand_def(IntegerType)
+    roundingMode = operand_def(IntegerType(3))
+    detectTininess = operand_def(IntegerType(1))
+    out = result_def(IntegerType)
+    exceptionFlags = result_def(IntegerType(5))
+
+    def verify_(self) -> None:
+        verify_raw_out(self, self.in_.type)
+        verify_recoded(self, self.out.type)
+
+
 Hardfloat = Dialect(
     "hardfloat",
     [
@@ -394,5 +509,9 @@ Hardfloat = Dialect(
         CompareRecFnOp,
         RecFnToRecFnOp,
         MulAddRecFnOp,
+        RecodeToRawOp,
+        AddRawFnOp,
+        MulRawFnOp,
+        RoundRawToRecFnOp,
     ],
 )
