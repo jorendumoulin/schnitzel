@@ -242,6 +242,11 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return PhsRemoveOneOptionSwitchesPass
 
+    def get_phs_divf_constant_to_mul():
+        from snaxc.transforms.phs.divf_constant_to_mul import PhsDivfConstantToMulPass
+
+        return PhsDivfConstantToMulPass
+
     def get_pipeline_canonicalize_for():
         from snaxc.transforms.pipeline.pipeline_canonicalize_for import (
             PipelineCanonicalizeFor,
@@ -387,6 +392,7 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "phs-export-phs": get_phs_export_phs,
         "phs-prune-unused-carries": get_phs_prune_unused_carries,
         "phs-remove-one-option-switches": get_phs_remove_one_option_switches,
+        "phs-divf-constant-to-mul": get_phs_divf_constant_to_mul,
         "pipeline-canonicalize-for": get_pipeline_canonicalize_for,
         "pipeline-duplicate-buffers": get_pipeline_duplicate_buffers,
         "postprocess": get_postprocess_mlir,

@@ -27,6 +27,7 @@ from snaxc.transforms.hardfloat.reconcile_recodes import ReconcileRecodesPass
 from snaxc.transforms.hardfloat.split_round import SplitHardfloatRoundersPass
 from snaxc.transforms.phs.convert_float_to_int import PhsConvertFloatToInt
 from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
+from snaxc.transforms.phs.divf_constant_to_mul import PhsDivfConstantToMulPass
 from snaxc.transforms.phs.encode import PhsEncodePass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
@@ -250,6 +251,10 @@ class PHSCMain(SNAXCMain):
                 )
             )
         )
+        # Rewrite `arith.divf %x, %const` as `arith.mulf %x, 1/const`. Runs
+        # before PHS encoding so the rewrite operates on plain linalg/arith
+        # IR. Assumes reciprocal accuracy is acceptable for NN inference.
+        input_pass_pipeline.append(PhsDivfConstantToMulPass())
         input_pass_pipeline.append(PhsEncodePass())
         # Drops carry-input slots whose data is unused in the merged PE body
         # (lowering them from `readWrite` to plain `write`). Defense-in-depth:
