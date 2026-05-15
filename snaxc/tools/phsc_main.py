@@ -22,7 +22,9 @@ from snaxc.phs.template_spec import TemplateSpec
 from snaxc.tools.snaxc_main import SNAXCMain
 from snaxc.transforms.hardfloat.convert_float_to_hardfloat import ConvertFloatToHardfloatPass
 from snaxc.transforms.hardfloat.convert_hardfloat_to_hw import ConvertHardfloatToHw
+from snaxc.transforms.hardfloat.merge_across_array_get import MergeAcrossArrayGetPass
 from snaxc.transforms.hardfloat.reconcile_recodes import ReconcileRecodesPass
+from snaxc.transforms.hardfloat.split_round import SplitHardfloatRoundersPass
 from snaxc.transforms.phs.convert_float_to_int import PhsConvertFloatToInt
 from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
 from snaxc.transforms.phs.encode import PhsEncodePass
@@ -268,6 +270,15 @@ class PHSCMain(SNAXCMain):
         hardware_pass_pipeline.append(InstantiatePEArrayPass())
         hardware_pass_pipeline.append(ConvertPEToHWPass())
         hardware_pass_pipeline.append(FinalizePhsToHWPass())
+        # Split fused `add_rec_fn` / `mul_rec_fn` so the rounder becomes a
+        # standalone op. This exposes the rounder for sharing in the next
+        # pass and lets CSE collapse identical `recode_to_raw` ops.
+        hardware_pass_pipeline.append(SplitHardfloatRoundersPass())
+        # Share hardfloat ops across mutex `phs.choose` lanes that the
+        # finalize pass has just turned into `array_get(array_create(...))`:
+        # rounders, addf/subf, sitofp/uitofp, fptosi/fptoui all collapse via
+        # a single shared instance + per-operand mux.
+        hardware_pass_pipeline.append(MergeAcrossArrayGetPass())
         # Dedupe identical pure ops (notably hardfloat ops) that previously
         # lived in mutex `phs.choose` regions and ended up at the same scope
         # after the finalize pass inlined them. Lossless and unconditional.
