@@ -145,6 +145,16 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return ReconcileRecodesPass
 
+    def get_split_hardfloat_rounders():
+        from snaxc.transforms.hardfloat.split_round import SplitHardfloatRoundersPass
+
+        return SplitHardfloatRoundersPass
+
+    def get_sink_rounder_past_array_get():
+        from snaxc.transforms.hardfloat.sink_rounder import SinkRounderPastArrayGetPass
+
+        return SinkRounderPastArrayGetPass
+
     def get_convert_tosa_to_kernel():
         from snaxc.transforms.convert_tosa_to_kernel import ConvertTosaToKernelPass
 
@@ -349,6 +359,8 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "convert-float-to-hardfloat": get_convert_float_to_hardfloat,
         "convert-hardfloat-to-hw": get_convert_hardfloat_to_hw,
         "hardfloat-reconcile-recodes": get_hardfloat_reconcile_recodes,
+        "split-hardfloat-rounders": get_split_hardfloat_rounders,
+        "sink-rounder-past-array-get": get_sink_rounder_past_array_get,
         "cse": get_cse,
         "convert-dart-to-snax-stream": get_convert_dart_to_snax_stream,
         "convert-kernel-to-linalg": get_convert_kernel_to_linalg,
