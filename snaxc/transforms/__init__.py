@@ -155,6 +155,11 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return SinkRounderPastArrayGetPass
 
+    def get_share_add_rec_fn_subop():
+        from snaxc.transforms.hardfloat.share_addrecfn_subop import ShareAddRecFnSubOpPass
+
+        return ShareAddRecFnSubOpPass
+
     def get_convert_tosa_to_kernel():
         from snaxc.transforms.convert_tosa_to_kernel import ConvertTosaToKernelPass
 
@@ -361,6 +366,7 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "hardfloat-reconcile-recodes": get_hardfloat_reconcile_recodes,
         "split-hardfloat-rounders": get_split_hardfloat_rounders,
         "sink-rounder-past-array-get": get_sink_rounder_past_array_get,
+        "share-add-rec-fn-subop": get_share_add_rec_fn_subop,
         "cse": get_cse,
         "convert-dart-to-snax-stream": get_convert_dart_to_snax_stream,
         "convert-kernel-to-linalg": get_convert_kernel_to_linalg,
