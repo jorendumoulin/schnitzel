@@ -10,6 +10,7 @@ from xdsl.dialects.builtin import ModuleOp
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
+from xdsl.transforms.common_subexpression_elimination import CommonSubexpressionElimination
 from xdsl.transforms.mlir_opt import MLIROptPass
 
 from snaxc.dialects import phs
@@ -267,6 +268,10 @@ class PHSCMain(SNAXCMain):
         hardware_pass_pipeline.append(InstantiatePEArrayPass())
         hardware_pass_pipeline.append(ConvertPEToHWPass())
         hardware_pass_pipeline.append(FinalizePhsToHWPass())
+        # Dedupe identical pure ops (notably hardfloat ops) that previously
+        # lived in mutex `phs.choose` regions and ended up at the same scope
+        # after the finalize pass inlined them. Lossless and unconditional.
+        hardware_pass_pipeline.append(CommonSubexpressionElimination())
         hardware_pass_pipeline.append(ReconcileRecodesPass())
         if self.args.easyfloat_path is None:
             tool_dir = os.path.dirname(__file__)
