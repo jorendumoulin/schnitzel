@@ -21,7 +21,7 @@ jobs:
       - name: Checkout kuleuven-easyfloat
         uses: actions/checkout@v4
         with:
-          ref: 14a0ace151927575f12188d7139585c5420d2dee
+          ref: fac54cda1270d7f0518e9fd6a6b24bdae7f178be
           repository: KULeuven-MICAS/kuleuven-easyfloat
           path: kuleuven-easyfloat
       - uses: prefix-dev/setup-pixi@v0.9.0
