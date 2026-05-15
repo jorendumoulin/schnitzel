@@ -6,9 +6,10 @@ module {
   func.func public @streamer_ad01(
       %arg0: memref<4x4xf32>,
       %arg1: memref<4x4xf32>,
-      %arg2: memref<4xf32>,
-      %arg3: memref<4xf32>,
-      %arg4: memref<4xf32>) {
+      %arg2: memref<4xf32>) {
+    %hi = arith.constant 3.000000e+01 : f32
+    %lo = arith.constant 0.000000e+00 : f32
+
     linalg.generic {
       indexing_maps = [#map_in, #map_in, #map_out],
       iterator_types = ["reduction", "parallel"]
@@ -18,12 +19,11 @@ module {
       %s = arith.addf %c, %m : f32
       linalg.yield %s : f32
     }
-
     linalg.generic {
-      indexing_maps = [#map_elt, #map_elt, #map_elt, #map_elt],
+      indexing_maps = [#map_elt, #map_elt],
       iterator_types = ["parallel"]
-    } ins(%arg2, %arg3, %arg4 : memref<4xf32>, memref<4xf32>, memref<4xf32>) outs(%arg2 : memref<4xf32>) {
-    ^bb0(%x : f32, %hi : f32, %lo : f32, %_ : f32):
+    } ins(%arg2 : memref<4xf32>) outs(%arg2 : memref<4xf32>) {
+    ^bb0(%x : f32, %_ : f32):
       %clamped_hi = arith.minimumf %x, %hi : f32
       %clamped = arith.maximumf %clamped_hi, %lo : f32
       linalg.yield %clamped : f32
