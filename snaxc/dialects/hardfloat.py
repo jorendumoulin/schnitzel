@@ -213,6 +213,25 @@ class InToRecFnOp(HardfloatOperation):
 
 
 @irdl_op_definition
+class CompareRecFnOp(HardfloatOperation):
+    CHISEL_NAME: ClassVar[str] = "CompareRecFN"
+    CHISEL_INPUT_NAMES: ClassVar[tuple[str, ...]] = ("a", "b", "signaling")
+    CHISEL_OUTPUT_NAMES: ClassVar[tuple[str, ...]] = ("lt", "eq", "gt", "exceptionFlags")
+    name = "hardfloat.compare_rec_fn"
+    a = operand_def(IntegerType)
+    b = operand_def(IntegerType)
+    signaling = operand_def(IntegerType(1))
+    lt = result_def(IntegerType(1))
+    eq = result_def(IntegerType(1))
+    gt = result_def(IntegerType(1))
+    exceptionFlags = result_def(IntegerType(5))
+
+    def verify_(self) -> None:
+        verify_recoded(self, self.a.type)
+        verify_recoded(self, self.b.type)
+
+
+@irdl_op_definition
 class RecFnToInOp(HardfloatOperation):
     CHISEL_NAME: ClassVar[str] = "RecFNToIN"
     CHISEL_INPUT_NAMES: ClassVar[tuple[str, ...]] = ("in", "roundingMode", "signedOut")
@@ -239,5 +258,6 @@ Hardfloat = Dialect(
         FnToRecFnOp,
         InToRecFnOp,
         RecFnToInOp,
+        CompareRecFnOp,
     ],
 )
