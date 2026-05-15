@@ -50,7 +50,6 @@ from snaxc.dialects.hardfloat import (
     RoundRawToRecFnOp,
 )
 
-
 # (op_class, muxable_operand_indices). Operands at the listed indices may
 # differ across lanes; everything else must match by SSA identity.
 _MUXABLE_OPS: dict[type[HardfloatOperation], tuple[int, ...]] = {
@@ -180,9 +179,7 @@ class ShareMuxableOp(RewritePattern):
             # non-member lanes to the head's value (don't-care fill).
             muxed_operands: list[SSAValue] = list(head.operands)
             for mi in mux_idxs:
-                fills: list[SSAValue] = [
-                    by_idx[i].operands[mi] if i in by_idx else head.operands[mi] for i in range(n)
-                ]
+                fills: list[SSAValue] = [by_idx[i].operands[mi] if i in by_idx else head.operands[mi] for i in range(n)]
                 arr = hw.ArrayCreateOp(*fills)
                 get = hw.ArrayGetOp(arr.result, op.index)
                 new_ops.extend([arr, get])
