@@ -58,6 +58,16 @@ class PhsDatapathBlackBox(config: PhsAcceleratorConfig, dataWidth: Int) extends 
         ports += s"mask_${sIdx}" -> Output(UInt(config.maskBitwidth(sIdx).W))
       }
 
+      // Dynamic carry-used indicator per readWrite streamer (1 = BB's output
+      // depends on data_{sIdx}_*, 0 = it doesn't this cycle). Indexed by
+      // position in the readWrite subset of config.streamers, in the same
+      // order PHS Python emits them. When absent (older configs) this
+      // defaults to carryUsed from PhsStreamerConfig.
+      for ((sc, sIdx) <- config.streamers.zipWithIndex if sc.streamType == "readWrite") {
+        val carryIdx = config.streamers.take(sIdx + 1).count(_.streamType == "readWrite") - 1
+        ports += s"carry_used_${carryIdx}" -> Output(UInt(1.W))
+      }
+
       collection.immutable.SeqMap.from(ports)
     }
   })
@@ -165,13 +175,25 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
 
   // For each reader, gate its `readData.valid` contribution to the AND that
   // drives writers' `writeData.valid`. Pure readers always contribute. A
-  // readWrite streamer contributes only when its `carryUsed` flag is true:
-  // when the BlackBox doesn't actually consume `data_K_*`, requiring its
-  // valid would deadlock the handshake (the write would never fire because
-  // the carry-side read never advances).
+  // readWrite streamer contributes only when ITS carry-input is actually
+  // consumed by the BlackBox *this cycle*: we read that from a per-readWrite
+  // dynamic `carry_used_K` output signal the BlackBox emits. This lets a
+  // single merged PE support modes that use the carry and modes that don't
+  // without deadlocking (a static flag couldn't express "depends on mode").
+  // The static `carryUsed` config field remains as a fallback hint for
+  // BlackBoxes that don't emit the dynamic signal.
+  var rwCarryIdx = 0
   val readDataValidContrib = readStreamers.zip(readStreamerConfigs).map { case (s, c) =>
-    if (c.streamType == "readWrite" && !c.carryUsed) true.B
-    else s.io.readData.valid
+    if (c.streamType == "readWrite") {
+      val idx = rwCarryIdx
+      rwCarryIdx += 1
+      val carryUsedDyn = bb.io.elements(s"carry_used_${idx}").asUInt(0)
+      // If dynamic signal is high, gate on readData.valid; otherwise treat as
+      // trivially valid so the writer's handshake doesn't stall on this lane.
+      Mux(carryUsedDyn, s.io.readData.valid, true.B)
+    } else {
+      s.io.readData.valid  // pure read: always needed
+    }
   }
   val combinedReadDataValid =
     if (readDataValidContrib.isEmpty) true.B else readDataValidContrib.reduce(_ && _)

@@ -67,7 +67,7 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
             # Fetch the first stride
             stride, bound = next(access_iter)
 
-            # TCDM takes 8 contiguous bytes minimum
+            # TCDM takes 8 contiguous bytes minimum.
             if stride * bound == TCDM_BANK_WIDTH:
                 stride, bound = next(access_iter)
             elif stride * bound < TCDM_BANK_WIDTH:
@@ -82,7 +82,16 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
 
             # fill up all spatial strides
             for spat_size in streamers[operand].spatial_dims:
-                assert stride is not None
+                # Multi-mode merged PE: the streamer's spatial layout is
+                # the union of all modes' shapes (e.g., 2x2 for matmul +
+                # 2D-elementwise). A single-mode candidate that doesn't
+                # access this spatial dim leaves access_iter exhausted
+                # while spatial slots remain. Fill the remaining slots
+                # with stride=0 + bound=spat_size, which the streamer
+                # turns into a runtime broadcast on that dim.
+                if stride is None:
+                    spatial_strides.append(0)
+                    continue
                 assert bound is not None
                 spatial_strides.append(stride)
                 if bound == spat_size:

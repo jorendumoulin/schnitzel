@@ -10,6 +10,7 @@ from snaxc.hw.accelerators.phs import Phs
 from snaxc.hw.streamer_accelerator import StreamerAccelerator
 from snaxc.hw.system import Accelerator
 from snaxc.ir.dart.access_pattern import Template
+from snaxc.phs.combine import align_schemas
 from snaxc.phs.decode import decode_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs
 from snaxc.phs.hw_conversion import get_switch_bitwidth
@@ -34,11 +35,26 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
 
         self.template_spec = template_spec
 
-        # Build Phs accelerator from template
-        true_switches = pe.get_true_switches()
-        switch_bitwidths = [get_switch_bitwidth(arg) for arg in pe.get_switches() if arg.get_unique_use() is not None][
-            :true_switches
-        ]
+        # Build Phs accelerator from template. "True" switches are those that
+        # actually drive a MuxOp or a ChooseOp with >1 operations; dead
+        # switches (ChooseOp with a single option) get cleaned up by the
+        # remove-one-option-switches hardware pass. Here we mirror that
+        # filter per-switch so bitwidths line up with ``true_switches`` — the
+        # old code took the first N bitwidths, which broke whenever a dead
+        # switch preceded a live one (common after merge's MuxOp inserts).
+        true_switch_bitwidths: list[int] = []
+        for sw_arg in pe.get_switches():
+            if sw_arg.get_unique_use() is None:
+                continue
+            user = sw_arg.get_user_of_unique_use()
+            assert user is not None
+            if isinstance(user, phs.ChooseOp):
+                if len(list(user.operations())) > 1:
+                    true_switch_bitwidths.append(get_switch_bitwidth(sw_arg))
+            elif isinstance(user, phs.MuxOp):
+                true_switch_bitwidths.append(get_switch_bitwidth(sw_arg))
+        true_switches = len(true_switch_bitwidths)
+        switch_bitwidths = true_switch_bitwidths
 
         # For each readWrite carry slot, check whether the corresponding PE
         # block-arg is actually used in the body. If not, mark carry_used=False
@@ -74,10 +90,13 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
     ) -> Sequence[tuple[Sequence[Operation], SSAValue]]:
         """Decode the PEOp graph to determine switch values for the given operation."""
         candidate_pe = convert_generic_body_to_phs(op, self.name, PatternRewriter(op))
-        # Align carry-input shape with the abstract PE (which the prune pass
-        # may have shrunk after merging). Without this the candidate looks
-        # wider than the abstract for parallel-only kernels.
+        # Align the candidate's schema with the abstract PE so decode_abstract_graph
+        # sees matching shapes: first drop any carry this mode doesn't use
+        # (mirrors prune on the abstract), then widen to the abstract's
+        # pure-input/paired-output schema (inserting dead slots for inputs the
+        # abstract has for other modes).
         prune_unused_carries(candidate_pe)
+        align_schemas(candidate_pe, self.pe)
         switch_values = decode_abstract_graph(self.pe, candidate_pe)
         ops = [arith.ConstantOp.from_int_and_width(value, 32) for value in switch_values]
         return [([op], op.results[0]) for op in ops]
@@ -111,18 +130,41 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
         """Generate all setup values: streamer configs + switch values."""
         result: list[tuple[Sequence[Operation], SSAValue]] = []
 
-        for operand, pattern, _streamer in zip(
+        # The Chisel Streamer reserves a fixed number of CSR slots per
+        # streamer (``temporal_dims`` ts + ``temporal_dims`` ub +
+        # ``spatial_dim`` ss). The canonicalized snax_stream pattern
+        # is allowed to be shorter (bound-1 dims dropped, missing spatial
+        # dims for narrow-mode candidates) — if we emit fewer values here,
+        # every CSR after this streamer shifts up by the missing count,
+        # and the next streamer's base lands in this one's bound slot.
+        # The hardware then reads garbage bounds and locks up. Pad ts/ub
+        # to the streamer's declared ``temporal_dims`` (stride 0, bound 1
+        # = one no-op iteration) and ss to ``spatial_dim`` (stride 0 =
+        # runtime broadcast on that lane).
+        for operand, pattern, streamer in zip(
             (*op.inputs, *op.outputs), op.stride_patterns.data, self.phs.streamers.streamers
         ):
             result.append(([], operand))
+            ts_count = len(pattern.temporal_strides)
+            ub_count = len(pattern.upper_bounds)
+            ss_count = len(pattern.spatial_strides)
             for ts in pattern.temporal_strides:
                 c = arith.ConstantOp.from_int_and_width(ts.data, 32)
+                result.append(([c], c.result))
+            for _ in range(streamer.temporal_dims - ts_count):
+                c = arith.ConstantOp.from_int_and_width(0, 32)
                 result.append(([c], c.result))
             for ub in pattern.upper_bounds:
                 c = arith.ConstantOp.from_int_and_width(ub.data, 32)
                 result.append(([c], c.result))
+            for _ in range(streamer.temporal_dims - ub_count):
+                c = arith.ConstantOp.from_int_and_width(1, 32)
+                result.append(([c], c.result))
             for ss in pattern.spatial_strides:
                 c = arith.ConstantOp.from_int_and_width(ss.data, 32)
+                result.append(([c], c.result))
+            for _ in range(streamer.spatial_dim - ss_count):
+                c = arith.ConstantOp.from_int_and_width(0, 32)
                 result.append(([c], c.result))
 
         generic = op.regions[0].ops.first
@@ -145,4 +187,13 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
         )
 
     def get_template(self, op: dart.StreamingRegionOpBase) -> Template:
+        # On a multi-mode PE the unioned template covers all modes' shapes
+        # together, but each dispatched kernel uses just one mode's access
+        # pattern. Picking the per-mode template here lets the dart scheduler's
+        # singular-vector match accept the narrower (broadcast-input) shapes
+        # of modes like matmul-via-temporal-carry; runtime broadcasting is
+        # handled by per-mode streamer stride config later.
+        if isinstance(op, dart.OperationOp):
+            operand_maps = tuple(p.data for p in op.patterns.data)
+            return self.template_spec.get_dart_template_for_maps(operand_maps)
         return self.template_spec.get_dart_template()

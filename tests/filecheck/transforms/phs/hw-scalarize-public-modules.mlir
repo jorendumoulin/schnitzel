@@ -12,6 +12,10 @@ hw.module @test_2d(in %data data_0: !hw.array<2x!hw.array<4xi64>>, in %data_1: !
 // CHECK: hw.module @test_1d(in %data_0_0 : i64, in %data_0_1 : i64, in %data_0_2 : i64, in %data_0_3 : i64, in %data_1_0 : i64, in %data_1_1 : i64, in %data_1_2 : i64, in %data_1_3 : i64, in %switch_0 : i2, out out_0_0 : i64, out out_0_1 : i64, out out_0_2 : i64, out out_0_3 : i64) {
 // CHECK:   hw.output %3, %4, %5, %6 : i64, i64, i64, i64
 // CHECK-NEXT: }
-// CHECK: hw.module @test_2d(in %data_0_0 : i64, in %data_0_1 : i64, in %data_0_2 : i64, in %data_0_3 : i64, in %data_0_4 : i64, in %data_0_5 : i64, in %data_0_6 : i64, in %data_0_7 : i64, in %data_1_0 : i64, in %data_1_1 : i64, in %data_1_2 : i64, in %data_1_3 : i64, in %data_1_4 : i64, in %data_1_5 : i64, in %data_1_6 : i64, in %data_1_7 : i64, out out_0_0_0 : i64, out out_0_0_1 : i64, out out_0_0_2 : i64, out out_0_0_3 : i64, out out_0_1_0 : i64, out out_0_1_1 : i64, out out_0_1_2 : i64, out out_0_1_3 : i64) {
+// Output ports are flat-indexed (out_0_<flat_idx>), matching the input
+// convention and the Chisel periphery's flat Vec output bus. The previous
+// per-spatial-dim naming (out_0_<i>_<j>) only happened to coincide with
+// the flat form on 1D arrays.
+// CHECK: hw.module @test_2d(in %data_0_0 : i64, in %data_0_1 : i64, in %data_0_2 : i64, in %data_0_3 : i64, in %data_0_4 : i64, in %data_0_5 : i64, in %data_0_6 : i64, in %data_0_7 : i64, in %data_1_0 : i64, in %data_1_1 : i64, in %data_1_2 : i64, in %data_1_3 : i64, in %data_1_4 : i64, in %data_1_5 : i64, in %data_1_6 : i64, in %data_1_7 : i64, out out_0_0 : i64, out out_0_1 : i64, out out_0_2 : i64, out out_0_3 : i64, out out_0_4 : i64, out out_0_5 : i64, out out_0_6 : i64, out out_0_7 : i64) {
 // CHECK-NEXT:   hw.output %data_0_0, %data_0_1, %data_0_2, %data_0_3, %data_0_4, %data_0_5, %data_0_6, %data_0_7 : i64, i64, i64, i64, i64, i64, i64, i64
 // CHECK-NEXT: }

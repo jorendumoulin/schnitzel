@@ -83,21 +83,32 @@ class Phs(Accelerator):
             carry_used = [True] * carry_no
         assert len(carry_used) == carry_no, f"carry_used has length {len(carry_used)} but carry_no={carry_no}"
 
+        def _normalize_dims(dims: tuple[int, ...]) -> tuple[tuple[int, ...], int]:
+            """Scalar (0-dim) streamers need a degenerate (1,) spatial dim and
+            at least 1 temporal dim — Chisel rejects empty Vecs on the AGU
+            side. Callers that really need ``0 spatial × 0 temporal`` would
+            have to represent that differently; for our spatial-chain scalar
+            carries 1 spatial lane × 1 temporal iter correctly encodes the
+            "one element accessed" semantics."""
+            if len(dims) == 0:
+                return ((1,), 1)
+            return (dims, len(dims))
+
         paired_set = set(paired_outputs)
         streamers: list[Streamer] = []
         for i in range(num_pure_inputs):
-            dims = input_sizes[i]
-            streamers.append(Streamer(access_width, len(dims), dims, f"in_{i}", "read"))
+            dims, tdims = _normalize_dims(input_sizes[i])
+            streamers.append(Streamer(access_width, tdims, dims, f"in_{i}", "read"))
         for k, out_idx in enumerate(paired_outputs):
-            dims = output_sizes[out_idx]
+            dims, tdims = _normalize_dims(output_sizes[out_idx])
             streamers.append(
-                Streamer(access_width, len(dims), dims, f"rw_{out_idx}", "readWrite", carry_used=carry_used[k])
+                Streamer(access_width, tdims, dims, f"rw_{out_idx}", "readWrite", carry_used=carry_used[k])
             )
         for out_idx in range(num_outputs):
             if out_idx in paired_set:
                 continue
-            dims = output_sizes[out_idx]
-            streamers.append(Streamer(access_width, len(dims), dims, f"out_{out_idx}", "write"))
+            dims, tdims = _normalize_dims(output_sizes[out_idx])
+            streamers.append(Streamer(access_width, tdims, dims, f"out_{out_idx}", "write"))
 
         return Phs(
             name=name,
