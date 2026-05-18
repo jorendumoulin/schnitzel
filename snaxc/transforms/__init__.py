@@ -252,6 +252,11 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return PhsDivfToReciprocalBitcastPass
 
+    def get_phs_schedule_separate_linalg():
+        from snaxc.transforms.phs.schedule_preset.separate_linalg import PhsScheduleSeparateLinalgPass
+
+        return PhsScheduleSeparateLinalgPass
+
     def get_pipeline_canonicalize_for():
         from snaxc.transforms.pipeline.pipeline_canonicalize_for import (
             PipelineCanonicalizeFor,
@@ -399,6 +404,7 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "phs-remove-one-option-switches": get_phs_remove_one_option_switches,
         "phs-divf-constant-to-mul": get_phs_divf_constant_to_mul,
         "phs-divf-to-reciprocal-bitcast": get_phs_divf_to_reciprocal_bitcast,
+        "phs-schedule-separate-linalg": get_phs_schedule_separate_linalg,
         "pipeline-canonicalize-for": get_pipeline_canonicalize_for,
         "pipeline-duplicate-buffers": get_pipeline_duplicate_buffers,
         "postprocess": get_postprocess_mlir,

@@ -37,6 +37,7 @@ from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicMo
 from snaxc.transforms.phs.instantiate_pe_array import BOUNDS_ATTR_NAME, InstantiatePEArrayPass
 from snaxc.transforms.phs.prune_unused_carries import PrunePEUnusedCarriesPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
+from snaxc.transforms.phs.schedule_preset.separate_linalg import PhsScheduleSeparateLinalgPass
 
 
 class PHSCMain(SNAXCMain):
@@ -183,6 +184,14 @@ class PHSCMain(SNAXCMain):
 
         arg_parser.add_argument("schedule_file", type=str, nargs="?", help="path to schedule file")
         arg_parser.add_argument(
+            "--scheduling-preset",
+            type=str,
+            choices=["separate-linalg"],
+            default=None,
+            help="Use a built-in scheduling pass instead of a transform-dialect schedule file. "
+            "'separate-linalg' assigns every unannotated linalg.generic its own @accN accelerator.",
+        )
+        arg_parser.add_argument(
             "--software-file",
             type=str,
             nargs="?",
@@ -242,17 +251,33 @@ class PHSCMain(SNAXCMain):
         Create input pipeline.
         The input pipeline annotates and encodes relevant linalg ops into PHS
         """
+        if (self.args.schedule_file is None) == (self.args.scheduling_preset is None):
+            raise SystemExit(
+                "Exactly one of <schedule_file> or --scheduling-preset must be provided."
+            )
+
         input_pass_pipeline: list[ModulePass] = []
 
-        input_pass_pipeline.append(
-            MLIROptPass(
-                arguments=(
-                    "--linalg-generalize-named-ops",
-                    f"--transform-preload-library=transform-library-paths={self.args.schedule_file}",
-                    "--transform-interpreter",
+        if self.args.scheduling_preset is None:
+            # Transform-dialect path: load the user's schedule.mlir and run
+            # the transform interpreter to apply it.
+            input_pass_pipeline.append(
+                MLIROptPass(
+                    arguments=(
+                        "--linalg-generalize-named-ops",
+                        f"--transform-preload-library=transform-library-paths={self.args.schedule_file}",
+                        "--transform-interpreter",
+                    )
                 )
             )
-        )
+        else:
+            # Preset path: still generalize named ops, then run the chosen
+            # built-in scheduling pass (no transform dialect involved).
+            input_pass_pipeline.append(MLIROptPass(arguments=("--linalg-generalize-named-ops",)))
+            if self.args.scheduling_preset == "separate-linalg":
+                input_pass_pipeline.append(PhsScheduleSeparateLinalgPass())
+            else:
+                raise SystemExit(f"Unknown scheduling preset: {self.args.scheduling_preset}")
         # Rewrite `arith.divf %x, %const` as `arith.mulf %x, 1/const`. Runs
         # before PHS encoding so the rewrite operates on plain linalg/arith
         # IR. Assumes reciprocal accuracy is acceptable for NN inference.
