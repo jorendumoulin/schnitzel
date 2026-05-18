@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import struct
 from typing import cast
 
 from xdsl.context import Context
@@ -10,6 +11,7 @@ from xdsl.dialects.builtin import (
     Float16Type,
     Float32Type,
     Float64Type,
+    FloatAttr,
     IntegerType,
     ModuleOp,
     UnrealizedConversionCastOp,
@@ -403,6 +405,69 @@ class ConvertCmpfOp(RewritePattern):
         rewriter.replace_op(op, new_ops=new_ops, new_results=[result])
 
 
+class ConvertSelectOp(RewritePattern):
+    """
+    Retype `arith.select` whose payload is a float to operate on the integer
+    bit-encoding instead.
+
+    `circt-opt --map-arith-to-comb` only converts `arith.select` whose operand
+    type is integer-like; float-typed selects survive and crash the SV
+    lowering. The select itself is a pure mux, so we just sandwich the float
+    operands in `unrealized_conversion_cast` to the matching integer type and
+    rebuild the select on integers. `reconcile_unrealized_casts` later folds
+    away the casts that meet other float-bit-encoded values.
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: arith.SelectOp, rewriter: PatternRewriter):
+        in_type = op.lhs.type
+        if type(in_type) not in _type_mapping:
+            return
+        in_type = cast(AnyFloat, in_type)
+        bitwidth = in_type.bitwidth
+        new_ops: list[Operation] = [
+            cast_lhs := UnrealizedConversionCastOp.get([op.lhs], [IntegerType(bitwidth)]),
+            cast_rhs := UnrealizedConversionCastOp.get([op.rhs], [IntegerType(bitwidth)]),
+            new_sel := arith.SelectOp(op.cond, cast_lhs.results[0], cast_rhs.results[0]),
+            cast_res := UnrealizedConversionCastOp.get([new_sel.result], [in_type]),
+        ]
+        rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_res.results[0]])
+
+
+_PACK_FORMAT: dict[type[Attribute], tuple[str, str]] = {
+    Float32Type: ("<f", "<I"),
+    Float64Type: ("<d", "<Q"),
+}
+
+
+class ConvertConstantOp(RewritePattern):
+    """
+    Replace `arith.constant <fp> : fX` with a same-bit-pattern integer
+    constant plus an `unrealized_conversion_cast` back to the float type.
+
+    `circt-opt --map-arith-to-comb` cannot lower float-typed `arith.constant`,
+    so the bit-encoded form is what survives to RTL. Only f32/f64 are
+    supported here (matching the rest of the hardfloat lowering).
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: arith.ConstantOp, rewriter: PatternRewriter):
+        out_type = op.result.type
+        if type(out_type) not in _PACK_FORMAT:
+            return
+        if not isinstance(op.value, FloatAttr):
+            return
+        out_type = cast(AnyFloat, out_type)
+        fp_fmt, int_fmt = _PACK_FORMAT[type(out_type)]
+        bit_pattern = struct.unpack(int_fmt, struct.pack(fp_fmt, op.value.value.data))[0]
+        bitwidth = out_type.bitwidth
+        new_ops: list[Operation] = [
+            int_const := arith.ConstantOp.from_int_and_width(bit_pattern, bitwidth),
+            cast_back := UnrealizedConversionCastOp.get([int_const.result], [out_type]),
+        ]
+        rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_back.results[0]])
+
+
 class ConvertFloatToHardfloatPass(ModulePass):
     name = "convert-float-to-hardfloat"
 
@@ -418,6 +483,21 @@ class ConvertFloatToHardfloatPass(ModulePass):
                     ConvertMaximumMinimumOp(),
                     ConvertTruncExtfOp(),
                     ConvertFmaOp(),
+                ]
+            ),
+            apply_recursively=False,
+        ).rewrite_module(op)
+        # Run `ConvertSelectOp` / `ConvertConstantOp` in a second walker so
+        # they pick up float-typed selects and constants emitted by the
+        # patterns above (the first walker doesn't revisit ops created
+        # during a rewrite). `ConvertConstantOp` is also needed for
+        # user-written float literals that no other pattern touches —
+        # circt-opt's --map-arith-to-comb otherwise leaves them behind.
+        PatternRewriteWalker(
+            GreedyRewritePatternApplier(
+                [
+                    ConvertSelectOp(),
+                    ConvertConstantOp(),
                 ]
             ),
             apply_recursively=False,
