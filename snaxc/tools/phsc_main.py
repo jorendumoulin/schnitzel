@@ -134,6 +134,13 @@ class PHSCMain(SNAXCMain):
             else:
                 with open(self.args.output_hardware, "w") as outfile:
                     outfile.write(stdout_final)
+                # Verilator resolves unknown modules by filename autodiscovery
+                # (looks for `<module_name>.sv` on its -y/-I path). firtool packs
+                # every `hw.module` into the single output above, so for multi-PE
+                # designs only one module is auto-findable. Split the consolidated
+                # output into per-module files named after each module so all PHS
+                # blackboxes are picked up by the simulator build.
+                self._split_sv_per_module(stdout_final, os.path.dirname(os.path.abspath(self.args.output_hardware)))
 
         else:
             with open(self.args.output_hardware, "w") as outfile:
@@ -179,6 +186,21 @@ class PHSCMain(SNAXCMain):
 
         if output_software_stream is not sys.stdout:
             output_software_stream.close()
+
+    @staticmethod
+    def _split_sv_per_module(sv_text: str, out_dir: str) -> None:
+        """Write each top-level `module <name>(...)endmodule` block to its own
+        `<out_dir>/<name>.sv` so Verilator can autodiscover BlackBox modules."""
+        import re
+
+        os.makedirs(out_dir, exist_ok=True)
+        starts = [m for m in re.finditer(r"^module\s+(\w+)\s*\(", sv_text, flags=re.MULTILINE)]
+        for idx, m in enumerate(starts):
+            name = m.group(1)
+            begin = m.start()
+            end = starts[idx + 1].start() if idx + 1 < len(starts) else len(sv_text)
+            with open(os.path.join(out_dir, f"{name}.sv"), "w") as f:
+                f.write(sv_text[begin:end])
 
     def register_all_arguments(self, arg_parser: argparse.ArgumentParser):
         """
