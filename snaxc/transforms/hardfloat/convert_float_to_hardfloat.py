@@ -460,6 +460,30 @@ class ConvertCmpfOp(RewritePattern):
         rewriter.replace_op(op, new_ops=new_ops, new_results=[result])
 
 
+class ConvertBitcastFloatOp(RewritePattern):
+    """
+    Replace `arith.bitcast` between a same-width float and integer with a
+    `builtin.unrealized_conversion_cast`.
+
+    Float<->int bitcasts (e.g. emitted by the Schraudolph reciprocal and the
+    approximate-math passes) are bit-pattern-preserving, so swapping them for
+    unrealized casts is a no-op semantically. Doing so lets
+    `reconcile_unrealized_casts` collapse chains like
+    `unrealized_cast(i32->f32) ; arith.bitcast(f32->i32)` that otherwise
+    survive the hardfloat lowering and bleed into the SV output.
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: arith.BitcastOp, rewriter: PatternRewriter):
+        in_type = op.input.type
+        out_type = op.result.type
+        in_is_float = type(in_type) in _type_mapping
+        out_is_float = type(out_type) in _type_mapping
+        if in_is_float == out_is_float:
+            return
+        rewriter.replace_op(op, UnrealizedConversionCastOp.get([op.input], [out_type]))
+
+
 class ConvertSelectOp(RewritePattern):
     """
     Retype `arith.select` whose payload is a float to operate on the integer
@@ -554,6 +578,7 @@ class ConvertFloatToHardfloatPass(ModulePass):
                 [
                     ConvertSelectOp(),
                     ConvertConstantOp(),
+                    ConvertBitcastFloatOp(),
                 ]
             ),
             apply_recursively=False,
