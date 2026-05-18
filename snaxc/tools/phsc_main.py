@@ -253,9 +253,7 @@ class PHSCMain(SNAXCMain):
         The input pipeline annotates and encodes relevant linalg ops into PHS
         """
         if (self.args.schedule_file is None) == (self.args.scheduling_preset is None):
-            raise SystemExit(
-                "Exactly one of <schedule_file> or --scheduling-preset must be provided."
-            )
+            raise SystemExit("Exactly one of <schedule_file> or --scheduling-preset must be provided.")
 
         input_pass_pipeline: list[ModulePass] = []
 

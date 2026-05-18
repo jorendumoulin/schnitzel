@@ -19,8 +19,9 @@ from xdsl.pattern_rewriter import (
 )
 
 
-def _expand(op: arith.MaxSIOp | arith.MinSIOp | arith.MaxUIOp | arith.MinUIOp,
-            predicate: str, rewriter: PatternRewriter) -> None:
+def _expand(
+    op: arith.MaxSIOp | arith.MinSIOp | arith.MaxUIOp | arith.MinUIOp, predicate: str, rewriter: PatternRewriter
+) -> None:
     cmp = arith.CmpiOp(op.lhs, op.rhs, predicate)
     sel = arith.SelectOp(cmp.result, op.lhs, op.rhs)
     rewriter.replace_op(op, [cmp, sel])
@@ -55,8 +56,6 @@ class ExpandIntegerMinMaxPass(ModulePass):
 
     def apply(self, ctx: Context, op: ModuleOp) -> None:
         PatternRewriteWalker(
-            GreedyRewritePatternApplier(
-                [ExpandMaxSI(), ExpandMinSI(), ExpandMaxUI(), ExpandMinUI()]
-            ),
+            GreedyRewritePatternApplier([ExpandMaxSI(), ExpandMinSI(), ExpandMaxUI(), ExpandMinUI()]),
             apply_recursively=False,
         ).rewrite_module(op)
