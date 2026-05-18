@@ -24,6 +24,9 @@ class Phs(Accelerator):
 
     streamers: StreamerConfiguration = field(default_factory=lambda: StreamerConfiguration([]))
 
+    csr_base: int = 0x900
+    """Absolute CSR base address assigned to this accelerator by the HW generator."""
+
     @staticmethod
     def from_template(
         name: str,
@@ -34,6 +37,7 @@ class Phs(Accelerator):
         access_width: int = 4,
         paired_outputs: tuple[int, ...] | None = None,
         carry_used: list[bool] | None = None,
+        csr_base: int = 0x900,
     ) -> "Phs":
         """
         Create a PHS accelerator from template input/output sizes.
@@ -105,6 +109,7 @@ class Phs(Accelerator):
             num_switches=num_switches,
             switch_bitwidths=switch_bitwidths or [32] * num_switches,
             streamers=StreamerConfiguration(streamers),
+            csr_base=csr_base,
         )
 
     @staticmethod
@@ -147,11 +152,12 @@ class Phs(Accelerator):
             switch_bitwidths=list(config.get("switchBitwidths", [])),
             paired_outputs=paired_outputs,
             carry_used=rw_carry_used,
+            csr_base=int(config.get("csrBase", 0x900)),
         )
 
     def param_values(self) -> dict[str, int]:
         """Compute CSR address map matching the Scala PhsAccelerator layout."""
-        base = 0x900
+        base = self.csr_base
         csrs: list[str] = []
         for streamer in self.streamers.streamers:
             csrs.append(streamer.addr_params())

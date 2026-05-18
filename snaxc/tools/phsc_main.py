@@ -146,11 +146,17 @@ class PHSCMain(SNAXCMain):
             self.ctx.system = parse_config(system_config)
 
             # Replace the Phs accelerator from config with the full PhsAccelerator
-            # (which has the PEOp and TemplateSpec needed for code generation)
+            # (which has the PEOp and TemplateSpec needed for code generation).
+            # The HW generator assigns the CSR base, so copy it across before
+            # swapping so that param_values() uses the correct absolute base.
             for acc in accelerators:
                 for core in self.ctx.system.clusters[0].cores:
                     for i, sys_acc in enumerate(core.accelerators):
                         if sys_acc.name == acc.phs.name:
+                            from snaxc.hw.accelerators.phs import Phs
+
+                            if isinstance(sys_acc, Phs):
+                                acc.phs.csr_base = sys_acc.csr_base
                             core.accelerators[i] = acc
                             acc.resolve_parents(core)
                             break
