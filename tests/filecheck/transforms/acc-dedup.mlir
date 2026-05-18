@@ -1,6 +1,6 @@
 // RUN: snax-opt %s -p accfg-dedup | filecheck %s
 
-func.func public @simple_mult(%arg0 : memref<?xi32>, %arg1 : memref<?xi32>, %arg2 : memref<?xi32>) {
+func.func public @simple_mult(%arg0: memref<?xi32>, %arg1: memref<?xi32>, %arg2: memref<?xi32>) {
   %0 = arith.constant 0 : index
   %cst = arith.constant 0 : i5
   %1 = "memref.extract_aligned_pointer_as_index"(%arg0) : (memref<?xi32>) -> index
@@ -55,7 +55,7 @@ func.func public @simple_mult(%arg0 : memref<?xi32>, %arg1 : memref<?xi32>, %arg
 }
 
 // CHECK-NEXT: builtin.module {
-// CHECK-NEXT:   func.func public @simple_mult(%arg0 : memref<?xi32>, %arg1 : memref<?xi32>, %arg2 : memref<?xi32>) {
+// CHECK-NEXT:   func.func public @simple_mult(%arg0: memref<?xi32>, %arg1: memref<?xi32>, %arg2: memref<?xi32>) {
 // CHECK-NEXT:     %0 = arith.constant 0 : index
 // CHECK-NEXT:     %cst = arith.constant 0 : i5
 // CHECK-NEXT:     %1 = "memref.extract_aligned_pointer_as_index"(%arg0) : (memref<?xi32>) -> index
@@ -137,7 +137,7 @@ func.func @scf_for_test(%A: i32, %B: i32) {
   return
 }
 
-// CHECK-NEXT:   func.func @scf_for_test(%A : i32, %B : i32) {
+// CHECK-NEXT:   func.func @scf_for_test(%A: i32, %B: i32) {
 // CHECK-NEXT:     %O = "test.op"() : () -> i32
 // CHECK-NEXT:     %c32 = arith.constant 32 : i32
 // CHECK-NEXT:     %init = accfg.setup "snax_hwpe_mult" to ("A" = %A : i32, "B" = %B : i32, "O" = %O : i32, "size" = %c32 : i32) : !accfg.state<"snax_hwpe_mult">
@@ -167,7 +167,7 @@ func.func @scf_for_test(%A: i32, %B: i32) {
 // CHECK-NEXT:   }
 
 
-func.func @nested_loops(%A : i32, %lb : i32, %ub : i32, %step : i32) {
+func.func @nested_loops(%A: i32, %lb: i32, %ub: i32, %step: i32) {
   %0 = accfg.setup "simple" to () : !accfg.state<"simple">
   %1 = scf.for %i = %lb to %ub step %step iter_args(%2 = %0) -> (!accfg.state<"simple">) : i32 {
     %3 = scf.for %j = %i to %ub step %step iter_args(%4 = %2) -> (!accfg.state<"simple">) : i32 {
@@ -180,7 +180,7 @@ func.func @nested_loops(%A : i32, %lb : i32, %ub : i32, %step : i32) {
 }
 
 // check that every loop-nest only contains values that cannot be set at a higher level
-// CHECK-NEXT:  func.func @nested_loops(%A : i32, %lb : i32, %ub : i32, %step : i32) {
+// CHECK-NEXT:  func.func @nested_loops(%A: i32, %lb: i32, %ub: i32, %step: i32) {
 // CHECK-NEXT:    %0 = accfg.setup "simple" to ("A" = %A : i32) : !accfg.state<"simple">
 //                                               ^^^^^^^^^^^^^^
 // CHECK-NEXT:    %1 = scf.for %i = %lb to %ub step %step iter_args(%2 = %0) -> (!accfg.state<"simple">) : i32 {
@@ -197,7 +197,7 @@ func.func @nested_loops(%A : i32, %lb : i32, %ub : i32, %step : i32) {
 // CHECK-NEXT:  }
 
 
-func.func @nested_loops_edge_cases(%A : i32, %lb : i32, %ub : i32, %step : i32) {
+func.func @nested_loops_edge_cases(%A: i32, %lb: i32, %ub: i32, %step: i32) {
   %0 = accfg.setup "simple" to () : !accfg.state<"simple">
   %1 = scf.for %i = %lb to %ub step %step iter_args(%2 = %0) -> (!accfg.state<"simple">) : i32 {
     %3 = scf.for %j = %i to %ub step %step iter_args(%l0 = %2) -> (!accfg.state<"simple">) : i32 {
@@ -215,7 +215,7 @@ func.func @nested_loops_edge_cases(%A : i32, %lb : i32, %ub : i32, %step : i32) 
 }
 
 // check that B cannot be hoisted outside of the loop because it is set to two different loop invariant values
-// CHECK-NEXT:  func.func @nested_loops_edge_cases(%A : i32, %lb : i32, %ub : i32, %step : i32) {
+// CHECK-NEXT:  func.func @nested_loops_edge_cases(%A: i32, %lb: i32, %ub: i32, %step: i32) {
 // CHECK-NEXT:    %0 = accfg.setup "simple" to ("A" = %A : i32) : !accfg.state<"simple">
 // CHECK-NEXT:    %1 = scf.for %i = %lb to %ub step %step iter_args(%2 = %0) -> (!accfg.state<"simple">) : i32 {
 // CHECK-NEXT:      %3 = accfg.setup "simple" from %2 to ("i" = %i : i32) : !accfg.state<"simple">
@@ -240,7 +240,7 @@ func.func @setup_fusion(%A: i32, %B: i32) {
 }
 
 // check that the two ops are fused and the values of the later one overwrite the earlier ones
-// CHECK-NEXT:  func.func @setup_fusion(%A : i32, %B : i32) {
+// CHECK-NEXT:  func.func @setup_fusion(%A: i32, %B: i32) {
 // CHECK-NEXT:    %0 = accfg.setup "simple" to ("A" = %B : i32, "B" = %B : i32) : !accfg.state<"simple">
 // CHECK-NEXT:    func.return
 // CHECK-NEXT:  }

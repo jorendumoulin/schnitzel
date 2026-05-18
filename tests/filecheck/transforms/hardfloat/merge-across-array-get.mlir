@@ -4,7 +4,7 @@
 // Flavor 1: sink rounder past array_get — fully shared (every lane is a
 // rounder, all from the same (sig, exp, rm, tn) bucket).
 // ---------------------------------------------------------------------------
-func.func @two_rounders_shared(%inv0 : i1, %raw0 : i41, %inv1 : i1, %raw1 : i41, %sw : i1) -> i33 {
+func.func @two_rounders_shared(%inv0: i1, %raw0: i41, %inv1: i1, %raw1: i41, %sw: i1) -> i33 {
   %rm = arith.constant 0 : i3
   %tn = arith.constant true
   %r0, %f0 = hardfloat.round_raw_to_rec_fn<24, 8>(%inv0, %raw0, %rm, %tn) : (i1, i41, i3, i1) -> (i33, i5)
@@ -92,7 +92,7 @@ func.func @two_groups_two_lanes(
 // ---------------------------------------------------------------------------
 // Flavor 4: addf vs subf — AddRecFnOp with muxed subOp.
 // ---------------------------------------------------------------------------
-func.func @share_addf_subf(%a : i33, %b : i33, %sw : i1) -> i33 {
+func.func @share_addf_subf(%a: i33, %b: i33, %sw: i1) -> i33 {
   %false = arith.constant false
   %true = arith.constant true
   %rm = arith.constant 0 : i3
@@ -114,7 +114,7 @@ func.func @share_addf_subf(%a : i33, %b : i33, %sw : i1) -> i33 {
 // ---------------------------------------------------------------------------
 // Flavor 5: sitofp vs uitofp — InToRecFnOp with muxed signedIn.
 // ---------------------------------------------------------------------------
-func.func @share_sitofp_uitofp(%i : i32, %sw : i1) -> i33 {
+func.func @share_sitofp_uitofp(%i: i32, %sw: i1) -> i33 {
   %false = arith.constant false
   %true = arith.constant true
   %rm = arith.constant 0 : i3
@@ -136,7 +136,7 @@ func.func @share_sitofp_uitofp(%i : i32, %sw : i1) -> i33 {
 // ---------------------------------------------------------------------------
 // Flavor 6: fptosi vs fptoui — RecFnToInOp with muxed signedOut.
 // ---------------------------------------------------------------------------
-func.func @share_fptosi_fptoui(%f : i33, %sw : i1) -> i32 {
+func.func @share_fptosi_fptoui(%f: i33, %sw: i1) -> i32 {
   %false = arith.constant false
   %true = arith.constant true
   %rm = arith.constant 0 : i3
@@ -158,7 +158,7 @@ func.func @share_fptosi_fptoui(%f : i33, %sw : i1) -> i32 {
 // ---------------------------------------------------------------------------
 // Negative: lanes with different non-muxable operands stay untouched.
 // ---------------------------------------------------------------------------
-func.func @different_operands_no_share(%a : i33, %b : i33, %c : i33, %sw : i1) -> i33 {
+func.func @different_operands_no_share(%a: i33, %b: i33, %c: i33, %sw: i1) -> i33 {
   %false = arith.constant false
   %rm = arith.constant 0 : i3
   %ab, %fa = hardfloat.add_rec_fn<24, 8>(%false, %a, %b, %rm, %false) : (i1, i33, i33, i3, i1) -> (i33, i5)

@@ -23,7 +23,7 @@ func.func @returned_args(%state: !accfg.state<"simple">) -> !accfg.state<"simple
 
 // -----
 
-func.func @simple(%i : i32) {
+func.func @simple(%i: i32) {
     %state = accfg.setup "acc" to ("i" = %i : i32) : !accfg.state<"acc">
     return
 }
@@ -35,7 +35,7 @@ func.func @simple(%i : i32) {
 
 // -----
 
-func.func @with_uses(%i : i32) {
+func.func @with_uses(%i: i32) {
     %state = accfg.setup "acc" to ("i" = %i : i32) : !accfg.state<"acc">
 
     %t = "accfg.launch"(%state) <{"param_names" = [], "accelerator" = "acc"}> : (!accfg.state<"acc">) -> !accfg.token<"acc">
@@ -53,7 +53,7 @@ func.func @with_uses(%i : i32) {
 
 // -----
 
-func.func @scf_if_1(%i : i32, %cond: i1) {
+func.func @scf_if_1(%i: i32, %cond: i1) {
     %state = accfg.setup "acc" to ("i" = %i : i32) : !accfg.state<"acc">
 
     "scf.if"(%cond) ({
@@ -89,7 +89,7 @@ func.func @scf_if_1(%i : i32, %cond: i1) {
 
 // -----
 
-func.func @scf_if_2(%i : i32, %cond: i1) {
+func.func @scf_if_2(%i: i32, %cond: i1) {
     %state = accfg.setup "acc" to ("i" = %i : i32) : !accfg.state<"acc">
 
     %2 = "scf.if"(%cond) ({

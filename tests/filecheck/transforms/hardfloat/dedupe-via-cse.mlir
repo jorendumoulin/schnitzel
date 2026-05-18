@@ -5,7 +5,7 @@
 // block, identical pure ops on identical operands collapse via xDSL's CSE
 // pass. This file simulates that post-finalize shape directly.
 
-func.func @dedupe_compares(%a : i33, %b : i33) -> (i1, i1) {
+func.func @dedupe_compares(%a: i33, %b: i33) -> (i1, i1) {
   %false = arith.constant false
   %lt0, %eq0, %gt0, %f0 = hardfloat.compare_rec_fn<24, 8>(%a, %b, %false) : (i33, i33, i1) -> (i1, i1, i1, i5)
   %lt1, %eq1, %gt1, %f1 = hardfloat.compare_rec_fn<24, 8>(%a, %b, %false) : (i33, i33, i1) -> (i1, i1, i1, i5)
@@ -20,7 +20,7 @@ func.func @dedupe_compares(%a : i33, %b : i33) -> (i1, i1) {
 
 
 // Recode pairs collapse alongside their consumers.
-func.func @dedupe_recodes(%a : f32, %b : f32) -> (f32, f32) {
+func.func @dedupe_recodes(%a: f32, %b: f32) -> (f32, f32) {
   %add0 = arith.addf %a, %b : f32
   %add1 = arith.addf %a, %b : f32
   func.return %add0, %add1 : f32, f32

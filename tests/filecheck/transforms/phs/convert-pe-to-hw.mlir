@@ -1,6 +1,6 @@
 // RUN: snax-opt %s -p convert-pe-to-hw | filecheck %s
 
-phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6 : i32, %7 : i32) {
+phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6: i32, %7: i32) {
   %8 = phs.choose @_0 with %0 (%6 : i32, %7 : i32) -> i32
     0) (%9, %10) {
       %11 = arith.muli %9, %10 : i32

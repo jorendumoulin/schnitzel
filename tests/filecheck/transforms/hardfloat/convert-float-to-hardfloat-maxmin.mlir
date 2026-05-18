@@ -1,6 +1,6 @@
 // RUN: snax-opt -p convert-float-to-hardfloat %s | filecheck %s
 
-func.func @test_max_min(%a : f32, %b : f32) -> (f32, f32) {
+func.func @test_max_min(%a: f32, %b: f32) -> (f32, f32) {
   %mx = arith.maximumf %a, %b : f32
   %mn = arith.minimumf %a, %b : f32
   return %mx, %mn : f32, f32

@@ -38,7 +38,7 @@ func.func @elementwise_add_2d(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) ->
   return %result2 : tensor<?x?xf32>
 }
 
-// CHECK:  phs.pe @acc1 with %0 (%in0 : f32, %in1 : f32, %out : f32) {
+// CHECK:  phs.pe @acc1 with %0 (%in0: f32, %in1: f32, %out: f32) {
 // CHECK-NEXT:    %add = phs.choose @i_f32_f32_o_f32_0 with %0 (%in0 : f32, %in1 : f32) -> f32
 // CHECK-NEXT:      0) (%1, %2) {
 // CHECK-NEXT:        %add_1 = arith.addf %1, %2 : f32
@@ -93,7 +93,7 @@ func.func @elementwise_add_2d_integer(%arg0: tensor<?x?xi32>, %arg1: tensor<?x?x
 }
 
 
-// CHECK:  phs.pe @acc2 with %0 (%in0 : i32, %in1 : i32, %out : i32) {
+// CHECK:  phs.pe @acc2 with %0 (%in0: i32, %in1: i32, %out: i32) {
 // CHECK-NEXT:    %add = phs.choose @i_i32_i32_o_i32_0 with %0 (%in0 : i32, %in1 : i32) -> i32
 // CHECK-NEXT:      0) (%1, %2) {
 // CHECK-NEXT:        %add_1 = arith.addi %1, %2 : i32
@@ -115,7 +115,7 @@ func.func @elementwise_add_2d_integer(%arg0: tensor<?x?xi32>, %arg1: tensor<?x?x
 
 #map_a = affine_map<(d0, d1) -> (d0, d1)>
 #map_c = affine_map<(d0, d1) -> (d1)>
-func.func public @streamer_acc(%arg0 : tensor<4x4xi32>, %arg1 : tensor<4xi32>) -> tensor<4xi32> {
+func.func public @streamer_acc(%arg0: tensor<4x4xi32>, %arg1: tensor<4xi32>) -> tensor<4xi32> {
   %result = linalg.generic {
     indexing_maps = [#map_a, #map_c],
     iterator_types = ["reduction", "parallel"]
@@ -127,7 +127,7 @@ func.func public @streamer_acc(%arg0 : tensor<4x4xi32>, %arg1 : tensor<4xi32>) -
   return %result : tensor<4xi32>
 }
 
-// CHECK:  phs.pe @acc3 with %0 (%in : i32, %out : i32) {
+// CHECK:  phs.pe @acc3 with %0 (%in: i32, %out: i32) {
 // CHECK-NEXT:    %s = phs.choose @i_i32_i32_o_i32_0 with %0 (%in : i32, %out : i32) -> i32
 // CHECK-NEXT:      0) (%1, %2) {
 // CHECK-NEXT:        %s_1 = arith.addi %1, %2 : i32

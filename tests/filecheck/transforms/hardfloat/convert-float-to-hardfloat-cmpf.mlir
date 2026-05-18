@@ -1,6 +1,6 @@
 // RUN: snax-opt -p convert-float-to-hardfloat %s | filecheck %s
 
-func.func @cmpf_ord_unord(%a : f32, %b : f32) -> (i1, i1, i1, i1, i1, i1, i1, i1) {
+func.func @cmpf_ord_unord(%a: f32, %b: f32) -> (i1, i1, i1, i1, i1, i1, i1, i1) {
   // Constant predicates
   %t = arith.cmpf true, %a, %b : f32
   %f = arith.cmpf false, %a, %b : f32

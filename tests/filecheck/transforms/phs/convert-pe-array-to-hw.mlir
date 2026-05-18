@@ -2,7 +2,7 @@
 
 // Test that convert-pe-to-hw converts PEArrayOp with body to hw.module
 
-phs.pe @myacc with %0 (%1 : i32, %2 : i32) {
+phs.pe @myacc with %0 (%1: i32, %2: i32) {
   %3 = phs.choose @_0 with %0 (%1 : i32, %2 : i32) -> i32
     0) (%4, %5) {
       %6 = arith.muli %4, %5 : i32

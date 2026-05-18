@@ -1,7 +1,7 @@
 // RUN: snax-opt %s -p phs-remove-one-option-switches | filecheck %s
 
 builtin.module {
-  phs.pe @acc1 with %0 (%in : i64, %in_1 : i64) {
+  phs.pe @acc1 with %0 (%in: i64, %in_1: i64) {
     %1 = phs.choose @i_i64_i64_o_i64_0 with %0 (%in : i64, %in_1 : i64) -> i64
       0) (%1, %2){
         %3 = arith.addi %1, %2 : i64
@@ -15,7 +15,7 @@ builtin.module {
 // CHECK-NEXT:    phs.yield %0 : i64
 // CHECK-NEXT:  }
 
-  phs.pe @acc2 with %0, %1 (%in : i64, %in_1 : i64) {
+  phs.pe @acc2 with %0, %1 (%in: i64, %in_1: i64) {
     %2 = phs.choose @i_i64_i64_o_i64_0 with %0 (%in : i64, %in_1 : i64) -> i64
       0) (%3, %4){
         %5 = arith.addi %3, %4 : i64

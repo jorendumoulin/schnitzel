@@ -1,7 +1,7 @@
 // RUN: XDSL_ROUNDTRIP
 // RUN: XDSL_SINGLETRIP
 
-phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6 : f32, %7 : f32) {
+phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6: f32, %7: f32) {
   %8 = phs.choose @_0 with %0 (%6 : f32, %7 : f32) -> f32
     0) (%9, %10) {
       %11 = arith.mulf %9, %10 : f32
@@ -57,7 +57,7 @@ phs.pe_array @myarray(%0 : !hw.array<2xi32>, %1 : index) -> (!hw.array<2xi32>) {
 }
 
 // CHECK: builtin.module {
-// CHECK-NEXT:   phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6 : f32, %7 : f32) {
+// CHECK-NEXT:   phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6: f32, %7: f32) {
 // CHECK-NEXT:     %8 = phs.choose @_0 with %0 (%6 : f32, %7 : f32) -> f32
 // CHECK-NEXT:       0) (%9, %10) {
 // CHECK-NEXT:         %11 = arith.mulf %9, %10 : f32

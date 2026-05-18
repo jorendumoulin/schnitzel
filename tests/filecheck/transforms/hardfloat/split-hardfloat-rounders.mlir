@@ -1,7 +1,7 @@
 // RUN: snax-opt -p split-hardfloat-rounders %s | filecheck %s
 // RUN: snax-opt -p split-hardfloat-rounders,cse %s | filecheck %s --check-prefix=CSE
 
-func.func @split_add(%a : i33, %b : i33) -> i33 {
+func.func @split_add(%a: i33, %b: i33) -> i33 {
   %false = arith.constant false
   %rm = arith.constant 0 : i3
   %res, %flags = hardfloat.add_rec_fn<24, 8>(%false, %a, %b, %rm, %false) : (i1, i33, i33, i3, i1) -> (i33, i5)
@@ -17,7 +17,7 @@ func.func @split_add(%a : i33, %b : i33) -> i33 {
 // CHECK-NOT: hardfloat.add_rec_fn
 
 
-func.func @split_mul(%a : i33, %b : i33) -> i33 {
+func.func @split_mul(%a: i33, %b: i33) -> i33 {
   %rm = arith.constant 0 : i3
   %tn = arith.constant true
   %res, %flags = hardfloat.mul_rec_fn<24, 8>(%a, %b, %rm, %tn) : (i33, i33, i3, i1) -> (i33, i5)
@@ -36,7 +36,7 @@ func.func @split_mul(%a : i33, %b : i33) -> i33 {
 // Cross-core rounder sharing: addf and mulf on the same recoded operands
 // with the same rounding mode + tininess produce identical
 // `round_raw_to_rec_fn` ops after the split. CSE collapses them to one.
-func.func @share_rounder_across_cores(%a : i33, %b : i33) -> (i33, i33) {
+func.func @share_rounder_across_cores(%a: i33, %b: i33) -> (i33, i33) {
   %false = arith.constant false
   %rm = arith.constant 0 : i3
   %add_res, %add_flags = hardfloat.add_rec_fn<24, 8>(%false, %a, %b, %rm, %false) : (i1, i33, i33, i3, i1) -> (i33, i5)

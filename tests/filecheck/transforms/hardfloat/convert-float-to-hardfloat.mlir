@@ -1,6 +1,6 @@
 // RUN: snax-opt -p convert-float-to-hardfloat %s | filecheck %s
 
-func.func @test_hardfloat(%a : f32, %b : f32, %c: i32, %d : f32) -> (f32, f32, f32, f32, i32, i32) {
+func.func @test_hardfloat(%a: f32, %b: f32, %c: i32, %d: f32) -> (f32, f32, f32, f32, i32, i32) {
   %add = arith.addf %a, %b : f32
   %mul = arith.mulf %a, %b : f32
   %sfp = arith.sitofp %c : i32 to f32
@@ -10,7 +10,7 @@ func.func @test_hardfloat(%a : f32, %b : f32, %c: i32, %d : f32) -> (f32, f32, f
   return %add, %mul, %sfp, %ufp, %uint, %sint : f32, f32, f32, f32, i32, i32
 }
 
-// CHECK: func.func @test_hardfloat(%a : f32, %b : f32, %c : i32, %d : f32) -> (f32, f32, f32, f32, i32, i32) {
+// CHECK: func.func @test_hardfloat(%a: f32, %b: f32, %c: i32, %d: f32) -> (f32, f32, f32, f32, i32, i32) {
 // CHECK-NEXT:   %add = hw.constant false
 // CHECK-NEXT:   %add_1 = builtin.unrealized_conversion_cast %a : f32 to i32
 // CHECK-NEXT:   %add_2 = builtin.unrealized_conversion_cast %b : f32 to i32

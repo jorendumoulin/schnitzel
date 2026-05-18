@@ -1,6 +1,6 @@
 // RUN: XDSL_ROUNDTRIP
 
-func.func @test_hardfloat_roundtrip(%a : i33, %b : i33, %val_i32 : i32) {
+func.func @test_hardfloat_roundtrip(%a: i33, %b: i33, %val_i32: i32) {
   // Setup constants for control signals
   %false = arith.constant false
   %true = arith.constant true

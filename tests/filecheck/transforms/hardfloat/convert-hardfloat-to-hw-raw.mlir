@@ -8,14 +8,14 @@
 // suffix, and the bus widths line up with the dialect verifiers (i39 for
 // the raw input bus, i41 for the raw output bus, i33 for recoded).
 
-func.func @raw_add(%rec : i33, %rm : i3, %tn : i1, %sub : i1) -> i33 {
+func.func @raw_add(%rec: i33, %rm: i3, %tn: i1, %sub: i1) -> i33 {
   %ra = hardfloat.recode_to_raw<24, 8>(%rec) : (i33) -> i39
   %inv, %raw = hardfloat.add_raw_fn<24, 8>(%sub, %ra, %ra) : (i1, i39, i39) -> (i1, i41)
   %out, %flags = hardfloat.round_raw_to_rec_fn<24, 8>(%inv, %raw, %rm, %tn) : (i1, i41, i3, i1) -> (i33, i5)
   func.return %out : i33
 }
 
-func.func @raw_mul(%rec : i33, %rm : i3, %tn : i1) -> i33 {
+func.func @raw_mul(%rec: i33, %rm: i3, %tn: i1) -> i33 {
   %ra = hardfloat.recode_to_raw<24, 8>(%rec) : (i33) -> i39
   %inv, %raw = hardfloat.mul_raw_fn<24, 8>(%ra, %ra) : (i39, i39) -> (i1, i41)
   %out, %flags = hardfloat.round_raw_to_rec_fn<24, 8>(%inv, %raw, %rm, %tn) : (i1, i41, i3, i1) -> (i33, i5)

@@ -4,7 +4,7 @@
 // PE[0] and PE[1] read pairs from the input array (leaf stage).
 // PE[2] combines their outputs (root stage).
 
-phs.pe @acc1 with %0 (%1 : i32, %2 : i32) {
+phs.pe @acc1 with %0 (%1: i32, %2: i32) {
   %3 = phs.choose @_0 with %0 (%1 : i32, %2 : i32) -> i32
     0) (%4, %5) {
       %6 = arith.addi %4, %5 : i32

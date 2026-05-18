@@ -1,6 +1,6 @@
 // RUN: snax-opt -p convert-float-to-hardfloat %s | filecheck %s
 
-func.func @test_fma(%a : f32, %b : f32, %c : f32) -> f32 {
+func.func @test_fma(%a: f32, %b: f32, %c: f32) -> f32 {
   %r = math.fma %a, %b, %c : f32
   return %r : f32
 }

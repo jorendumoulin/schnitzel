@@ -1,7 +1,7 @@
 // RUN: snax-opt --split-input-file %s -p reuse-memref-allocs | filecheck %s
 
 builtin.module {
-  func.func @streamer_matmul_0(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+  func.func @streamer_matmul_0(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
     %0 = arith.constant 8 : index
     %1 = arith.constant 1 : index
     %2 = arith.constant 0 : i32
@@ -14,7 +14,7 @@ builtin.module {
 }
 // Check if the memref.alloc is moved out of the loop with all operands outside loop
 //CHECK: builtin.module {
-//CHECK-NEXT:   func.func @streamer_matmul_0(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+//CHECK-NEXT:   func.func @streamer_matmul_0(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
 //CHECK-NEXT:     %0 = arith.constant 8 : index
 //                dead code elimination:
 //                 vvvvvvvvvvvvvvvvvv
@@ -33,7 +33,7 @@ builtin.module {
 
 
 builtin.module {
-  func.func @streamer_matmul_1(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+  func.func @streamer_matmul_1(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
     %0 = arith.constant 8 : index
     %1 = arith.constant 1 : index
     %2 = arith.constant 0 : i32
@@ -49,7 +49,7 @@ builtin.module {
 
 // Check if the memref.alloc is moved out of the loop with all operands inside loop
 //CHECK: builtin.module {
-//CHECK-NEXT:   func.func @streamer_matmul_1(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+//CHECK-NEXT:   func.func @streamer_matmul_1(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
 //                dead code elimination
 //                 vvvvvvvvvvvvvvvvvv
 //                %0 = arith.constant 8 : index
@@ -69,7 +69,7 @@ builtin.module {
 // -----
 
 builtin.module {
-  func.func @streamer_matmul_2(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+  func.func @streamer_matmul_2(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
     %0 = arith.constant 8 : index
     %1 = arith.constant 1 : index
     %2 = arith.constant 0 : i32
@@ -84,7 +84,7 @@ builtin.module {
 
 // Nothing should happen to the memref.alloc when sizes are not constant throughout iterations
 //CHECK: builtin.module {
-//CHECK-NEXT:   func.func @streamer_matmul_2(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+//CHECK-NEXT:   func.func @streamer_matmul_2(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
 //CHECK-NEXT:     %0 = arith.constant 8 : index
 //CHECK-NEXT:     %1 = arith.constant 1 : index
 //                dead code elimination
@@ -101,7 +101,7 @@ builtin.module {
 // -----
 
 builtin.module {
-  func.func @streamer_matmul_3(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+  func.func @streamer_matmul_3(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
     %0 = arith.constant 8 : index
     %1 = arith.constant 1 : index
     %2 = arith.constant 0 : i32
@@ -116,7 +116,7 @@ builtin.module {
 }
 // Check if the memref.alloc is moved out of the loop when dim operations are outside loop
 //CHECK: builtin.module {
-//CHECK-NEXT:   func.func @streamer_matmul_3(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+//CHECK-NEXT:   func.func @streamer_matmul_3(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
 //                dead code elimination
 //                 vvvvvvvvvvvvvvvvvv
 //                %0 = arith.constant 8 : index
@@ -138,7 +138,7 @@ builtin.module {
 // -----
 
 builtin.module {
-  func.func @streamer_matmul_4(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+  func.func @streamer_matmul_4(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
     %0 = arith.constant 8 : index
     %1 = arith.constant 1 : index
     %2 = arith.constant 0 : i32
@@ -154,7 +154,7 @@ builtin.module {
 
 // Check if the memref.alloc is elevated outside together with dim operations inside loop
 //CHECK: builtin.module {
-//CHECK-NEXT:  func.func @streamer_matmul_4(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+//CHECK-NEXT:  func.func @streamer_matmul_4(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
 //               dead code elimination
 //                vvvvvvvvvvvvvvvvvv
 //               %0 = arith.constant 8 : index
@@ -176,7 +176,7 @@ builtin.module {
 // -----
 
 builtin.module {
-  func.func @streamer_matmul_5(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+  func.func @streamer_matmul_5(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
     %0 = arith.constant 8 : index
     %1 = arith.constant 1 : index
     %2 = arith.constant 0 : i32
@@ -195,7 +195,7 @@ builtin.module {
 // Nothing should happen if no dim operation is used with a subview to directly dependant on the affine.min
 // Only the dim operation can be lowered here
 //CHECK: builtin.module {
-//CHECK-NEXT:    func.func @streamer_matmul_5(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+//CHECK-NEXT:    func.func @streamer_matmul_5(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
 //CHECK-NEXT:    %0 = arith.constant 8 : index
 //CHECK-NEXT:    %1 = arith.constant 1 : index
 //               dead code elimination
@@ -215,7 +215,7 @@ builtin.module {
 // -----
 
 builtin.module {
-  func.func @streamer_matmul_6(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+  func.func @streamer_matmul_6(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
     %0 = arith.constant 8 : index
     %1 = arith.constant 1 : index
     %2 = arith.constant 0 : i32
@@ -236,7 +236,7 @@ builtin.module {
 
 // Check if the correct constant is found when dim is called on a subview which itself uses affine.min and a dim operation
 //CHECK: builtin.module {
-//CHECK-NEXT:  func.func @streamer_matmul_6(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+//CHECK-NEXT:  func.func @streamer_matmul_6(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
 //CHECK-NEXT:    %0 = arith.constant 8 : index
 //CHECK-NEXT:    %1 = arith.constant 1 : index
 //               dead code eliminiation
@@ -259,7 +259,7 @@ builtin.module {
 // -----
 
 builtin.module {
-  func.func @streamer_matmul_7(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+  func.func @streamer_matmul_7(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
     %0 = arith.constant 8 : index
     %1 = arith.constant 1 : index
     %2 = arith.constant 0 : i32
@@ -278,7 +278,7 @@ builtin.module {
 
 // Nothing should happen when dim is called on a subview which itself is dependent on a loop variable
 //CHECK: builtin.module {
-//CHECK-NEXT:   func.func @streamer_matmul_7(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+//CHECK-NEXT:   func.func @streamer_matmul_7(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
 //CHECK-NEXT:     %0 = arith.constant 8 : index
 //CHECK-NEXT:     %1 = arith.constant 1 : index
 //                dead code elimination
@@ -298,7 +298,7 @@ builtin.module {
 // -----
 
 builtin.module {
-  func.func @streamer_matmul_8(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+  func.func @streamer_matmul_8(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
     %0 = arith.constant 8 : index
     %1 = arith.constant 1 : index
     %2 = arith.constant 0 : i32
@@ -316,7 +316,7 @@ builtin.module {
 
 // Nothing should happen when the Dim result is used by operations other than subviews and allocs
 //CHECK: builtin.module {
-//CHECK-NEXT:   func.func @streamer_matmul_8(%arg0 : memref<?x?xi8, "L3">, %arg1 : memref<?x?xi32, "L3">) {
+//CHECK-NEXT:   func.func @streamer_matmul_8(%arg0: memref<?x?xi8, "L3">, %arg1: memref<?x?xi32, "L3">) {
 //CHECK-NEXT:     %0 = arith.constant 8 : index
 //CHECK-NEXT:     %1 = arith.constant 1 : index
 //                dead code elimination
