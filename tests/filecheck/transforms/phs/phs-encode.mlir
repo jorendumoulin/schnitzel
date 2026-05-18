@@ -160,7 +160,7 @@ func.func @clamp_with_captured_constants(%arg0: tensor<4xf32>) -> tensor<4xf32> 
   return %result : tensor<4xf32>
 }
 
-// CHECK:  phs.pe @acc1 with %0, %1, %2, %3 (%x : f32, %{{.*}} : f32) {
+// CHECK:  phs.pe @acc1 with %0, %1, %2, %3 (%x: f32, %{{.*}}: f32) {
 // CHECK:    arith.constant 0.000000e+00 : f32
 // CHECK:    arith.constant 3.000000e+01 : f32
 // CHECK:    phs.choose @i_f32_f32_o_f32_0
