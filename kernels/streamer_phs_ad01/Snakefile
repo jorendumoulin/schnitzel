@@ -30,8 +30,7 @@ rule all:
 
 rule phsc:
     input:
-        mlir="ad01.mlir",
-        schedule="schedule.mlir",
+        mlir="ad01_float.mlir",
         software="test_software.mlir",
     output:
         sw=f"{BUILD}/sw.llvm.mlir",
@@ -41,7 +40,8 @@ rule phsc:
         generated=lambda wc: os.path.abspath(f"{BUILD}/generated"),
     shell:
         """
-        phsc {input.mlir} {input.schedule} \
+        phsc {input.mlir} \
+            --scheduling-preset=separate-linalg \
             --software-file {input.software} \
             -o {output.sw} \
             --output-hardware {params.generated}/acc1_array.sv \
