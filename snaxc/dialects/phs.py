@@ -589,7 +589,7 @@ class PEInstanceOp(IRDLOperation):
     switches = var_operand_def(IndexType)
     res = var_result_def()
 
-    irdl_options = [AttrSizedOperandSegments()]
+    irdl_options = (AttrSizedOperandSegments(),)
 
     def __init__(
         self,
@@ -840,7 +840,7 @@ class CallOp(IRDLOperation):
     res = var_result_def()
 
     traits = traits_def(SymbolOpInterface())
-    irdl_options = [AttrSizedOperandSegments()]
+    irdl_options = (AttrSizedOperandSegments(),)
 
     assembly_format = " $sym_name `with` $switches `(`$data_operands type($data_operands)`)` `->` type($res) attr-dict"
 

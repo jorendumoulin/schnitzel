@@ -121,7 +121,7 @@ class StageOp(IRDLOperation):
 
     index = prop_def(IntegerAttr[IndexType])
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True)]
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
     assembly_format = (
         "$index (` ins` `(` $ins^ `:` type($ins) `)`)?" + "(` outs` `(` $outs^ `:` type($outs) `)`)? $body attr-dict"
