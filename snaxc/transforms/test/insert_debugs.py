@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from xdsl.context import Context
-from xdsl.dialects import builtin, linalg
+from xdsl.dialects import builtin
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     PatternRewriter,
@@ -10,6 +10,7 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 from xdsl.rewriter import InsertPoint
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 
 from snaxc.dialects import dart
 from snaxc.dialects.test import debug
@@ -23,7 +24,7 @@ class InsertDebugStatements(RewritePattern):
     """
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: linalg.GenericOp, rewriter: PatternRewriter):
+    def match_and_rewrite(self, op: LinalgGenericOp, rewriter: PatternRewriter):
         kernel_type = op.body.block.first_op
         assert kernel_type
         kernel_name = kernel_type.name

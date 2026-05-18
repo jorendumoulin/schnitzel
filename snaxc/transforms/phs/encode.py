@@ -1,11 +1,12 @@
 from xdsl.context import Context
-from xdsl.dialects import builtin, linalg
+from xdsl.dialects import builtin
 from xdsl.dialects.builtin import DenseArrayBase, ModuleOp, i64
 from xdsl.parser import SymbolRefAttr
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import PatternRewriter, PatternRewriteWalker, RewritePattern, op_type_rewrite_pattern
 from xdsl.rewriter import InsertPoint
 from xdsl.traits import SymbolTable
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 
 from snaxc.dialects import phs
 from snaxc.phs.combine import append_to_abstract_graph
@@ -18,7 +19,7 @@ PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
 
 class EncodeLinalgGeneric(RewritePattern):
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, linalg_op: linalg.GenericOp, rewriter: PatternRewriter):
+    def match_and_rewrite(self, linalg_op: LinalgGenericOp, rewriter: PatternRewriter):
         # Bail if this accelerator does not have an acc symbol
         if MAGIC_ATTR_NAME not in linalg_op.attributes:
             return

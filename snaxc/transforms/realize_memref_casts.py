@@ -4,7 +4,7 @@ from typing import cast
 
 import numpy as np
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin, func, linalg, memref
+from xdsl.dialects import arith, builtin, func, memref
 from xdsl.dialects.memref import MemorySpaceCastOp, SubviewOp
 from xdsl.ir import Attribute, Operation, OpResult
 from xdsl.irdl import Operand
@@ -20,6 +20,7 @@ from xdsl.pattern_rewriter import (
 from xdsl.rewriter import InsertPoint
 from xdsl.traits import IsTerminator, SymbolTable
 from xdsl.utils.hints import isa
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 
 from snaxc.dialects import dart
 from snaxc.dialects.snax import LayoutCast
@@ -523,7 +524,7 @@ class RealizeMemrefCasts(RewritePattern):
                 continue
             # check if input
             is_input = False
-            if isinstance(use_op, linalg.GenericOp):
+            if isinstance(use_op, LinalgGenericOp):
                 # don't know if input or output, default to yes
                 is_input = op.results[0] in use_op.inputs
             elif isinstance(use_op, dart.StreamingRegionOpBase):
@@ -543,7 +544,7 @@ class RealizeMemrefCasts(RewritePattern):
                 continue
             # check if input
             is_output = False
-            if isinstance(use_op, linalg.GenericOp):
+            if isinstance(use_op, LinalgGenericOp):
                 is_output = op.results[0] in use_op.outputs
             elif isinstance(use_op, dart.StreamingRegionOpBase):
                 is_output = op.results[0] in use_op.outputs

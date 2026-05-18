@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 from xdsl.builder import Builder
 from xdsl.context import Context
-from xdsl.dialects import linalg
 from xdsl.dialects.arith import ConstantOp
 from xdsl.dialects.builtin import (
     AffineMapAttr,
@@ -26,6 +25,8 @@ from xdsl.pattern_rewriter import (
 )
 from xdsl.rewriter import InsertPoint
 from xdsl.utils.hints import isa
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 
 from snaxc.dialects import dart
 from snaxc.dialects.kernel import AddOp
@@ -34,7 +35,7 @@ from snaxc.dialects.kernel import AddOp
 @dataclass
 class StreamifyGenericOpPattern(RewritePattern):
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: linalg.GenericOp, rewriter: PatternRewriter) -> None:
+    def match_and_rewrite(self, op: LinalgGenericOp, rewriter: PatternRewriter) -> None:
         # place guard for library calls ending in _stream
         if not op.library_call:
             return
@@ -120,7 +121,7 @@ class StreamifyGenericOpPattern(RewritePattern):
         )
 
         # replace linalg yield with stream yield
-        assert isinstance(yield_op := generic.body.block.last_op, linalg.YieldOp)
+        assert isinstance(yield_op := generic.body.block.last_op, LinalgYieldOp)
         rewriter.replace_op(yield_op, dart.YieldOp(yield_op.operands[0]))
 
         rewriter.replace_op(op, streaming_region_op)
@@ -169,8 +170,8 @@ class StreamifyGenericOpPattern(RewritePattern):
                 )
             elif (
                 isinstance(output, OpResult)
-                and isinstance(generic := output.op, linalg.GenericOp)
-                and isinstance(generic.body.block.first_op, linalg.YieldOp)
+                and isinstance(generic := output.op, LinalgGenericOp)
+                and isinstance(generic.body.block.first_op, LinalgYieldOp)
             ):
                 assert isa(output.type, TensorType)
                 assert isinstance(out := generic.outputs[0], OpResult)

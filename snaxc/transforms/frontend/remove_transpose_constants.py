@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import cast
 
-from xdsl.dialects import arith, builtin, linalg
+from xdsl.dialects import arith, builtin
 from xdsl.ir import OpResult
 from xdsl.ir.affine import AffineMap
 from xdsl.pattern_rewriter import (
@@ -11,6 +11,8 @@ from xdsl.pattern_rewriter import (
 )
 from xdsl.rewriter import InsertPoint
 from xdsl.utils.hints import isa
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 
 
 class RemoveTransposeConstants(RewritePattern):
@@ -25,11 +27,11 @@ class RemoveTransposeConstants(RewritePattern):
         return transposed_tuple
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: linalg.GenericOp, rewriter: PatternRewriter):
+    def match_and_rewrite(self, op: LinalgGenericOp, rewriter: PatternRewriter):
         # find transpose generics on constants and just do it directly
 
         # transpose op has only yield
-        if not isinstance(op.body.block.first_op, linalg.YieldOp):
+        if not isinstance(op.body.block.first_op, LinalgYieldOp):
             return
 
         # check for transpose:

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from xdsl.context import Context
-from xdsl.dialects import builtin, func, linalg, scf
+from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, BlockArgument, Operation, OpResult, Region, SSAValue, SSAValues
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -11,6 +11,7 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 from xdsl.rewriter import InsertPoint
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 
 from snaxc.dialects import accfg
 from snaxc.dialects.snax_stream import StreamingRegionOp
@@ -37,7 +38,7 @@ class ConvertLinalgToAcceleratorPattern(RewritePattern):
     ctx: AccContext
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: linalg.GenericOp, rewriter: PatternRewriter, /):
+    def match_and_rewrite(self, op: LinalgGenericOp, rewriter: PatternRewriter, /):
         if op.library_call is None:
             return
 
@@ -103,7 +104,7 @@ def _weave_states_in_region(
     - if/else blocks
     - for loops
 
-    Assumes arith, memref, linalg, test and snax dialect ops can't modify the accelerator
+    Assumes arith, memref, test and snax dialect ops can't modify the accelerator
     state.
 
     Also knows about some of the control flow dialects and terminator ops

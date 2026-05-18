@@ -1,5 +1,6 @@
-from xdsl.dialects import linalg
 from xdsl.dialects.builtin import DenseArrayBase, FunctionType, i64
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.ir import Operation
 from xdsl.pattern_rewriter import PatternRewriter
 
@@ -32,7 +33,7 @@ def get_id(op: Operation, count: dict[str, int]):
 
 
 def convert_generic_body_to_phs(
-    generic_op: linalg.GenericOp | dart.GenericOp, name: str, rewriter: PatternRewriter
+    generic_op: LinalgGenericOp | dart.GenericOp, name: str, rewriter: PatternRewriter
 ) -> phs.PEOp:
     """
     Perform conversion from linalg.generic body -> phs body
@@ -44,7 +45,7 @@ def convert_generic_body_to_phs(
     # Get a copy for conversion of the block
     body_copy = generic_op.body.clone()
     generic_yield = body_copy.block.ops.last
-    assert isinstance(generic_yield, linalg.YieldOp) or isinstance(generic_yield, dart.YieldOp)
+    assert isinstance(generic_yield, LinalgYieldOp) or isinstance(generic_yield, dart.YieldOp)
     # Keep every block arg, including the linalg `outs` block args even when the
     # body never reads them. The PHS array convention is "every output is paired
     # with a readWrite carry input at position len(ins)+k", so the outs args must
@@ -64,7 +65,7 @@ def convert_generic_body_to_phs(
     # block-arg) for outputs whose carry is never read in the body.
     pe.attributes[PAIRED_OUTPUTS_ATTR_NAME] = DenseArrayBase.from_list(i64, list(range(len(generic_op.outputs))))
     for op in pe.body.ops:
-        if isinstance(op, linalg.YieldOp) or isinstance(op, dart.YieldOp):
+        if isinstance(op, LinalgYieldOp) or isinstance(op, dart.YieldOp):
             yield_op = phs.YieldOp(op.operands[0])
             rewriter.replace_op(op, yield_op)
         else:

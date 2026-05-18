@@ -1,9 +1,10 @@
 from collections.abc import Sequence
 
-from xdsl.dialects import arith, builtin, linalg
+from xdsl.dialects import arith, builtin
 from xdsl.dialects.builtin import StringAttr
 from xdsl.ir import Operation, SSAValue
 from xdsl.pattern_rewriter import PatternRewriter
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 
 from snaxc.dialects import accfg, dart, phs, snax_stream
 from snaxc.hw.accelerators.phs import Phs
@@ -70,7 +71,7 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
         return self.phs.barrier_address()
 
     def get_switch_values(
-        self, op: linalg.GenericOp | dart.GenericOp
+        self, op: LinalgGenericOp | dart.GenericOp
     ) -> Sequence[tuple[Sequence[Operation], SSAValue]]:
         """Decode the PEOp graph to determine switch values for the given operation."""
         candidate_pe = convert_generic_body_to_phs(op, self.name, PatternRewriter(op))
@@ -126,7 +127,7 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
                 result.append(([c], c.result))
 
         generic = op.regions[0].ops.first
-        assert isinstance(generic, linalg.GenericOp | dart.GenericOp)
+        assert isinstance(generic, LinalgGenericOp | dart.GenericOp)
         result.extend(self.get_switch_values(generic))
 
         return result
