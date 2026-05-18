@@ -5,7 +5,7 @@
 %output_zp = "tosa.const"() <{ values = dense<-128> : tensor<1xi32> }> : () -> tensor<1xi32>
 %multiplier = "tosa.const"() <{ values = dense<1085889731> : tensor<1xi32> }> : () -> tensor<1xi32>
 %shift = "tosa.const"() <{ values = dense<37> : tensor<1xi32> }> : () -> tensor<1xi32>
-%1 = tosa.rescale %0, %multiplier, %shift, %input_zp, %output_zp {"rounding_mode" = "DOUBLE_ROUND", "per_channel" = false, "scale32" = true, "input_unsigned" = false, output_unsigned = false} : (tensor<?x8xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>) -> tensor<?x8xi8>
+%1 = tosa.rescale %0, %multiplier, %shift, %input_zp, %output_zp {rounding_mode = DOUBLE_ROUND, per_channel = false, scale32 = true, input_unsigned = false, output_unsigned = false} : (tensor<?x8xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>) -> tensor<?x8xi8>
 %2 = tosa.clamp %1 {"max_val" = 127 : i8, "min_val" = -128 : i8} : (tensor<?x8xi8>) -> tensor<?x8xi8>
 
 // CHECK:        %{{.*}} = tensor.empty() : tensor<?x8xi8>
