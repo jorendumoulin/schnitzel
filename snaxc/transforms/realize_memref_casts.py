@@ -5,6 +5,7 @@ from typing import cast
 import numpy as np
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, func, memref
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.dialects.memref import MemorySpaceCastOp, SubviewOp
 from xdsl.ir import Attribute, Operation, OpResult
 from xdsl.irdl import Operand
@@ -20,7 +21,6 @@ from xdsl.pattern_rewriter import (
 from xdsl.rewriter import InsertPoint
 from xdsl.traits import IsTerminator, SymbolTable
 from xdsl.utils.hints import isa
-from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 
 from snaxc.dialects import dart
 from snaxc.dialects.snax import LayoutCast

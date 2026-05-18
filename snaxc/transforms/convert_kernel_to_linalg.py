@@ -1,6 +1,8 @@
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.dialects.arith import AddiOp, ConstantOp, ExtSIOp, MaxSIOp, MinSIOp, MuliOp, ShRSIOp, SubiOp, TruncIOp
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     PatternRewriter,
@@ -9,8 +11,6 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 from xdsl.rewriter import InsertPoint
-from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
-from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 
 from snaxc.dialects.kernel import Parsable, RescaleOp
 

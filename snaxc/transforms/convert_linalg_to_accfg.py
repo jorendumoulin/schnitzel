@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from xdsl.context import Context
 from xdsl.dialects import builtin, func, scf
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.ir import Block, BlockArgument, Operation, OpResult, Region, SSAValue, SSAValues
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -11,7 +12,6 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 from xdsl.rewriter import InsertPoint
-from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 
 from snaxc.dialects import accfg
 from snaxc.dialects.snax_stream import StreamingRegionOp

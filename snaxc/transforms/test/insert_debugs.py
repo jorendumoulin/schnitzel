@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     PatternRewriter,
@@ -10,7 +11,6 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 from xdsl.rewriter import InsertPoint
-from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 
 from snaxc.dialects import dart
 from snaxc.dialects.test import debug

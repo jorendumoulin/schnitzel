@@ -5,11 +5,11 @@ from typing import cast
 from xdsl.builder import Builder
 from xdsl.dialects import arith
 from xdsl.dialects.builtin import I32, BoolAttr, DenseArrayBase, IntegerType, Signedness, i32
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.ir import Attribute, BlockArgument, Dialect, Operation, Region, SSAValue
 from xdsl.irdl import attr_def, irdl_op_definition, operand_def, result_def
 from xdsl.parser import IntegerAttr, IRDLOperation
 from xdsl.utils.hints import isa
-from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 
 
 class KernelOp(IRDLOperation, ABC):

@@ -1,6 +1,6 @@
 from xdsl.dialects import memref
-from xdsl.ir import Operation
 from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.ir import Operation
 
 from snaxc.hw.acc_context import AccContext
 

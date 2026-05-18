@@ -1,6 +1,9 @@
 from xdsl.builder import Builder
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, tensor, tosa
+from xdsl.dialects.linalg.attrs import IteratorTypeAttr
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.ir import Attribute, BlockArgument, OpResult
 from xdsl.ir.affine import AffineDimExpr, AffineMap
 from xdsl.irdl import Operand
@@ -12,9 +15,6 @@ from xdsl.pattern_rewriter import (
     RewritePattern,
     op_type_rewrite_pattern,
 )
-from xdsl.dialects.linalg.attrs import IteratorTypeAttr
-from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
-from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.utils.hints import isa
 
 from snaxc.dialects import kernel

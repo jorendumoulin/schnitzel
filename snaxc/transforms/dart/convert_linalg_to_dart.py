@@ -12,6 +12,8 @@ from xdsl.dialects.builtin import (
     StringAttr,
     TensorType,
 )
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.dialects.tensor import EmptyOp, ExtractSliceOp
 from xdsl.ir import Block, BlockArgument, OpResult, Region, SSAValue
 from xdsl.ir.affine import AffineMap
@@ -25,8 +27,6 @@ from xdsl.pattern_rewriter import (
 )
 from xdsl.rewriter import InsertPoint
 from xdsl.utils.hints import isa
-from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
-from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 
 from snaxc.dialects import dart
 from snaxc.dialects.kernel import AddOp

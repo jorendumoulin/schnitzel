@@ -2,6 +2,8 @@ from collections.abc import Sequence
 from typing import cast
 
 from xdsl.dialects import arith, builtin
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.ir import OpResult
 from xdsl.ir.affine import AffineMap
 from xdsl.pattern_rewriter import (
@@ -11,8 +13,6 @@ from xdsl.pattern_rewriter import (
 )
 from xdsl.rewriter import InsertPoint
 from xdsl.utils.hints import isa
-from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
-from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 
 
 class RemoveTransposeConstants(RewritePattern):

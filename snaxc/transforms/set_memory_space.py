@@ -1,6 +1,7 @@
 from xdsl.context import Context
 from xdsl.dialects import builtin, func, memref
 from xdsl.dialects.builtin import StringAttr
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.ir import Attribute, Operation, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -11,7 +12,6 @@ from xdsl.pattern_rewriter import (
     op_type_rewrite_pattern,
 )
 from xdsl.utils.hints import isa
-from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 
 from snaxc.dialects import dart
 
