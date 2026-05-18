@@ -150,7 +150,7 @@ class CopyToDmaPattern(RewritePattern):
             body=Region(Block([dir_val, dir_op])),
         )
 
-        rewriter.replace_matched_op((source_ptr_op, dest_ptr_op, new_op))  # both ptr ops needed for their SSA values
+        rewriter.replace_op(op, (source_ptr_op, dest_ptr_op, new_op))  # both ptr ops needed for their SSA values
 
 
 @dataclass(frozen=True)

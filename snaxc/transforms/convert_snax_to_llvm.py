@@ -20,7 +20,7 @@ class HartIdPattern(RewritePattern):
     def match_and_rewrite(self, op: HartIdOp, rewriter: PatternRewriter):
         csr_op = InlineAsmOp("csrr $0, mhartid", "=r", [], [i32])
         cast_op = UnrealizedConversionCastOp.get(csr_op.results, op.result_types)
-        rewriter.replace_matched_op((csr_op, cast_op))
+        rewriter.replace_op(op, (csr_op, cast_op))
 
 
 class ClusterSyncPattern(RewritePattern):
@@ -28,7 +28,7 @@ class ClusterSyncPattern(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: ClusterSyncOp, rewriter: PatternRewriter):
-        rewriter.replace_matched_op(InlineAsmOp("csrr x0, 0x810", "", [], [], has_side_effects=True))
+        rewriter.replace_op(op, InlineAsmOp("csrr x0, 0x810", "", [], [], has_side_effects=True))
 
 
 class ConvertSnaxToLlvmPass(ModulePass):

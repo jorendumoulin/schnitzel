@@ -64,7 +64,7 @@ class LowerAccfgAwaitToCsr(RewritePattern):
         addr = accelerator.barrier_address()
         c0 = ConstantOp.from_int_and_width(0, 32)
         poll_op = InlineAsmOp(f"csrr x0, {addr:#x}", "", [], has_side_effects=True)
-        rewriter.replace_matched_op((c0, poll_op), safe_erase=False)
+        rewriter.replace_op(op, (c0, poll_op), safe_erase=False)
 
 
 class DeleteAllStates(RewritePattern):
