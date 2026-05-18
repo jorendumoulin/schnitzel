@@ -1,6 +1,9 @@
 from xdsl.builder import Builder
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin, linalg, tensor, tosa
+from xdsl.dialects import arith, builtin, tensor, tosa
+from xdsl.dialects.linalg.attrs import IteratorTypeAttr
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.ir import Attribute, BlockArgument, OpResult
 from xdsl.ir.affine import AffineDimExpr, AffineMap
 from xdsl.irdl import Operand
@@ -90,7 +93,7 @@ class RescaleClampPattern(RewritePattern):
                 min_int,
                 double_round,
             )
-            linalg.YieldOp(kernel_op)
+            LinalgYieldOp(kernel_op)
 
         # create elementwise linalg op
         nb_dims = inp_type.get_num_dims()
@@ -107,7 +110,7 @@ class RescaleClampPattern(RewritePattern):
         dim_op_values = [dim_op.result for dim_op in dim_ops]
         output_tensor = tensor.EmptyOp(dim_op_values, out_type)
 
-        new_op = linalg.GenericOp(
+        new_op = LinalgGenericOp(
             inputs=[rescale_op.input],
             outputs=[output_tensor.tensor],
             body=linalg_body,
@@ -115,7 +118,7 @@ class RescaleClampPattern(RewritePattern):
                 builtin.AffineMapAttr(AffineMap(nb_dims, 0, tuple(AffineDimExpr(i) for i in range(nb_dims))))
                 for _ in range(2)
             ],
-            iterator_types=builtin.ArrayAttr([linalg.IteratorTypeAttr.parallel()] * nb_dims),
+            iterator_types=builtin.ArrayAttr([IteratorTypeAttr.parallel()] * nb_dims),
             result_types=(clamp_op.output.type,),
         )
 

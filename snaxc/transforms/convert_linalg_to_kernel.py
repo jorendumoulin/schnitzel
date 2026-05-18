@@ -1,5 +1,7 @@
 from xdsl.context import Context
-from xdsl.dialects import builtin, linalg
+from xdsl.dialects import builtin
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.ir import Block
 from xdsl.parser import IRDLOperation
 from xdsl.passes import ModulePass
@@ -41,7 +43,7 @@ class ParseLinalgBody(RewritePattern):
     """
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, linalg_op: linalg.GenericOp, rewriter: PatternRewriter):
+    def match_and_rewrite(self, linalg_op: LinalgGenericOp, rewriter: PatternRewriter):
         for op_def in Kernel.operations:
             if not issubclass(op_def, Parsable):
                 # not a parsable op, continue search
@@ -63,7 +65,7 @@ class ParseLinalgBody(RewritePattern):
 
                 # insert new kernel op kernel in body
                 rewriter.insert_op(
-                    (kernel_op, linalg.YieldOp(kernel_op)),
+                    (kernel_op, LinalgYieldOp(kernel_op)),
                     InsertPoint.at_end(linalg_op.body.block),
                 )
 

@@ -1,6 +1,7 @@
 from xdsl.context import Context
-from xdsl.dialects import builtin, func, linalg, memref
+from xdsl.dialects import builtin, func, memref
 from xdsl.dialects.builtin import StringAttr
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.ir import Attribute, Operation, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -133,7 +134,7 @@ class InitStreamAndLinalgMemorySpace(RewritePattern):
     """
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, op: linalg.GenericOp | dart.OperationOp, rewriter: PatternRewriter):
+    def match_and_rewrite(self, op: LinalgGenericOp | dart.OperationOp, rewriter: PatternRewriter):
         operands_to_memory_cast = tuple(
             x
             for x in op.operands

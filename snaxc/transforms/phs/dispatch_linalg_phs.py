@@ -1,8 +1,9 @@
 from collections.abc import Iterable
 
 from xdsl.context import Context
-from xdsl.dialects import builtin, linalg
+from xdsl.dialects import builtin
 from xdsl.dialects.builtin import DYNAMIC_INDEX, ShapedType
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     PatternRewriter,
@@ -30,7 +31,7 @@ class DispatchLinalgPhsPattern(RewritePattern):
         self.accelerators = accelerators
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, linalg_op: linalg.GenericOp, rewriter: PatternRewriter):
+    def match_and_rewrite(self, linalg_op: LinalgGenericOp, rewriter: PatternRewriter):
         # if already dispatched, don't dispatch again
         if linalg_op.library_call:
             return

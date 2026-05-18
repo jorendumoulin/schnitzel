@@ -64,7 +64,8 @@ class ConvertStreamToAccfgPattern(RewritePattern):
         setup_op = SetupOp(setup_vals, accelerator.name)
 
         c1 = ConstantOp.from_int_and_width(1, 32)
-        rewriter.replace_matched_op(
+        rewriter.replace_op(
+            op,
             (
                 *ops_to_add,
                 *body_ops,
@@ -72,7 +73,7 @@ class ConvertStreamToAccfgPattern(RewritePattern):
                 c1,
                 token := LaunchOp([c1], [accelerator.launch_param()], setup_op),
                 AwaitOp(token),
-            )
+            ),
         )
 
 

@@ -2,8 +2,8 @@
 
 // Test that convert-pe-to-hw converts PEArrayOp with body to hw.module
 
-phs.pe @myacc with %0 (%1 : i32, %2 : i32) {
-  %3 = phs.choose @_0 with %0 (%1 : i32, %2 : i32) -> i32
+phs.pe @myacc with %0 (%1: i32, %2: i32) {
+  %3 = phs.choose @_0 with %0 (%1: i32, %2: i32) -> i32
     0) (%4, %5) {
       %6 = arith.muli %4, %5 : i32
       phs.yield %6 : i32
@@ -15,7 +15,7 @@ phs.pe @myacc with %0 (%1 : i32, %2 : i32) {
   phs.yield %3 : i32
 }
 
-phs.pe_array @myacc_array(%0 : !hw.array<4xi32>, %1 : !hw.array<4xi32>, %2 : index) -> (!hw.array<4xi32>) {
+phs.pe_array @myacc_array(%0: !hw.array<4xi32>, %1: !hw.array<4xi32>, %2: index) -> (!hw.array<4xi32>) {
   %3 = arith.constant 0 : i2
   %4 = hw.array_get %0[%3] : !hw.array<4xi32>, i2
   %5 = arith.constant 0 : i2

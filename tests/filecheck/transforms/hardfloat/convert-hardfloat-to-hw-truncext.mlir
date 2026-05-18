@@ -3,7 +3,7 @@
 // RUN: snax-opt -p convert-hardfloat-to-hw{external_modules=true} %s | filecheck %s --check-prefix=EXTERN
 
 
-func.func @test_truncext(%a : f32) -> f16 {
+func.func @test_truncext(%a: f32) -> f16 {
   %rm = arith.constant 0 : i3
   %tininess = arith.constant true
   %a_i32 = builtin.unrealized_conversion_cast %a : f32 to i32

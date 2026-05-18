@@ -91,7 +91,7 @@ class StreamingRegionOpBase(IRDLOperation):
 
     accelerator = opt_prop_def(StringAttr)
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True)]
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
     def __init__(
         self,

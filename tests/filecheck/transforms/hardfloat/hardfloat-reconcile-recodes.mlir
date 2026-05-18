@@ -1,7 +1,7 @@
 // RUN: snax-opt -p hardfloat-reconcile-recodes %s | filecheck %s
 
 
-func.func @test_hardfloat(%a : f32, %b : f32) -> f32 {
+func.func @test_hardfloat(%a: f32, %b: f32) -> f32 {
   %false = arith.constant 0 : i1
   %rm = arith.constant 0 : i3
   %a_i32 = builtin.unrealized_conversion_cast %a : f32 to i32
@@ -20,7 +20,7 @@ func.func @test_hardfloat(%a : f32, %b : f32) -> f32 {
 }
 
 
-// CHECK: func.func @test_hardfloat(%a : f32, %b : f32) -> f32 {
+// CHECK: func.func @test_hardfloat(%a: f32, %b: f32) -> f32 {
 // CHECK-NEXT:   %false = arith.constant false
 // CHECK-NEXT:   %rm = arith.constant 0 : i3
 // CHECK-NEXT:   %a_i32 = builtin.unrealized_conversion_cast %a : f32 to i32

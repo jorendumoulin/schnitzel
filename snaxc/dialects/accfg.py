@@ -264,7 +264,7 @@ class SetupOp(AccfgBaseOp):
     Name of the accelerator this setup is for
     """
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True)]
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
     def __init__(
         self,

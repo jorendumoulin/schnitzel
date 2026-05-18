@@ -3,7 +3,7 @@
 // RUN: snax-opt -p convert-hardfloat-to-hw{external_modules=true} %s | filecheck %s --check-prefix=EXTERN
 
 
-func.func @test_fma(%a : f32, %b : f32, %c : f32) -> f32 {
+func.func @test_fma(%a: f32, %b: f32, %c: f32) -> f32 {
   %rm = arith.constant 0 : i3
   %tininess = arith.constant true
   %op = arith.constant 0 : i2

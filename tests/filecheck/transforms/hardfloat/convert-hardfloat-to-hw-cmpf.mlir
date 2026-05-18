@@ -3,7 +3,7 @@
 // RUN: snax-opt -p convert-hardfloat-to-hw{external_modules=true} %s | filecheck %s --check-prefix=EXTERN
 
 
-func.func @test_cmpf(%a : f32, %b : f32) -> i1 {
+func.func @test_cmpf(%a: f32, %b: f32) -> i1 {
   %false = arith.constant false
   %a_i32 = builtin.unrealized_conversion_cast %a : f32 to i32
   %b_i32 = builtin.unrealized_conversion_cast %b : f32 to i32

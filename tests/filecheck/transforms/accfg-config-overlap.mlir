@@ -12,7 +12,7 @@ func.func @simple(%A: i32, %B: i32) {
 }
 
 // check that simple overlapping works
-// CHECK:       func.func @simple(%A : i32, %B : i32) {
+// CHECK:       func.func @simple(%A: i32, %B: i32) {
 // CHECK-NEXT:    %s1 = accfg.setup "simple" to ("A" = %A : i32) : !accfg.state<"simple">
 // CHECK-NEXT:    %t = "accfg.launch"(%s1) <{param_names = [], accelerator = "simple"}> : (!accfg.state<"simple">) -> !accfg.token<"simple">
 //                      ∨∨∨∨∨ setup comes right after launch ∧∧∧∧∧
@@ -43,7 +43,7 @@ func.func @computed(%A: i32) {
 }
 
 // check that values needed to calculate the setup values are also moved
-// CHECK:       func.func @computed(%A : i32) {
+// CHECK:       func.func @computed(%A: i32) {
 // CHECK-NEXT:    %s1 = accfg.setup "simple" to ("A" = %A : i32) : !accfg.state<"simple">
 // CHECK-NEXT:    %t = "accfg.launch"(%s1) <{param_names = [], accelerator = "simple"}> : (!accfg.state<"simple">) -> !accfg.token<"simple">
 //                ∨∨∨∨∨ arith values moved up
@@ -77,7 +77,7 @@ func.func @simple_negative(%A: i32, %B: i32, %i1: i1) {
 }
 
 // check that we don't move setups out of control flow (as this would change observable behaviour)
-// CHECK:       func.func @simple_negative(%A : i32, %B : i32, %i1 : i1) {
+// CHECK:       func.func @simple_negative(%A: i32, %B: i32, %i1: i1) {
 // CHECK-NEXT:    %s1 = accfg.setup "simple" to ("A" = %A : i32) : !accfg.state<"simple">
 // CHECK-NEXT:    %t = "accfg.launch"(%s1) <{param_names = [], accelerator = "simple"}> : (!accfg.state<"simple">) -> !accfg.token<"simple">
 // CHECK-NEXT:    "accfg.await"(%t) : (!accfg.token<"simple">) -> ()
@@ -92,7 +92,7 @@ func.func @simple_negative(%A: i32, %B: i32, %i1: i1) {
 
 // -----
 
-func.func @single_loop(%A : i32, %lb : i32, %ub : i32, %step : i32) {
+func.func @single_loop(%A: i32, %lb: i32, %ub: i32, %step: i32) {
   %0 = accfg.setup "simple" to () : !accfg.state<"simple">
 
   %1 = scf.for %i = %lb to %ub step %step iter_args(%l0 = %0) -> (!accfg.state<"simple">) : i32 {
@@ -107,7 +107,7 @@ func.func @single_loop(%A : i32, %lb : i32, %ub : i32, %step : i32) {
   func.return
 }
 
-// CHECK:        func.func @single_loop(%A : i32, %lb : i32, %ub : i32, %step : i32) {
+// CHECK:        func.func @single_loop(%A: i32, %lb: i32, %ub: i32, %step: i32) {
 // CHECK-NEXT:     %0 = accfg.setup "simple" to () : !accfg.state<"simple">
 // CHECK-NEXT:     %l1 = accfg.setup "simple" from %0 to ("A" = %A : i32, "B" = %A : i32, "i" = %lb : i32) : !accfg.state<"simple">
 // CHECK-NEXT:     %1 = scf.for %i = %lb to %ub step %step iter_args(%l0 = %l1) -> (!accfg.state<"simple">) : i32 {
@@ -124,7 +124,7 @@ func.func @single_loop(%A : i32, %lb : i32, %ub : i32, %step : i32) {
 
 // -----
 
-func.func @complex_loop(%A : i32, %lb : i32, %ub : i32, %step : i32) {
+func.func @complex_loop(%A: i32, %lb: i32, %ub: i32, %step: i32) {
   %0 = accfg.setup "simple" to () : !accfg.state<"simple">
   %c2_i32 = arith.constant 2 : i32
 
@@ -141,7 +141,7 @@ func.func @complex_loop(%A : i32, %lb : i32, %ub : i32, %step : i32) {
 }
 
 // CHECK:      builtin.module {
-// CHECK-NEXT:   func.func @complex_loop(%A : i32, %lb : i32, %ub : i32, %step : i32) {
+// CHECK-NEXT:   func.func @complex_loop(%A: i32, %lb: i32, %ub: i32, %step: i32) {
 // CHECK-NEXT:     %0 = accfg.setup "simple" to () : !accfg.state<"simple">
 // CHECK-NEXT:     %c2_i32 = arith.constant 2 : i32
 // CHECK-NEXT:     %b = arith.addi %lb, %c2_i32 : i32
@@ -169,7 +169,7 @@ func.func @complex_loop(%A : i32, %lb : i32, %ub : i32, %step : i32) {
 
 // -----
 
-func.func @nested_loops(%A : i32, %lb : i32, %ub : i32, %step : i32) {
+func.func @nested_loops(%A: i32, %lb: i32, %ub: i32, %step: i32) {
   %0 = accfg.setup "simple" to () : !accfg.state<"simple">
   %1 = scf.for %i = %lb to %ub step %step iter_args(%2 = %0) -> (!accfg.state<"simple">) : i32 {
     %3 = scf.for %j = %i to %ub step %step iter_args(%4 = %2) -> (!accfg.state<"simple">) : i32 {
@@ -187,7 +187,7 @@ func.func @nested_loops(%A : i32, %lb : i32, %ub : i32, %step : i32) {
 
 // note that accfg-dedup has not been ran yet on this IR
 // we check that we correctly overlap setup/await in the inner loop
-// CHECK:       func.func @nested_loops(%A : i32, %lb : i32, %ub : i32, %step : i32) {
+// CHECK:       func.func @nested_loops(%A: i32, %lb: i32, %ub: i32, %step: i32) {
 // CHECK-NEXT:    %0 = accfg.setup "simple" to () : !accfg.state<"simple">
 // CHECK-NEXT:    %1 = scf.for %i = %lb to %ub step %step iter_args(%2 = %0) -> (!accfg.state<"simple">) : i32 {
 // CHECK-NEXT:      %out_state = accfg.setup "simple" from %2 to ("A" = %A : i32, "i" = %i : i32, "j" = %i : i32) : !accfg.state<"simple">
@@ -210,7 +210,7 @@ func.func @nested_loops(%A : i32, %lb : i32, %ub : i32, %step : i32) {
 
 // -----
 
-func.func @double_setup_loop(%A : i32, %B : i32, %lb : i32, %ub : i32, %step : i32) {
+func.func @double_setup_loop(%A: i32, %B: i32, %lb: i32, %ub: i32, %step: i32) {
   %0 = accfg.setup "simple" to () : !accfg.state<"simple">
   %c2 = arith.constant 2 : i32
 
@@ -237,7 +237,7 @@ func.func @double_setup_loop(%A : i32, %B : i32, %lb : i32, %ub : i32, %step : i
 // Check that the loop structure is preserved and only a single setup is moved up.
 // We expect the loop to contain a launch, setup, await, launch, setup, await sequence.
 // We also expect that the first setup that sets up %A is pulled out of the loop.
-// CHECK:       func.func @double_setup_loop(%A : i32, %B : i32, %lb : i32, %ub : i32, %step : i32) {
+// CHECK:       func.func @double_setup_loop(%A: i32, %B: i32, %lb: i32, %ub: i32, %step: i32) {
 // CHECK-NEXT:    %0 = accfg.setup "simple" to () : !accfg.state<"simple">
 // CHECK-NEXT:    %c2 = arith.constant 2 : i32
 //                  Correctly adding variables

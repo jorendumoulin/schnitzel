@@ -1,6 +1,8 @@
 from xdsl.context import Context
-from xdsl.dialects import builtin, linalg
+from xdsl.dialects import builtin
 from xdsl.dialects.arith import AddiOp, ConstantOp, ExtSIOp, MaxSIOp, MinSIOp, MuliOp, ShRSIOp, SubiOp, TruncIOp
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     PatternRewriter,
@@ -21,7 +23,7 @@ class LowerRescale(RewritePattern):
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: RescaleOp, rewriter: PatternRewriter):
-        if not isinstance(linalg_op := op.parent_op(), linalg.GenericOp):
+        if not isinstance(linalg_op := op.parent_op(), LinalgGenericOp):
             return
 
         # create constant ops:
@@ -56,19 +58,19 @@ class LowerLinalgBody(RewritePattern):
     """
 
     @op_type_rewrite_pattern
-    def match_and_rewrite(self, linalg_op: linalg.GenericOp, rewriter: PatternRewriter):
+    def match_and_rewrite(self, linalg_op: LinalgGenericOp, rewriter: PatternRewriter):
         # find the kernel op in linalg body
         if not isinstance(kernel_op := linalg_op.body.block.first_op, Parsable):
             return
 
         # only works for non-fused kernels (only 1 kernel op)
-        if not isinstance(kernel_op.next_op, linalg.YieldOp):
+        if not isinstance(kernel_op.next_op, LinalgYieldOp):
             return
 
         # replace linalg op
         rewriter.replace_op(
             linalg_op,
-            linalg.GenericOp(
+            LinalgGenericOp(
                 linalg_op.inputs,
                 linalg_op.outputs,
                 kernel_op.equivalent_region,

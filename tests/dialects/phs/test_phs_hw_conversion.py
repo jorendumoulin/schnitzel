@@ -34,7 +34,7 @@ def test_get_from_shaped_hw_array():
     printr = printer.Printer(stream=stream)
     printr.print_block(block)
     expected = """\
-\n^bb0(%0 : !hw.array<2x!hw.array<1x!hw.array<3xi32>>>):\
+\n^bb0(%0: !hw.array<2x!hw.array<1x!hw.array<3xi32>>>):\
 \n  %1 = arith.constant true\
 \n  %2 = hw.array_get %0[%1] : !hw.array<2x!hw.array<1x!hw.array<3xi32>>>, i1\
 \n  %3 = arith.constant 0 : i0\

@@ -1,6 +1,6 @@
 // RUN: snax-opt -p convert-float-to-hardfloat %s | filecheck %s
 
-func.func @test_truncext(%a : f32, %b : f16) -> (f16, f32) {
+func.func @test_truncext(%a: f32, %b: f16) -> (f16, f32) {
   %tr = arith.truncf %a : f32 to f16
   %ex = arith.extf %b : f16 to f32
   return %tr, %ex : f16, f32

@@ -1,4 +1,5 @@
-from xdsl.dialects import linalg, memref
+from xdsl.dialects import memref
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.ir import Operation
 
 from snaxc.hw.acc_context import AccContext
@@ -18,6 +19,6 @@ def dispatch_to_compute(op: Operation, ctx: AccContext):
     for now, this is only linalg generic operations
     and streaming regions
     """
-    if isinstance(op, linalg.GenericOp):
+    if isinstance(op, LinalgGenericOp):
         return True
     return False

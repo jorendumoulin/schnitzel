@@ -3,8 +3,9 @@ from collections.abc import Sequence
 from typing import cast
 
 from xdsl.builder import Builder
-from xdsl.dialects import arith, linalg
+from xdsl.dialects import arith
 from xdsl.dialects.builtin import I32, BoolAttr, DenseArrayBase, IntegerType, Signedness, i32
+from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
 from xdsl.ir import Attribute, BlockArgument, Dialect, Operation, Region, SSAValue
 from xdsl.irdl import attr_def, irdl_op_definition, operand_def, result_def
 from xdsl.parser import IntegerAttr, IRDLOperation
@@ -55,7 +56,7 @@ class MulOp(KernelOp, BinaryOp, Parsable):
         )
         def equivalent_region(args: tuple[BlockArgument, ...]) -> None:
             mul = arith.MuliOp(args[0], args[1])
-            linalg.YieldOp(mul)
+            LinalgYieldOp(mul)
 
         return equivalent_region
 
@@ -76,7 +77,7 @@ class AddOp(KernelOp, BinaryOp, Parsable):
         )
         def equivalent_region(args: tuple[BlockArgument, ...]) -> None:
             add = arith.AddiOp(args[0], args[1])
-            linalg.YieldOp(add)
+            LinalgYieldOp(add)
 
         return equivalent_region
 
@@ -98,7 +99,7 @@ class MacOp(KernelOp, BinaryOp, Parsable):
         def equivalent_region(args: tuple[BlockArgument, ...]) -> None:
             mul = arith.MuliOp(args[0], args[1])
             mac = arith.AddiOp(args[2], mul)
-            linalg.YieldOp(mac)
+            LinalgYieldOp(mac)
 
         @Builder.implicit_region(
             (
@@ -112,7 +113,7 @@ class MacOp(KernelOp, BinaryOp, Parsable):
             b = arith.ExtSIOp(args[1], cast(IntegerType, args[2].type))
             mul = arith.MuliOp(a, b)
             mac = arith.AddiOp(args[2], mul)
-            linalg.YieldOp(mac)
+            LinalgYieldOp(mac)
 
         if SSAValue.get(self.lhs).type == self.result_types[0]:
             return equivalent_region
@@ -148,7 +149,7 @@ class QMacOp(KernelOp, QuantizedBinaryOp, Parsable):
             subi_rhs = arith.SubiOp(extsi_rhs, args[3])
             mul = arith.MuliOp(subi_lhs, subi_rhs)
             mac = arith.AddiOp(args[4], mul)
-            linalg.YieldOp(mac)
+            LinalgYieldOp(mac)
 
         return equivalent_region
 

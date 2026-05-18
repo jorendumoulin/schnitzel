@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from xdsl.context import Context
 from xdsl.dialects import builtin, scf
 from xdsl.dialects.builtin import IndexType, MemRefType
-from xdsl.dialects.linalg import GenericOp
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.dialects.memref import CopyOp
 from xdsl.dialects.scf import ForOp
 from xdsl.ir import Block, Operation, Region, SSAValue
@@ -88,7 +88,7 @@ class ConstructPipeline(RewritePattern):
         cluster_sync_ops: list[ClusterSyncOp] = []
 
         def is_stage_op(op: Operation) -> bool:
-            return isinstance(op, CopyOp | GenericOp | StreamingRegionOpBase)
+            return isinstance(op, CopyOp | LinalgGenericOp | StreamingRegionOpBase)
 
         while is_stage_op(next_op):
             current_stage.append(next_op)
@@ -154,7 +154,7 @@ class ConstructPipeline(RewritePattern):
                 if isinstance(operation, CopyOp):
                     rewrite_operand(operation.source, 0, True)
                     rewrite_operand(operation.destination, 1, False)
-                elif isinstance(operation, GenericOp):
+                elif isinstance(operation, LinalgGenericOp):
                     for j, operand in enumerate(operation.operands):
                         if isinstance(operand.type, MemRefType):
                             rewrite_operand(operand, j, operand in operation.inputs)
