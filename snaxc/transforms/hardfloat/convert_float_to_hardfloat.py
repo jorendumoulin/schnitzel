@@ -119,7 +119,7 @@ class ConvertIToFPOp(RewritePattern):
                 signed_in = hw.ConstantOp(1, 1)
             case arith.UIToFPOp():
                 signed_in = hw.ConstantOp(0, 1)
-        out_float_type = cast(AnyFloat, op.result.type)
+        out_float_type = op.result.type
         if type(out_float_type) not in _type_mapping:
             return
         exp_width, sig_width = _type_mapping[type(out_float_type)]
@@ -157,7 +157,7 @@ class ConvertFPToIOp(RewritePattern):
             return
         exp_width, sig_width = _type_mapping[type(in_float_type)]
         in_bw = in_float_type.bitwidth
-        out_bw = cast(IntegerType, op.result.type).bitwidth
+        out_bw = op.result.type.bitwidth
         new_ops = [
             signed_out,
             rounding_mode := hw.ConstantOp(0, 3),
