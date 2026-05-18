@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import struct
 from typing import cast
 
 from xdsl.context import Context
@@ -10,6 +11,7 @@ from xdsl.dialects.builtin import (
     Float16Type,
     Float32Type,
     Float64Type,
+    FloatAttr,
     IntegerType,
     ModuleOp,
     UnrealizedConversionCastOp,
@@ -117,20 +119,24 @@ class ConvertIToFPOp(RewritePattern):
                 signed_in = hw.ConstantOp(1, 1)
             case arith.UIToFPOp():
                 signed_in = hw.ConstantOp(0, 1)
-        exp_width, sig_width = _type_mapping[type(op.result.type)]
-        bitwidth = cast(IntegerType, op.input.type).bitwidth
+        out_float_type = op.result.type
+        if type(out_float_type) not in _type_mapping:
+            return
+        exp_width, sig_width = _type_mapping[type(out_float_type)]
+        in_bw = cast(IntegerType, op.input.type).bitwidth
+        out_bw = out_float_type.bitwidth
         new_ops = [
             signed_in,
             rounding_mode := hw.ConstantOp(0, 3),
             tininess := hw.ConstantOp(1, 1),
             conversion := InToRecFnOp(
                 [signed_in.result, op.input, rounding_mode, tininess],
-                [IntegerType(bitwidth + 1), IntegerType(5)],
+                [IntegerType(out_bw + 1), IntegerType(5)],
                 sig_width,
                 exp_width,
-                bitwidth,
+                in_bw,
             ),
-            unrecode := RecFnToFnOp([conversion.results[0]], [IntegerType(bitwidth)], sig_width, exp_width),
+            unrecode := RecFnToFnOp([conversion.results[0]], [IntegerType(out_bw)], sig_width, exp_width),
             cast_res := UnrealizedConversionCastOp.get([unrecode], [op.result.type]),
         ]
         rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_res.results[0]])
@@ -146,19 +152,23 @@ class ConvertFPToIOp(RewritePattern):
                 signed_out = hw.ConstantOp(0, 1)
             case _:
                 raise NotImplementedError()
-        exp_width, sig_width = _type_mapping[type(op.input.type)]
-        bitwidth = cast(IntegerType, op.input.type).bitwidth
+        in_float_type = cast(AnyFloat, op.input.type)
+        if type(in_float_type) not in _type_mapping:
+            return
+        exp_width, sig_width = _type_mapping[type(in_float_type)]
+        in_bw = in_float_type.bitwidth
+        out_bw = op.result.type.bitwidth
         new_ops = [
             signed_out,
             rounding_mode := hw.ConstantOp(0, 3),
-            cast_res := UnrealizedConversionCastOp.get([op.input], [op.result.type]),
-            recode := FnToRecFnOp([cast_res], [IntegerType(bitwidth + 1)], sig_width, exp_width),
+            cast_res := UnrealizedConversionCastOp.get([op.input], [IntegerType(in_bw)]),
+            recode := FnToRecFnOp([cast_res], [IntegerType(in_bw + 1)], sig_width, exp_width),
             rec_fn := RecFnToInOp(
                 [recode, rounding_mode, signed_out],
-                [IntegerType(bitwidth), IntegerType(3)],
+                [IntegerType(out_bw), IntegerType(3)],
                 sig_width,
                 exp_width,
-                bitwidth,
+                out_bw,
             ),
         ]
         rewriter.replace_op(op, new_ops=new_ops, new_results=[rec_fn.results[0]])
@@ -192,6 +202,53 @@ class ConvertFmaOp(RewritePattern):
                 exp_width,
             ),
             unrecode := RecFnToFnOp([fma.results[0]], [IntegerType(bitwidth)], sig_width, exp_width),
+            cast_res := UnrealizedConversionCastOp.get([unrecode], [in_type]),
+        ]
+        rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_res.results[0]])
+
+
+class ConvertRoundEvenOp(RewritePattern):
+    """
+    Lower `math.roundeven %x : fX` via a hardfloat float→int→float round-trip
+    with rounding mode RNE (= 0). The integer width matches the float
+    bit-width (i32 for f32, i64 for f64). Values whose roundeven result
+    doesn't fit in that width (|x| above ~2^bitwidth) saturate — acceptable
+    for NN dequant pipelines where the next op is a clamp + fptosi anyway.
+
+    Without this lowering `math.roundeven` survives `convert-float-to-hardfloat`
+    and circt-opt rejects the float-typed math op, leaving stale
+    `unrealized_conversion_cast i32 ↔ f32` ops that
+    `reconcile_unrealized_casts` can't fold.
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: math.RoundEvenOp, rewriter: PatternRewriter):
+        in_type = cast(AnyFloat, op.operand.type)
+        if type(in_type) not in _type_mapping:
+            return
+        exp_width, sig_width = _type_mapping[type(in_type)]
+        bitwidth = in_type.bitwidth
+        new_ops: list[Operation] = [
+            signed := hw.ConstantOp(1, 1),
+            rm := hw.ConstantOp(0, 3),
+            tininess := hw.ConstantOp(1, 1),
+            cast_in := UnrealizedConversionCastOp.get([op.operand], [IntegerType(bitwidth)]),
+            recode := FnToRecFnOp([cast_in], [IntegerType(bitwidth + 1)], sig_width, exp_width),
+            to_int := RecFnToInOp(
+                [recode, rm, signed],
+                [IntegerType(bitwidth), IntegerType(3)],
+                sig_width,
+                exp_width,
+                bitwidth,
+            ),
+            back_recode := InToRecFnOp(
+                [signed.result, to_int.results[0], rm, tininess],
+                [IntegerType(bitwidth + 1), IntegerType(5)],
+                sig_width,
+                exp_width,
+                bitwidth,
+            ),
+            unrecode := RecFnToFnOp([back_recode.results[0]], [IntegerType(bitwidth)], sig_width, exp_width),
             cast_res := UnrealizedConversionCastOp.get([unrecode], [in_type]),
         ]
         rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_res.results[0]])
@@ -403,6 +460,93 @@ class ConvertCmpfOp(RewritePattern):
         rewriter.replace_op(op, new_ops=new_ops, new_results=[result])
 
 
+class ConvertBitcastFloatOp(RewritePattern):
+    """
+    Replace `arith.bitcast` between a same-width float and integer with a
+    `builtin.unrealized_conversion_cast`.
+
+    Float<->int bitcasts (e.g. emitted by the Schraudolph reciprocal and the
+    approximate-math passes) are bit-pattern-preserving, so swapping them for
+    unrealized casts is a no-op semantically. Doing so lets
+    `reconcile_unrealized_casts` collapse chains like
+    `unrealized_cast(i32->f32) ; arith.bitcast(f32->i32)` that otherwise
+    survive the hardfloat lowering and bleed into the SV output.
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: arith.BitcastOp, rewriter: PatternRewriter):
+        in_type = op.input.type
+        out_type = op.result.type
+        in_is_float = type(in_type) in _type_mapping
+        out_is_float = type(out_type) in _type_mapping
+        if in_is_float == out_is_float:
+            return
+        rewriter.replace_op(op, UnrealizedConversionCastOp.get([op.input], [out_type]))
+
+
+class ConvertSelectOp(RewritePattern):
+    """
+    Retype `arith.select` whose payload is a float to operate on the integer
+    bit-encoding instead.
+
+    `circt-opt --map-arith-to-comb` only converts `arith.select` whose operand
+    type is integer-like; float-typed selects survive and crash the SV
+    lowering. The select itself is a pure mux, so we just sandwich the float
+    operands in `unrealized_conversion_cast` to the matching integer type and
+    rebuild the select on integers. `reconcile_unrealized_casts` later folds
+    away the casts that meet other float-bit-encoded values.
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: arith.SelectOp, rewriter: PatternRewriter):
+        in_type = op.lhs.type
+        if type(in_type) not in _type_mapping:
+            return
+        in_type = cast(AnyFloat, in_type)
+        bitwidth = in_type.bitwidth
+        new_ops: list[Operation] = [
+            cast_lhs := UnrealizedConversionCastOp.get([op.lhs], [IntegerType(bitwidth)]),
+            cast_rhs := UnrealizedConversionCastOp.get([op.rhs], [IntegerType(bitwidth)]),
+            new_sel := arith.SelectOp(op.cond, cast_lhs.results[0], cast_rhs.results[0]),
+            cast_res := UnrealizedConversionCastOp.get([new_sel.result], [in_type]),
+        ]
+        rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_res.results[0]])
+
+
+_PACK_FORMAT: dict[type[Attribute], tuple[str, str]] = {
+    Float32Type: ("<f", "<I"),
+    Float64Type: ("<d", "<Q"),
+}
+
+
+class ConvertConstantOp(RewritePattern):
+    """
+    Replace `arith.constant <fp> : fX` with a same-bit-pattern integer
+    constant plus an `unrealized_conversion_cast` back to the float type.
+
+    `circt-opt --map-arith-to-comb` cannot lower float-typed `arith.constant`,
+    so the bit-encoded form is what survives to RTL. Only f32/f64 are
+    supported here (matching the rest of the hardfloat lowering).
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: arith.ConstantOp, rewriter: PatternRewriter):
+        out_type = op.result.type
+        if type(out_type) not in _PACK_FORMAT:
+            return
+        if not isinstance(op.value, FloatAttr):
+            return
+        out_type = cast(AnyFloat, out_type)
+        fp_fmt, int_fmt = _PACK_FORMAT[type(out_type)]
+        bit_pattern = struct.unpack(int_fmt, struct.pack(fp_fmt, op.value.value.data))[0]
+        bitwidth = out_type.bitwidth
+        new_ops: list[Operation] = [
+            int_const := arith.ConstantOp.from_int_and_width(bit_pattern, bitwidth),
+            cast_back := UnrealizedConversionCastOp.get([int_const.result], [out_type]),
+        ]
+        rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_back.results[0]])
+
+
 class ConvertFloatToHardfloatPass(ModulePass):
     name = "convert-float-to-hardfloat"
 
@@ -418,6 +562,23 @@ class ConvertFloatToHardfloatPass(ModulePass):
                     ConvertMaximumMinimumOp(),
                     ConvertTruncExtfOp(),
                     ConvertFmaOp(),
+                    ConvertRoundEvenOp(),
+                ]
+            ),
+            apply_recursively=False,
+        ).rewrite_module(op)
+        # Run `ConvertSelectOp` / `ConvertConstantOp` in a second walker so
+        # they pick up float-typed selects and constants emitted by the
+        # patterns above (the first walker doesn't revisit ops created
+        # during a rewrite). `ConvertConstantOp` is also needed for
+        # user-written float literals that no other pattern touches —
+        # circt-opt's --map-arith-to-comb otherwise leaves them behind.
+        PatternRewriteWalker(
+            GreedyRewritePatternApplier(
+                [
+                    ConvertSelectOp(),
+                    ConvertConstantOp(),
+                    ConvertBitcastFloatOp(),
                 ]
             ),
             apply_recursively=False,

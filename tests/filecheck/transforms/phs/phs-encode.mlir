@@ -135,3 +135,35 @@ func.func public @streamer_acc(%arg0: tensor<4x4xi32>, %arg1: tensor<4xi32>) -> 
 // CHECK-NEXT:      }
 // CHECK-NEXT:    phs.yield %s : i32
 // CHECK-NEXT:  }
+
+// -----
+
+// Outer-scope `arith.constant` operands captured by the linalg body are sunk
+// into the body by the encoder, so the resulting `phs.choose` ops never see
+// them as top-level data operands.
+func.func @clamp_with_captured_constants(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+  %hi = arith.constant 3.000000e+01 : f32
+  %lo = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<4xf32>
+  %result = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0) -> (d0)>,
+      affine_map<(d0) -> (d0)>
+    ],
+    iterator_types = ["parallel"]
+  } ins(%arg0 : tensor<4xf32>) outs(%init : tensor<4xf32>) attrs = {"phs_acc" = @acc1} {
+  ^bb0(%x: f32, %_: f32):
+    %clamped_hi = arith.minimumf %x, %hi : f32
+    %clamped = arith.maximumf %clamped_hi, %lo : f32
+    linalg.yield %clamped : f32
+  } -> tensor<4xf32>
+  return %result : tensor<4xf32>
+}
+
+// CHECK:  phs.pe @acc1 with %0, %1, %2, %3 (%x: f32, %{{.*}}: f32) {
+// CHECK:    arith.constant 0.000000e+00 : f32
+// CHECK:    arith.constant 3.000000e+01 : f32
+// CHECK:    phs.choose @i_f32_f32_o_f32_0
+// CHECK:      arith.minimumf
+// CHECK:    phs.choose @i_f32_f32_o_f32_1
+// CHECK:      arith.maximumf

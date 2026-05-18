@@ -1,8 +1,9 @@
 from xdsl.dialects.builtin import DenseArrayBase, FunctionType, i64
 from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
-from xdsl.ir import Operation
+from xdsl.ir import Block, Operation, OpResult
 from xdsl.pattern_rewriter import PatternRewriter
+from xdsl.traits import ConstantLike
 
 from snaxc.dialects import dart, phs
 
@@ -44,6 +45,16 @@ def convert_generic_body_to_phs(
 
     # Get a copy for conversion of the block
     body_copy = generic_op.body.clone()
+
+    # Sink outer-scope `ConstantLike` operands into the body. Each `phs.choose`
+    # built below exposes its op's operands as top-level data inputs; when one
+    # of those operands is a literal captured from the surrounding function
+    # scope, the combine pass fails because the operand owner is neither a
+    # block argument nor a prior `phs.choose`. Cloning the constant inside the
+    # body turns it into a local literal of each `phs.choose` it ends up in,
+    # which lowers naturally to a wired bit pattern in hardware.
+    _sink_outer_constants(body_copy.block)
+
     generic_yield = body_copy.block.ops.last
     assert isinstance(generic_yield, LinalgYieldOp) or isinstance(generic_yield, dart.YieldOp)
     # Keep every block arg, including the linalg `outs` block args even when the
@@ -76,3 +87,33 @@ def convert_generic_body_to_phs(
             rewriter.replace_op(op, choose_op)
 
     return pe
+
+
+def _sink_outer_constants(body_block: Block) -> None:
+    """Clone every outer-scope `ConstantLike` operand into ``body_block``.
+
+    Walks ``body_block``, identifies operands whose defining op lives outside
+    the block and carries the `ConstantLike` trait, clones each such defining
+    op once at the top of the block, and rewires uses inside the block to the
+    clone. Constants are then treated like any other local op by the rest of
+    the encoder.
+    """
+    clones: dict[OpResult, OpResult] = {}
+    for op in list(body_block.ops):
+        for i, opnd in enumerate(op.operands):
+            if not isinstance(opnd, OpResult):
+                continue
+            owner = opnd.owner
+            if owner.parent_block() is body_block:
+                continue
+            if not owner.has_trait(ConstantLike):
+                continue
+            clone_res = clones.get(opnd)
+            if clone_res is None:
+                cloned_op = owner.clone()
+                first = body_block.ops.first
+                assert first is not None
+                body_block.insert_op_before(cloned_op, first)
+                clone_res = cloned_op.results[opnd.index]
+                clones[opnd] = clone_res
+            op.operands[i] = clone_res

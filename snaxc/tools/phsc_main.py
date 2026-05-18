@@ -10,6 +10,7 @@ from xdsl.dialects.builtin import ModuleOp
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
+from xdsl.transforms.approximate_math_with_bitcast import ApproximateMathWithBitcastPass
 from xdsl.transforms.common_subexpression_elimination import CommonSubexpressionElimination
 from xdsl.transforms.mlir_opt import MLIROptPass
 
@@ -27,13 +28,17 @@ from snaxc.transforms.hardfloat.reconcile_recodes import ReconcileRecodesPass
 from snaxc.transforms.hardfloat.split_round import SplitHardfloatRoundersPass
 from snaxc.transforms.phs.convert_float_to_int import PhsConvertFloatToInt
 from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
+from snaxc.transforms.phs.divf_constant_to_mul import PhsDivfConstantToMulPass
+from snaxc.transforms.phs.divf_to_reciprocal_bitcast import PhsDivfToReciprocalBitcastPass
 from snaxc.transforms.phs.encode import PhsEncodePass
+from snaxc.transforms.phs.expand_integer_minmax import ExpandIntegerMinMaxPass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
 from snaxc.transforms.phs.instantiate_pe_array import BOUNDS_ATTR_NAME, InstantiatePEArrayPass
 from snaxc.transforms.phs.prune_unused_carries import PrunePEUnusedCarriesPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
+from snaxc.transforms.phs.schedule_preset.separate_linalg import PhsScheduleSeparateLinalgPass
 
 
 class PHSCMain(SNAXCMain):
@@ -180,6 +185,14 @@ class PHSCMain(SNAXCMain):
 
         arg_parser.add_argument("schedule_file", type=str, nargs="?", help="path to schedule file")
         arg_parser.add_argument(
+            "--scheduling-preset",
+            type=str,
+            choices=["separate-linalg"],
+            default=None,
+            help="Use a built-in scheduling pass instead of a transform-dialect schedule file. "
+            "'separate-linalg' assigns every unannotated linalg.generic its own @accN accelerator.",
+        )
+        arg_parser.add_argument(
             "--software-file",
             type=str,
             nargs="?",
@@ -239,17 +252,43 @@ class PHSCMain(SNAXCMain):
         Create input pipeline.
         The input pipeline annotates and encodes relevant linalg ops into PHS
         """
+        if (self.args.schedule_file is None) == (self.args.scheduling_preset is None):
+            raise SystemExit("Exactly one of <schedule_file> or --scheduling-preset must be provided.")
+
         input_pass_pipeline: list[ModulePass] = []
 
-        input_pass_pipeline.append(
-            MLIROptPass(
-                arguments=(
-                    "--linalg-generalize-named-ops",
-                    f"--transform-preload-library=transform-library-paths={self.args.schedule_file}",
-                    "--transform-interpreter",
+        if self.args.scheduling_preset is None:
+            # Transform-dialect path: load the user's schedule.mlir and run
+            # the transform interpreter to apply it.
+            input_pass_pipeline.append(
+                MLIROptPass(
+                    arguments=(
+                        "--linalg-generalize-named-ops",
+                        f"--transform-preload-library=transform-library-paths={self.args.schedule_file}",
+                        "--transform-interpreter",
+                    )
                 )
             )
-        )
+        else:
+            # Preset path: still generalize named ops, then run the chosen
+            # built-in scheduling pass (no transform dialect involved).
+            input_pass_pipeline.append(MLIROptPass(arguments=("--linalg-generalize-named-ops",)))
+            if self.args.scheduling_preset == "separate-linalg":
+                input_pass_pipeline.append(PhsScheduleSeparateLinalgPass())
+            else:
+                raise SystemExit(f"Unknown scheduling preset: {self.args.scheduling_preset}")
+        # Rewrite `arith.divf %x, %const` as `arith.mulf %x, 1/const`. Runs
+        # before PHS encoding so the rewrite operates on plain linalg/arith
+        # IR. Assumes reciprocal accuracy is acceptable for NN inference.
+        input_pass_pipeline.append(PhsDivfConstantToMulPass())
+        # Replace `math.exp`/`math.log` with bitcast-trick approximations. The
+        # PHS hardware path has no transcendental ops; this lowers them to
+        # mul/add/fptosi/bitcast which already lower through hardfloat.
+        input_pass_pipeline.append(ApproximateMathWithBitcastPass())
+        # Approximate any remaining `arith.divf` (e.g. softmax 1/sum_exp) as
+        # `%a * recip(%b)` via the Schraudolph bitcast trick plus one Newton
+        # iteration.
+        input_pass_pipeline.append(PhsDivfToReciprocalBitcastPass())
         input_pass_pipeline.append(PhsEncodePass())
         # Drops carry-input slots whose data is unused in the merged PE body
         # (lowering them from `readWrite` to plain `write`). Defense-in-depth:
@@ -266,6 +305,9 @@ class PHSCMain(SNAXCMain):
         hardware_pass_pipeline.append(PhsKeepPhsPass())
         hardware_pass_pipeline.append(PhsConvertFloatToInt())
         hardware_pass_pipeline.append(ConvertFloatToHardfloatPass())
+        # Lower integer min/max to cmpi+select; circt-opt's --map-arith-to-comb
+        # rejects `arith.maxsi`/`minsi`/`maxui`/`minui`.
+        hardware_pass_pipeline.append(ExpandIntegerMinMaxPass())
         hardware_pass_pipeline.append(PhsRemoveOneOptionSwitchesPass())
         hardware_pass_pipeline.append(InstantiatePEArrayPass())
         hardware_pass_pipeline.append(ConvertPEToHWPass())

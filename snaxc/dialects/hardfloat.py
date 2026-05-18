@@ -395,7 +395,7 @@ class CompareRecFnOp(HardfloatOperation):
 class RecFnToInOp(HardfloatOperation):
     CHISEL_NAME: ClassVar[str] = "RecFNToIN"
     CHISEL_INPUT_NAMES: ClassVar[tuple[str, ...]] = ("in", "roundingMode", "signedOut")
-    CHISEL_OUTPUT_NAMES: ClassVar[tuple[str, ...]] = ("out", "exceptionFlags")
+    CHISEL_OUTPUT_NAMES: ClassVar[tuple[str, ...]] = ("out", "intExceptionFlags")
     name = "hardfloat.rec_fn_to_in"
     in_ = operand_def(IntegerType)  # "in" is reserved in python
     roundingMode = operand_def(IntegerType(3))
