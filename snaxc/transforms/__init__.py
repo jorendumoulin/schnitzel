@@ -257,6 +257,11 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return PhsScheduleSeparateLinalgPass
 
+    def get_phs_expand_integer_minmax():
+        from snaxc.transforms.phs.expand_integer_minmax import ExpandIntegerMinMaxPass
+
+        return ExpandIntegerMinMaxPass
+
     def get_pipeline_canonicalize_for():
         from snaxc.transforms.pipeline.pipeline_canonicalize_for import (
             PipelineCanonicalizeFor,
@@ -405,6 +410,7 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "phs-divf-constant-to-mul": get_phs_divf_constant_to_mul,
         "phs-divf-to-reciprocal-bitcast": get_phs_divf_to_reciprocal_bitcast,
         "phs-schedule-separate-linalg": get_phs_schedule_separate_linalg,
+        "phs-expand-integer-minmax": get_phs_expand_integer_minmax,
         "pipeline-canonicalize-for": get_pipeline_canonicalize_for,
         "pipeline-duplicate-buffers": get_pipeline_duplicate_buffers,
         "postprocess": get_postprocess_mlir,

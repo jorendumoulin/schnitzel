@@ -31,6 +31,7 @@ from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
 from snaxc.transforms.phs.divf_constant_to_mul import PhsDivfConstantToMulPass
 from snaxc.transforms.phs.divf_to_reciprocal_bitcast import PhsDivfToReciprocalBitcastPass
 from snaxc.transforms.phs.encode import PhsEncodePass
+from snaxc.transforms.phs.expand_integer_minmax import ExpandIntegerMinMaxPass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
@@ -306,6 +307,9 @@ class PHSCMain(SNAXCMain):
         hardware_pass_pipeline.append(PhsKeepPhsPass())
         hardware_pass_pipeline.append(PhsConvertFloatToInt())
         hardware_pass_pipeline.append(ConvertFloatToHardfloatPass())
+        # Lower integer min/max to cmpi+select; circt-opt's --map-arith-to-comb
+        # rejects `arith.maxsi`/`minsi`/`maxui`/`minui`.
+        hardware_pass_pipeline.append(ExpandIntegerMinMaxPass())
         hardware_pass_pipeline.append(PhsRemoveOneOptionSwitchesPass())
         hardware_pass_pipeline.append(InstantiatePEArrayPass())
         hardware_pass_pipeline.append(ConvertPEToHWPass())
