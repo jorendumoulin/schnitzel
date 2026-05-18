@@ -207,6 +207,53 @@ class ConvertFmaOp(RewritePattern):
         rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_res.results[0]])
 
 
+class ConvertRoundEvenOp(RewritePattern):
+    """
+    Lower `math.roundeven %x : fX` via a hardfloat float→int→float round-trip
+    with rounding mode RNE (= 0). The integer width matches the float
+    bit-width (i32 for f32, i64 for f64). Values whose roundeven result
+    doesn't fit in that width (|x| above ~2^bitwidth) saturate — acceptable
+    for NN dequant pipelines where the next op is a clamp + fptosi anyway.
+
+    Without this lowering `math.roundeven` survives `convert-float-to-hardfloat`
+    and circt-opt rejects the float-typed math op, leaving stale
+    `unrealized_conversion_cast i32 ↔ f32` ops that
+    `reconcile_unrealized_casts` can't fold.
+    """
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, op: math.RoundEvenOp, rewriter: PatternRewriter):
+        in_type = cast(AnyFloat, op.operand.type)
+        if type(in_type) not in _type_mapping:
+            return
+        exp_width, sig_width = _type_mapping[type(in_type)]
+        bitwidth = in_type.bitwidth
+        new_ops: list[Operation] = [
+            signed := hw.ConstantOp(1, 1),
+            rm := hw.ConstantOp(0, 3),
+            tininess := hw.ConstantOp(1, 1),
+            cast_in := UnrealizedConversionCastOp.get([op.operand], [IntegerType(bitwidth)]),
+            recode := FnToRecFnOp([cast_in], [IntegerType(bitwidth + 1)], sig_width, exp_width),
+            to_int := RecFnToInOp(
+                [recode, rm, signed],
+                [IntegerType(bitwidth), IntegerType(3)],
+                sig_width,
+                exp_width,
+                bitwidth,
+            ),
+            back_recode := InToRecFnOp(
+                [signed.result, to_int.results[0], rm, tininess],
+                [IntegerType(bitwidth + 1), IntegerType(5)],
+                sig_width,
+                exp_width,
+                bitwidth,
+            ),
+            unrecode := RecFnToFnOp([back_recode.results[0]], [IntegerType(bitwidth)], sig_width, exp_width),
+            cast_res := UnrealizedConversionCastOp.get([unrecode], [in_type]),
+        ]
+        rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_res.results[0]])
+
+
 class ConvertTruncExtfOp(RewritePattern):
     """
     Lower arith.truncf / arith.extf via hardfloat.rec_fn_to_rec_fn.
@@ -491,6 +538,7 @@ class ConvertFloatToHardfloatPass(ModulePass):
                     ConvertMaximumMinimumOp(),
                     ConvertTruncExtfOp(),
                     ConvertFmaOp(),
+                    ConvertRoundEvenOp(),
                 ]
             ),
             apply_recursively=False,
