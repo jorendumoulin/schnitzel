@@ -21,7 +21,7 @@ func.func @ker_parallel(%arg0: tensor<?xi32>, %arg1: tensor<?xi32>) -> tensor<?x
 }
 
 // CHECK-LABEL: phs.pe @parallel_acc
-// CHECK-SAME: with %0 (%a : i32, %b : i32) {
+// CHECK-SAME: with %0 (%a: i32, %b: i32) {
 
 // -----
 
@@ -42,4 +42,4 @@ func.func @ker_reduction(%arg0: tensor<?x?xi32>, %arg1: tensor<?xi32>) -> tensor
 }
 
 // CHECK-LABEL: phs.pe @reduction_acc
-// CHECK-SAME: with %0 (%a : i32, %out : i32) {
+// CHECK-SAME: with %0 (%a: i32, %out: i32) {

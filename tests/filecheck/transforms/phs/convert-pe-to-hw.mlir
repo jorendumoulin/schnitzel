@@ -1,7 +1,7 @@
 // RUN: snax-opt %s -p convert-pe-to-hw | filecheck %s
 
 phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6: i32, %7: i32) {
-  %8 = phs.choose @_0 with %0 (%6 : i32, %7 : i32) -> i32
+  %8 = phs.choose @_0 with %0 (%6: i32, %7: i32) -> i32
     0) (%9, %10) {
       %11 = arith.muli %9, %10 : i32
       phs.yield %11 : i32
@@ -14,7 +14,7 @@ phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6: i32, %7: i32) {
       %17 = arith.subi %15, %16 : i32
       phs.yield %17 : i32
     }
-  %9 = phs.choose @_1 with %1 (%6 : i32, %8 : i32) -> i32
+  %9 = phs.choose @_1 with %1 (%6: i32, %8: i32) -> i32
     0) (%10, %11) {
       %12 = arith.muli %10, %11 : i32
       phs.yield %12 : i32
@@ -25,7 +25,7 @@ phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6: i32, %7: i32) {
     }
   %10 = phs.mux with %2 (%8 : i32, %9 : i32) -> i32
   %11 = phs.mux with %5 (%9 : i32, %7 : i32) -> i32
-  %12 = phs.choose @_2 with %3 (%8 : i32, %11 : i32) -> i32
+  %12 = phs.choose @_2 with %3 (%8: i32, %11: i32) -> i32
     0) (%13, %14) {
       %15 = arith.muli %13, %14 : i32
       phs.yield %15 : i32
@@ -47,7 +47,7 @@ phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6: i32, %7: i32) {
 // CHECK-NEXT:    %11 = builtin.unrealized_conversion_cast %5 : i1 to index
 // CHECK-NEXT:    %12 = builtin.unrealized_conversion_cast %6 : i1 to index
 // CHECK-NEXT:    %13 = builtin.unrealized_conversion_cast %7 : i1 to index
-// CHECK-NEXT:    %14 = phs.choose @_0 with %8 (%0 : i32, %1 : i32) -> i32
+// CHECK-NEXT:    %14 = phs.choose @_0 with %8 (%0: i32, %1: i32) -> i32
 // CHECK-NEXT:      0) (%15, %16) {
 // CHECK-NEXT:        %17 = arith.muli %15, %16 : i32
 // CHECK-NEXT:        phs.yield %17 : i32
@@ -60,7 +60,7 @@ phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6: i32, %7: i32) {
 // CHECK-NEXT:        %23 = arith.subi %21, %22 : i32
 // CHECK-NEXT:        phs.yield %23 : i32
 // CHECK-NEXT:      }
-// CHECK-NEXT:    %15 = phs.choose @_1 with %9 (%0 : i32, %14 : i32) -> i32
+// CHECK-NEXT:    %15 = phs.choose @_1 with %9 (%0: i32, %14: i32) -> i32
 // CHECK-NEXT:      0) (%16, %17) {
 // CHECK-NEXT:        %18 = arith.muli %16, %17 : i32
 // CHECK-NEXT:        phs.yield %18 : i32
@@ -71,7 +71,7 @@ phs.pe @myfirstaccelerator with %0, %1, %2, %3, %4, %5 (%6: i32, %7: i32) {
 // CHECK-NEXT:      }
 // CHECK-NEXT:    %16 = phs.mux with %10 (%14 : i32, %15 : i32) -> i32
 // CHECK-NEXT:    %17 = phs.mux with %13 (%15 : i32, %1 : i32) -> i32
-// CHECK-NEXT:    %18 = phs.choose @_2 with %11 (%14 : i32, %17 : i32) -> i32
+// CHECK-NEXT:    %18 = phs.choose @_2 with %11 (%14: i32, %17: i32) -> i32
 // CHECK-NEXT:      0) (%19, %20) {
 // CHECK-NEXT:        %21 = arith.muli %19, %20 : i32
 // CHECK-NEXT:        phs.yield %21 : i32

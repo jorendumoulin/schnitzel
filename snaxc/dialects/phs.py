@@ -285,7 +285,7 @@ class PEOp(IRDLOperation):
         data_operands = self.data_operands()
         for i, opnd in enumerate(data_operands):
             printer.print_operand(opnd)
-            printer.print_string(" : ")
+            printer.print_string(": ")
             printer.print_attribute(opnd.type)
             if i != len(data_operands) - 1:
                 printer.print_string(", ")
@@ -466,7 +466,7 @@ class ChooseOp(IRDLOperation):
         printer.print_string(" (")
         for i, opnd in enumerate(self.data_operands):
             printer.print_operand(opnd)
-            printer.print_string(" : ")
+            printer.print_string(": ")
             printer.print_attribute(opnd.type)
             if i != len(self.data_operands) - 1:
                 printer.print_string(", ")
@@ -761,7 +761,7 @@ class PEArrayOp(IRDLOperation):
             if i > 0:
                 printer.print_string(", ")
             printer.print_operand(arg)
-            printer.print_string(" : ")
+            printer.print_string(": ")
             printer.print_attribute(arg.type)
         printer.print_string(") -> (")
 
