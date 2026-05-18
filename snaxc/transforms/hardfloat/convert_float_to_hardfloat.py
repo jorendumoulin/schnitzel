@@ -119,20 +119,24 @@ class ConvertIToFPOp(RewritePattern):
                 signed_in = hw.ConstantOp(1, 1)
             case arith.UIToFPOp():
                 signed_in = hw.ConstantOp(0, 1)
-        exp_width, sig_width = _type_mapping[type(op.result.type)]
-        bitwidth = cast(IntegerType, op.input.type).bitwidth
+        out_float_type = cast(AnyFloat, op.result.type)
+        if type(out_float_type) not in _type_mapping:
+            return
+        exp_width, sig_width = _type_mapping[type(out_float_type)]
+        in_bw = cast(IntegerType, op.input.type).bitwidth
+        out_bw = out_float_type.bitwidth
         new_ops = [
             signed_in,
             rounding_mode := hw.ConstantOp(0, 3),
             tininess := hw.ConstantOp(1, 1),
             conversion := InToRecFnOp(
                 [signed_in.result, op.input, rounding_mode, tininess],
-                [IntegerType(bitwidth + 1), IntegerType(5)],
+                [IntegerType(out_bw + 1), IntegerType(5)],
                 sig_width,
                 exp_width,
-                bitwidth,
+                in_bw,
             ),
-            unrecode := RecFnToFnOp([conversion.results[0]], [IntegerType(bitwidth)], sig_width, exp_width),
+            unrecode := RecFnToFnOp([conversion.results[0]], [IntegerType(out_bw)], sig_width, exp_width),
             cast_res := UnrealizedConversionCastOp.get([unrecode], [op.result.type]),
         ]
         rewriter.replace_op(op, new_ops=new_ops, new_results=[cast_res.results[0]])
@@ -148,19 +152,23 @@ class ConvertFPToIOp(RewritePattern):
                 signed_out = hw.ConstantOp(0, 1)
             case _:
                 raise NotImplementedError()
-        exp_width, sig_width = _type_mapping[type(op.input.type)]
-        bitwidth = cast(IntegerType, op.input.type).bitwidth
+        in_float_type = cast(AnyFloat, op.input.type)
+        if type(in_float_type) not in _type_mapping:
+            return
+        exp_width, sig_width = _type_mapping[type(in_float_type)]
+        in_bw = in_float_type.bitwidth
+        out_bw = cast(IntegerType, op.result.type).bitwidth
         new_ops = [
             signed_out,
             rounding_mode := hw.ConstantOp(0, 3),
-            cast_res := UnrealizedConversionCastOp.get([op.input], [op.result.type]),
-            recode := FnToRecFnOp([cast_res], [IntegerType(bitwidth + 1)], sig_width, exp_width),
+            cast_res := UnrealizedConversionCastOp.get([op.input], [IntegerType(in_bw)]),
+            recode := FnToRecFnOp([cast_res], [IntegerType(in_bw + 1)], sig_width, exp_width),
             rec_fn := RecFnToInOp(
                 [recode, rounding_mode, signed_out],
-                [IntegerType(bitwidth), IntegerType(3)],
+                [IntegerType(out_bw), IntegerType(3)],
                 sig_width,
                 exp_width,
-                bitwidth,
+                out_bw,
             ),
         ]
         rewriter.replace_op(op, new_ops=new_ops, new_results=[rec_fn.results[0]])
