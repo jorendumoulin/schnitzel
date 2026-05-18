@@ -6,7 +6,7 @@ func.func public @simple_mult(%arg0: memref<?xi32>, %arg1: memref<?xi32>, %arg2:
   %1 = "memref.extract_aligned_pointer_as_index"(%arg0) : (memref<?xi32>) -> index
   %2 = "memref.extract_aligned_pointer_as_index"(%arg1) : (memref<?xi32>) -> index
   %3 = "memref.extract_aligned_pointer_as_index"(%arg2) : (memref<?xi32>) -> index
-  %4 = "memref.dim"(%arg0, %0) : (memref<?xi32>, index) -> index
+  %4 = memref.dim %arg0, %0 : memref<?xi32>
 
   %5 = "accfg.setup"(%1, %2, %3, %4) <{"accelerator" = "snax_hwpe_mult", "operandSegmentSizes" = array<i32: 4, 0>, "param_names" = ["A", "B", "O", "size"]}> : (index, index, index, index) -> !accfg.state<"snax_hwpe_mult">
 
@@ -61,7 +61,7 @@ func.func public @simple_mult(%arg0: memref<?xi32>, %arg1: memref<?xi32>, %arg2:
 // CHECK-NEXT:     %1 = "memref.extract_aligned_pointer_as_index"(%arg0) : (memref<?xi32>) -> index
 // CHECK-NEXT:     %2 = "memref.extract_aligned_pointer_as_index"(%arg1) : (memref<?xi32>) -> index
 // CHECK-NEXT:     %3 = "memref.extract_aligned_pointer_as_index"(%arg2) : (memref<?xi32>) -> index
-// CHECK-NEXT:     %4 = "memref.dim"(%arg0, %0) : (memref<?xi32>, index) -> index
+// CHECK-NEXT:     %4 = memref.dim %arg0, %0 : memref<?xi32>
 // CHECK-NEXT:     %5 = accfg.setup "snax_hwpe_mult" to ("A" = %1 : index, "B" = %2 : index, "O" = %3 : index, "size" = %4 : index) : !accfg.state<"snax_hwpe_mult">
 // CHECK-NEXT:     %6 = "accfg.launch"(%cst, %5) <{param_names = ["launch"], accelerator = "snax_hwpe_mult"}> : (i5, !accfg.state<"snax_hwpe_mult">) -> !accfg.token<"snax_hwpe_mult">
 // CHECK-NEXT:     "accfg.await"(%6) : (!accfg.token<"snax_hwpe_mult">) -> ()

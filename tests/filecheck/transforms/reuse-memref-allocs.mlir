@@ -125,8 +125,8 @@ builtin.module {
 //                 vvvvvvvvvvvvvvvvvv
 //                %2 = arith.constant 0 : i32
 //CHECK-NEXT:     %1 = arith.constant 0 : index
-//CHECK-NEXT:     %2 = "memref.dim"(%arg0, %1) : (memref<?x?xi8, "L3">, index) -> index
-//CHECK-NEXT:     %3 = "memref.dim"(%arg0, %0) : (memref<?x?xi8, "L3">, index) -> index
+//CHECK-NEXT:     %2 = memref.dim %arg0, %1 : memref<?x?xi8, "L3">
+//CHECK-NEXT:     %3 = memref.dim %arg0, %0 : memref<?x?xi8, "L3">
 //CHECK-NEXT:     %4 = memref.alloc(%2, %3) {alignment = 64 : i64} : memref<?x?xi8, #tsl.tsl<[?, 8] -> (?, 8), [?, 8] -> (256, 1)>, "L1">
 //                dead code elimination
 //                 vvvvvvvvvvvvvvvvvv
@@ -163,8 +163,8 @@ builtin.module {
 //                vvvvvvvvvvvvvvvvvv
 //               %2 = arith.constant 0 : i32
 //CHECK-NEXT:    %1 = arith.constant 0 : index
-//CHECK-NEXT:    %2 = "memref.dim"(%arg0, %1) : (memref<?x?xi8, "L3">, index) -> index
-//CHECK-NEXT:    %3 = "memref.dim"(%arg0, %0) : (memref<?x?xi8, "L3">, index) -> index
+//CHECK-NEXT:    %2 = memref.dim %arg0, %1 : memref<?x?xi8, "L3">
+//CHECK-NEXT:    %3 = memref.dim %arg0, %0 : memref<?x?xi8, "L3">
 //CHECK-NEXT:    %4 = memref.alloc(%2, %3) {alignment = 64 : i64} : memref<?x?xi8, #tsl.tsl<[?, 8] -> (?, 8), [?, 8] -> (256, 1)>, "L1">
 //               dead code elimination
 //                vvvvvvvvvvvvvvvvvv
@@ -202,7 +202,7 @@ builtin.module {
 //                vvvvvvvvvvvvvvvvvv
 //               %2 = arith.constant 0 : i32
 //CHECK-NEXT:    %2 = arith.constant 0 : index
-//CHECK-NEXT:    %3 = "memref.dim"(%arg0, %1) : (memref<?x?xi8, "L3">, index) -> index
+//CHECK-NEXT:    %3 = memref.dim %arg0, %1 : memref<?x?xi8, "L3">
 //CHECK-NEXT:    scf.for %arg2 = %2 to %0 step %1 {
 //CHECK-NEXT:      scf.for %arg3 = %2 to %0 step %1 {
 //CHECK-NEXT:        %4 = "affine.min"(%1, %0) <{map = affine_map<(d0)[s0] -> (8, ((d0 * -1) + s0))>}> : (index, index) -> index
@@ -243,7 +243,7 @@ builtin.module {
 //                vvvvvvvvvvvvvvvvvv
 //               %2 = arith.constant 0 : i32
 //CHECK-NEXT:    %2 = arith.constant 0 : index
-//CHECK-NEXT:    %3 = "memref.dim"(%arg0, %1) : (memref<?x?xi8, "L3">, index) -> index
+//CHECK-NEXT:    %3 = memref.dim %arg0, %1 : memref<?x?xi8, "L3">
 //CHECK-NEXT:    %4 = arith.constant 8 : index
 //CHECK-NEXT:    %5 = memref.alloc(%4, %4) {alignment = 64 : i64} : memref<?x?xi8, #tsl.tsl<[?, 8] -> (?, 8), [?, 8] -> (256, 1)>, "L1">
 //CHECK-NEXT:    scf.for %arg2 = %2 to %0 step %1 {
@@ -288,7 +288,7 @@ builtin.module {
 //CHECK-NEXT:     scf.for %arg2 = %2 to %0 step %1 {
 //CHECK-NEXT:       scf.for %arg3 = %2 to %0 step %1 {
 //CHECK-NEXT:         %3 = memref.subview %arg1[%arg2, %arg3] [%0, %arg3] [1, 1] : memref<?x?xi32, "L3"> to memref<?x?xi32, strided<[?, 1], offset: ?>>
-//CHECK-NEXT:         %4 = "memref.dim"(%3, %1) : (memref<?x?xi32, strided<[?, 1], offset: ?>>, index) -> index
+//CHECK-NEXT:         %4 = memref.dim %3, %1 : memref<?x?xi32, strided<[?, 1], offset: ?>>
 //CHECK-NEXT:         %5 = memref.alloc(%0, %4) {alignment = 64 : i64} : memref<?x?xi8, #tsl.tsl<[?, 8] -> (?, 8), [?, 8] -> (256, 1)>, "L1">
 //CHECK-NEXT:       }
 //CHECK-NEXT:     }
@@ -324,8 +324,8 @@ builtin.module {
 //                %2 = arith.constant 0 : i32
 //CHECK-NEXT:     %2 = arith.constant 0 : index
 //CHECK-NEXT:     scf.for %arg2 = %2 to %0 step %1 {
-//CHECK-NEXT:       %3 = "memref.dim"(%arg0, %2) : (memref<?x?xi8, "L3">, index) -> index
-//CHECK-NEXT:       %4 = "memref.dim"(%arg0, %1) : (memref<?x?xi8, "L3">, index) -> index
+//CHECK-NEXT:       %3 = memref.dim %arg0, %2 : memref<?x?xi8, "L3">
+//CHECK-NEXT:       %4 = memref.dim %arg0, %1 : memref<?x?xi8, "L3">
 //CHECK-NEXT:       %5 = memref.alloc(%3, %4) {alignment = 64 : i64} : memref<?x?xi8, #tsl.tsl<[?, 8] -> (?, 8), [?, 8] -> (256, 1)>, "L1">
 //CHECK-NEXT:       %6 = arith.addi %3, %4 : index
 //CHECK-NEXT:       "test.op"(%6) : (index) -> ()

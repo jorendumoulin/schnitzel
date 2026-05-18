@@ -133,13 +133,13 @@ func.func public @simple_mult(%arg0: memref<?xi32, "L3">, %arg1: memref<?xi32, "
 // CHECK:      builtin.module {
 // CHECK-NEXT:   func.func public @simple_mult(%arg0: memref<?xi32, "L3">, %arg1: memref<?xi32, "L3">, %arg2: memref<?xi32, "L3">) {
 // CHECK-NEXT:     %0 = arith.constant 0 : index
-// CHECK-NEXT:     %1 = "memref.dim"(%arg0, %0) : (memref<?xi32, "L3">, index) -> index
+// CHECK-NEXT:     %1 = memref.dim %arg0, %0 : memref<?xi32, "L3">
 // CHECK-NEXT:     %2 = memref.alloc(%1) {alignment = 64 : i64} : memref<?xi32, "L1">
 // CHECK-NEXT:     %3 = arith.constant 0 : index
-// CHECK-NEXT:     %4 = "memref.dim"(%arg1, %3) : (memref<?xi32, "L3">, index) -> index
+// CHECK-NEXT:     %4 = memref.dim %arg1, %3 : memref<?xi32, "L3">
 // CHECK-NEXT:     %5 = memref.alloc(%4) {alignment = 64 : i64} : memref<?xi32, "L1">
 // CHECK-NEXT:     %6 = arith.constant 0 : index
-// CHECK-NEXT:     %7 = "memref.dim"(%arg2, %6) : (memref<?xi32, "L3">, index) -> index
+// CHECK-NEXT:     %7 = memref.dim %arg2, %6 : memref<?xi32, "L3">
 // CHECK-NEXT:     %8 = memref.alloc(%7) {alignment = 64 : i64} : memref<?xi32, "L1">
 // CHECK-NEXT:     "memref.copy"(%arg1, %5) : (memref<?xi32, "L3">, memref<?xi32, "L1">) -> ()
 // CHECK-NEXT:     "memref.copy"(%arg0, %2) : (memref<?xi32, "L3">, memref<?xi32, "L1">) -> ()
@@ -190,11 +190,11 @@ func.func @mnist(%arg0: memref<?x128xi8, "L3">, %arg1: memref<128x128xi8, "L3">,
 // CHECK-NEXT:     %3 = "memref.memory_space_cast"(%arg1) : (memref<128x128xi8, "L3">) -> memref<128x128xi8, "L1">
 // CHECK-NEXT:     %4 = "memref.memory_space_cast"(%arg2) : (memref<?x128xi32, "L3">) -> memref<?x128xi32, "L1">
 // CHECK-NEXT:     %5 = arith.constant 0 : index
-// CHECK-NEXT:     %6 = "memref.dim"(%arg0, %5) : (memref<?x128xi8, "L3">, index) -> index
+// CHECK-NEXT:     %6 = memref.dim %arg0, %5 : memref<?x128xi8, "L3">
 // CHECK-NEXT:     %7 = memref.alloc(%6) {alignment = 64 : i64} : memref<?x128xi8, #tsl.tsl<[?, 8] -> (?, 8), [?, 8] -> (256, 1)>, "L1">
 // CHECK-NEXT:     %8 = memref.alloc() {alignment = 64 : i64} : memref<128x128xi8, #tsl.tsl<[?, 8] -> (256, 1), [?, 8] -> (?, 8), offset: 64>, "L1">
 // CHECK-NEXT:     %9 = arith.constant 0 : index
-// CHECK-NEXT:     %10 = "memref.dim"(%arg2, %9) : (memref<?x128xi32, "L3">, index) -> index
+// CHECK-NEXT:     %10 = memref.dim %arg2, %9 : memref<?x128xi32, "L3">
 // CHECK-NEXT:     %11 = memref.alloc(%10) {alignment = 64 : i64} : memref<?x128xi32, #tsl.tsl<[?, 8] -> (256, 4), [?, 8] -> (?, 32)>, "L1">
 // CHECK-NEXT:     "memref.copy"(%arg1, %8) : (memref<128x128xi8, "L3">, memref<128x128xi8, #tsl.tsl<[?, 8] -> (256, 1), [?, 8] -> (?, 8), offset: 64>, "L1">) -> ()
 // CHECK-NEXT:     "memref.copy"(%arg0, %7) : (memref<?x128xi8, "L3">, memref<?x128xi8, #tsl.tsl<[?, 8] -> (?, 8), [?, 8] -> (256, 1)>, "L1">) -> ()
