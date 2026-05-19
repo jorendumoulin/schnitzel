@@ -49,6 +49,22 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
         for operand in range(len(op.operands)):
             pattern = AffineTransform.from_affine_map(op.patterns.data[operand].data)
 
+            # Scalar (0-rank) broadcast operand: indexing map has no result
+            # dims, so no access dimensions. Emit a degenerate stride pattern
+            # (zero strides on every spatial lane, no temporal dims) — the
+            # streamer reads the single value once and broadcasts it across
+            # the spatial unroll.
+            if pattern.A.shape[0] == 0:
+                spatial_strides = [0] * len(streamers[operand].spatial_dims)
+                snax_stride_patterns.append(
+                    snax_stream.StridePattern(
+                        upper_bounds=[],
+                        temporal_strides=[],
+                        spatial_strides=spatial_strides,
+                    )
+                )
+                continue
+
             # filter out irrelevant spatial access patterns:
             relevant: list[bool] = [True] * (pattern.num_dims - template.num_dims)
             # relevant spatial strides have a component in the template matrix
