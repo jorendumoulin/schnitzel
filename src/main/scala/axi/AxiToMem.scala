@@ -124,3 +124,18 @@ class AxiToMem(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig) extends Mod
   when(metaReg.write && metaReg.last) { io.mem.rsp.ready := io.axi.b.ready }
 
 }
+
+object AxiToMem {
+
+  /** Instantiate an [[AxiToMem]] adapter and wire its `axi` side to `axi` and
+    * its `mem` side to `mem`. Widths are derived from `axi.cfg`.
+    */
+  def apply(axi: AXIBundle, mem: DecoupledBusIO): AxiToMem = {
+    val m = Module(
+      new AxiToMem(addrWidth = axi.cfg.addrWidth, dataWidth = axi.cfg.dataWidth, axiConfig = axi.cfg)
+    )
+    m.io.axi <> axi
+    m.io.mem <> mem
+    m
+  }
+}
