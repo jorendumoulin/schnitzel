@@ -107,4 +107,4 @@ jobs:
           ldd ./build/sim/sim || true
           ./build/sim/sim --help || echo "sim exited with $?"
       - name: Run App Tests
-        run: lit tests/apps -v
+        run: lit tests/apps -v --timeout=120
