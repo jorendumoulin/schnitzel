@@ -85,7 +85,8 @@ case class PhsAccelPhsEntry(
     switchBitwidths: Seq[Int],
     maskBitwidths: Seq[Int],
     moduleName: String,
-    svPath: String
+    svPath: String,
+    csrBase: Int
 ) extends PhsAccelEntry
 object PhsAccelPhsEntry { implicit val rw: RW[PhsAccelPhsEntry] = macroRW }
 

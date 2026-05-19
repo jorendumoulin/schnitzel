@@ -28,8 +28,10 @@ def build_schnitzel_config(
     Build a PhsAcceleratorConfig JSON string from registered accelerators.
 
     Returns a ``Seq[Seq[PhsAcceleratorConfig]]`` JSON string matching the
-    schema expected by schnitzel's ``PhsDriver``.  All PHS accelerators are
-    placed on core 1 (core 0 has DMA only).
+    schema expected by schnitzel's ``PhsDriver``. All PHS accelerators are
+    placed on core 1 (core 0 hosts DMA); multiple accelerators are allowed
+    on core 1 and each will be assigned its own CSR window by the HW
+    generator.
 
     Parameters
     ----------

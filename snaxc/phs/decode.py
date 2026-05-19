@@ -144,20 +144,30 @@ def decode_abstract_graph(abstract_graph: phs.PEOp, graph: phs.PEOp) -> Sequence
 
         # Local mapping of choose_ops
         if isinstance(switchee, phs.ChooseOp):
-            # Do not emit values for one choice switches, as they will get optimized away in hardware
-            if len(list(switchee.operations())) == 1:
-                continue
-            # Otherwise, look for the equivalent choice in the graph
+            options = list(switchee.operations())
+            single_option = len(options) == 1
+            # Look up the candidate's equivalent ChooseOp by id (operand/result-type signature).
             equivalent_choice = graph.get_choose_op(switchee.name_prop.data)
             if equivalent_choice is None:
-                # The current choose_op is not needed in the graph -> Map to default = zero
-                call_switches.append(0)
+                # Candidate does not need this ChooseOp at all. Single-option
+                # ChooseOps emit no switch value (constant-folded in HW);
+                # multi-option ones fall back to index 0 as a "don't care".
+                if not single_option:
+                    call_switches.append(0)
                 continue
             target_operation = list(equivalent_choice.operations())[0]
             assert isinstance(target_operation, Operation)
-            for i, operation in enumerate(switchee.operations()):
+            for i, operation in enumerate(options):
                 if type(target_operation) is type(operation):
-                    call_switches.append(i)
+                    # Only emit a switch value when the abstract ChooseOp has
+                    # more than one option — single-option ChooseOps are
+                    # constant-folded in HW so no runtime value is needed,
+                    # but the op-kind check above is still required to reject
+                    # candidates that would dispatch to an incompatible PE
+                    # (e.g. an addi candidate matched against a xori-only PE
+                    # whose ChooseOp id collided via operand-type signature).
+                    if not single_option:
+                        call_switches.append(i)
                     break
             # If no match happened, raise an error.
             else:

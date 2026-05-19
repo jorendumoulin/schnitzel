@@ -59,7 +59,7 @@ rule phsc:
         phsc {input.mlir} {input.schedule} \
             --software-file {input.software} \
             -o {output.sw} \
-            --output-hardware {GENERATED}/acc1_array.sv \
+            --output-hardware {GENERATED}/phs_blackboxes.sv \
             --output-schnitzel-dir {GENERATED}
         """
 

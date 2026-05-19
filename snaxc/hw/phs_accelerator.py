@@ -134,12 +134,13 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
         """Generate the accfg.accelerator op with CSR address mappings."""
         param_vals = self.phs.param_values()
         launch_field = "start"
-        barrier_addr = 0x900 + len(param_vals) + 1
+        base = self.phs.csr_base
+        barrier_addr = base + len(param_vals) + 1
 
         return accfg.AcceleratorOp(
             self.name,
             param_vals,
-            {launch_field: 0x900 + len(param_vals)},
+            {launch_field: base + len(param_vals)},
             barrier_addr,
         )
 
