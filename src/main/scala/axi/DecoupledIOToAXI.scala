@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util.{Cat, log2Ceil, Queue}
 import core.DecoupledBusIO
 
-class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends Module {
+class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig) extends Module {
 
   val io = IO(new Bundle {
     val bus = Flipped(new DecoupledBusIO(addrWidth, dataWidth));
@@ -14,7 +14,7 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   val addrAlignment: Int = log2Ceil(axiConfig.dataWidth / 8);
 
   // AW Channel
-  io.axi.aw.bits.id := id.U;
+  io.axi.aw.bits.id := 0.U;
   io.axi.aw.bits.addr := Cat(io.bus.req.bits.addr(addrWidth - 1, addrAlignment), 0.U(addrAlignment.W));
   io.axi.aw.bits.len := 0.U; // nb bytes
   io.axi.aw.bits.size := log2Ceil(dataWidth / 8).U; // nb bytes per beat
@@ -61,7 +61,7 @@ class DecoupledIOToAXI(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id:
   io.axi.b.ready := true.B;
 
   // AR Channel
-  io.axi.ar.bits.id := id.U;
+  io.axi.ar.bits.id := 0.U;
   io.axi.ar.bits.addr := Cat(io.bus.req.bits.addr(addrWidth - 1, addrAlignment), 0.U(addrAlignment.W));
   io.axi.ar.bits.len := 0.U; // = (burst size - 1)
   io.axi.ar.bits.size := log2Ceil(dataWidth / 8).U; // nb beats

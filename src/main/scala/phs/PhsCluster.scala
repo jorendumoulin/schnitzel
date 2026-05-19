@@ -68,17 +68,17 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
 
   // ---- AXI interfaces for cores ----
   val mem_to_axi_0 = Module(
-    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = wideAxiDataWidth), 1)
+    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = wideAxiDataWidth))
   )
   memMux_0.io.outs(0) <> mem_to_axi_0.io.bus
   val mem_to_axi_1 = Module(
-    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = wideAxiDataWidth), 2)
+    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = wideAxiDataWidth))
   )
   memMux_1.io.outs(0) <> mem_to_axi_1.io.bus
 
   // ---- DMA on core 0 (catch-all at 0x900) ----
   val dma = Module(
-    new Dma(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, AXIConfig(dataWidth = wideAxiDataWidth), 3)
+    new Dma(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, AXIConfig(dataWidth = wideAxiDataWidth))
   )
 
   // ---- CSR Demux core 0: barrier(0x800) + local barrier(0x810) + DMA catch-all ----

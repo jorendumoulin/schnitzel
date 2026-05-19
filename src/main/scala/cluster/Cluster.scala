@@ -38,7 +38,7 @@ class Cluster extends Module {
 
   // Convert data interface to AXI
   val mem_to_axi_0 = Module(
-    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = wideAxiDataWidth), 1)
+    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = wideAxiDataWidth))
   )
   memMux_0.io.outs(0) <> mem_to_axi_0.io.bus
 
@@ -47,7 +47,7 @@ class Cluster extends Module {
 
   // Attach dma to first core:
   val dma = Module(
-    new Dma(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, AXIConfig(dataWidth = wideAxiDataWidth), 3)
+    new Dma(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, AXIConfig(dataWidth = wideAxiDataWidth))
   )
   dma.io.csr <> csrDemux_0.io.outs(2)
 
@@ -60,7 +60,7 @@ class Cluster extends Module {
 
   // Convert data interface to AXI
   val mem_to_axi_1 = Module(
-    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = wideAxiDataWidth), 2)
+    new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, AXIConfig(dataWidth = wideAxiDataWidth))
   )
   memMux_1.io.outs(0) <> mem_to_axi_1.io.bus
 
