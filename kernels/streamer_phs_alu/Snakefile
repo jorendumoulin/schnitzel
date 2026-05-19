@@ -189,11 +189,12 @@ rule simulate:
         log=f"{BUILD}/test.log",
     shell:
         """
-        python -m snaxc.golden.verify \
+        snax-runner \
             --elf {input.elf} \
             --spec {input.spec} \
             --inputs {input.inputs} \
             --build-dir {BUILD}/golden \
-            --sim-lib {input.sim_lib} 2>&1 | tee {output.log}
+            --sim-lib {input.sim_lib} \
+            --vlt-args "+ibex_tracer_enable=0" 2>&1 | tee {output.log}
         grep -q "TEST PASSED" {output.log}
         """
