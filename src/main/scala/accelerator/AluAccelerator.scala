@@ -50,7 +50,7 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   val queueDepth = 3
 
   // A streamer: always reads from TCDM
-  val aStreamer = Module(new Streamer(new AffineAguConfig(1, Seq(parallelUnroll), addrWidth), queueDepth, dataWidth));
+  val aStreamer = Module(new Streamer(csrVals.aStreamerConfig, queueDepth, dataWidth));
   aStreamer.io.tcdmReqs <> io.aData
   aStreamer.io.config := csrVals.aStreamerConfig
   aStreamer.io.spatialDimMask := VecInit(Seq(csrVals.spatialDimMask(0)))
@@ -62,7 +62,7 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   aluArray.io.A_in.bits := aStreamer.io.readData.bits.asTypeOf(Vec(parallelUnroll, UInt(dataWidth.W)))
 
   // B streamer: reads from TCDM, only active in normal mode
-  val bStreamer = Module(new Streamer(new AffineAguConfig(1, Seq(parallelUnroll), addrWidth), queueDepth, dataWidth));
+  val bStreamer = Module(new Streamer(csrVals.bStreamerConfig, queueDepth, dataWidth));
   bStreamer.io.tcdmReqs <> io.bData
   bStreamer.io.config := csrVals.bStreamerConfig
   bStreamer.io.start := csrItf.io.start && !readWriteMode
@@ -75,7 +75,7 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   bStreamer.io.dir := StreamerDir.read
 
   // C streamer: 2 temporal dims, supports write (normal) and readWrite (reduction)
-  val cStreamer = Module(new Streamer(new AffineAguConfig(2, Seq(parallelUnroll), addrWidth), queueDepth, dataWidth));
+  val cStreamer = Module(new Streamer(csrVals.cStreamerConfig, queueDepth, dataWidth));
   cStreamer.io.tcdmReqs <> io.cData
   cStreamer.io.config := csrVals.cStreamerConfig
   cStreamer.io.spatialDimMask := VecInit(Seq(csrVals.spatialDimMask(0)))
@@ -112,4 +112,9 @@ class AluAccelerator(addrWidth: Int, dataWidth: Int) extends Module {
   // In AluAccelerator.scala
   def getConfig = AcceleratorConfig("alu", Map.empty)
   // def getConfig: AcceleratorWrapper = AluWrapper: AcceleratorWrapper
+}
+
+object AluAccelerator {
+  def apply(addrWidth: Int, dataWidth: Int): AluAccelerator =
+    Module(new AluAccelerator(addrWidth, dataWidth))
 }
