@@ -17,6 +17,7 @@ dependencies = [
 snax-opt = "snaxc.tools.snax_opt_main:main"
 snaxc = "snaxc.tools.snaxc_main:main"
 phsc = "snaxc.tools.phsc_main:main"
+snax-runner = "snaxc.tools.snax_runner_main:main"
 
 [tool.ruff]
 target-version = "py310"

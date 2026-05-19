@@ -170,6 +170,7 @@ rule build_sim:
         top=f"{GENERATED}/Top.sv",
     output:
         sim=f"{SIM_BUILD}/sim",
+        sim_lib=f"{SIM_BUILD}/my_module.cpython-312-x86_64-linux-gnu.so",
     threads: workflow.cores
     shell:
         "cmake --build {SIM_BUILD} -j{threads}"
@@ -181,11 +182,20 @@ rule build_sim:
 rule simulate:
     input:
         sim=f"{SIM_BUILD}/sim",
+        sim_lib=f"{SIM_BUILD}/my_module.cpython-312-x86_64-linux-gnu.so",
         elf=f"{BUILD}/test.elf",
+        spec="test_software.mlir",
+        inputs="inputs.json",
     output:
         log=f"{BUILD}/test.log",
     shell:
         """
-        {input.sim} {input.elf} --vltargs="+ibex_tracer_enable=0" 2>&1 | tee {output.log}
+        snax-runner \
+            --elf {input.elf} \
+            --spec {input.spec} \
+            --inputs {input.inputs} \
+            --build-dir {BUILD}/golden \
+            --sim-lib {input.sim_lib} \
+            --vlt-args "+ibex_tracer_enable=0" 2>&1 | tee {output.log}
         grep -q "TEST PASSED" {output.log}
         """

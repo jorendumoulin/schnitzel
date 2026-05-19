@@ -9,8 +9,9 @@
 
 class PySim {
 public:
-  PySim(const std::vector<std::string> &program_args) {
-    sim = std::make_unique<Sim>(program_args, "");
+  PySim(const std::vector<std::string> &program_args,
+        const std::string &vlt_args) {
+    sim = std::make_unique<Sim>(program_args, vlt_args);
   }
 
   int run() { return sim->run(); }
@@ -36,7 +37,8 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(my_module, m) {
   py::class_<PySim>(m, "Sim")
-      .def(py::init<const std::vector<std::string> &>(), py::arg("program"))
+      .def(py::init<const std::vector<std::string> &, const std::string &>(),
+           py::arg("program"), py::arg("vlt_args") = "")
       .def("run", &PySim::run)
       .def("get_symbols", &PySim::get_symbols)
       .def("write_data", &PySim::write_data, py::arg("addr"), py::arg("data"))
