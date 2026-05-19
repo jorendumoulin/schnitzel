@@ -50,12 +50,25 @@ class AutoflowScheduler(RewritePattern):
             return
         template = accelerator.get_template(op)
 
+        # Make sure tensor operands are memrefs (scalar operands are passed
+        # through as 0-rank broadcast streams and don't require bufferization).
+        for operand in op.operands:
+            if isinstance(operand.type, builtin.TensorType):
+                return
+
         # First, run the stream scheduling algorithm
         schedule_bounds = tuple(op.get_static_pattern_bounds())
         schedule = Schedule(SchedulePattern(schedule_bounds, pattern.data) for pattern in op.patterns.data)
 
         schedule = schedule.canonicalize()
-        element_sizes = [cast(MemRefType[FixedBitwidthType], oper.type).element_type.size for oper in op.operands]
+        element_sizes = [
+            (
+                cast(MemRefType[FixedBitwidthType], oper.type).element_type.size
+                if isinstance(oper.type, builtin.MemRefType)
+                else cast(FixedBitwidthType, oper.type).size
+            )
+            for oper in op.operands
+        ]
         schedule = scheduler(
             template,
             schedule,

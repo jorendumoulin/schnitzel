@@ -158,6 +158,10 @@ def is_memory_flexible_enough(template: Template, schedule: Schedule, element_si
     if not schedule.num_dims > template.num_dims:
         return True
     for s, size in zip(schedule, element_sizes):
+        # 0-rank broadcast operands have no access dims — flexibility check
+        # is vacuous for them (the streamer hands out a single value).
+        if s.pattern.A.shape[0] == 0:
+            continue
         # is there temporary fine-grained access for this dimension?
         temporal = (s.pattern.A[:, 0 : -template.num_dims] % ceil(TCDM_BANK_WIDTH / size)).any(axis=1)
         temporal = cast(NDArray[np.bool], temporal)
