@@ -133,3 +133,16 @@ class InstructionCache(numInp: Int = 1) extends Module {
   io.axi.b := DontCare
 
 }
+
+object InstructionCache {
+
+  /** Instantiate an InstructionCache and wire its imem ports from `imems`.
+    * Port count is derived from the input sequence. The returned module
+    * exposes `io.axi` for the caller to connect to backing memory.
+    */
+  def apply(imems: Seq[DecoupledBusIO]): InstructionCache = {
+    val icache = Module(new InstructionCache(imems.size))
+    icache.io.imems <> VecInit(imems)
+    icache
+  }
+}

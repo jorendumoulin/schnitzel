@@ -89,8 +89,7 @@ class TensorCluster extends Module {
   barrier.io.ins <> Seq(csrDemux_0.io.outs(1), csrDemux_1.io.outs(1))
 
   // Instruction Cache
-  val icache = Module(new InstructionCache(2))
-  icache.io.imems <> VecInit(Seq(core_0.io.imem, core_1.io.imem));
+  val icache = InstructionCache(Seq(core_0.io.imem, core_1.io.imem))
 
   // Accelerator ports:
   val accPorts = tensorCore.io.aData ++ tensorCore.io.bData ++ tensorCore.io.cData
