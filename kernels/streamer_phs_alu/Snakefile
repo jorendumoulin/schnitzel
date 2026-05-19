@@ -170,6 +170,7 @@ rule build_sim:
         top=f"{GENERATED}/Top.sv",
     output:
         sim=f"{SIM_BUILD}/sim",
+        sim_lib=f"{SIM_BUILD}/my_module.cpython-312-x86_64-linux-gnu.so",
     threads: workflow.cores
     shell:
         "cmake --build {SIM_BUILD} -j{threads}"
