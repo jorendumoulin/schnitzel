@@ -32,4 +32,4 @@ jobs:
       - name: Test with pytest
         shell: bash
         run: |
-          pixi run python -m pytest .
+          pixi run python -m pytest tests/pytest
