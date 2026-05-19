@@ -4,8 +4,8 @@ flatten-ibex:
 flatten-cva6:
     make -C ./src/main/resources/cva6
 
-generate-verilog: flatten-ibex flatten-cva6
-    ./mill schnitzel.runMain sim.EmitVerilog
+generate-verilog top='default': flatten-ibex flatten-cva6
+    ./mill schnitzel.runMain sim.EmitVerilog --top={{top}}
 
 configure-quick:
     cmake -B build/sim -S sim -G Ninja -DSIM_OPT_FAST="-O0"
