@@ -38,8 +38,6 @@ object CoreSubsystem {
     * @param accelerator    CSR slave port of an accelerator; receives every
     *                       CSR access that doesn't fall in the global- or
     *                       local-sync ranges.
-    * @param axiId          AXI master ID used by this core's mem-to-axi
-    *                       adapter.
     * @param tcdmDataWidth  Data width of the cluster TCDM.
     * @param wideAxiCfg     AXI config for the external (slave-facing) side.
     * @param splitThreshold Address at/above which dmem requests are routed
@@ -48,7 +46,6 @@ object CoreSubsystem {
   def apply(
       hartId: Int,
       accelerator: CsrIO,
-      axiId: Int,
       tcdmDataWidth: Int,
       wideAxiCfg: AXIConfig,
       splitThreshold: Int = 0x10000000
@@ -63,7 +60,7 @@ object CoreSubsystem {
     memWidthConverter.io.in <> memMux.io.outs(1)
 
     val memToAxi = Module(
-      new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, wideAxiCfg, axiId)
+      new DecoupledIOToAXI(CoreConfig.addrWidth, CoreConfig.dataWidth, wideAxiCfg)
     )
     memMux.io.outs(0) <> memToAxi.io.bus
 
