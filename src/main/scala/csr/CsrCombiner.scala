@@ -25,3 +25,16 @@ class CsrCombiner(numInp: Int) extends Module {
   io.ins.foreach(_.req.ready := io.out.req.ready)
   io.ins.foreach(_.rsp.rdata := io.out.rsp.rdata)
 }
+
+object CsrCombiner {
+
+  /** Instantiate a CsrCombiner and wire its inputs from `inputs` and its
+    * output to `output`. The combiner width is derived from `inputs`.
+    */
+  def apply(inputs: Seq[CsrIO], output: CsrIO): CsrCombiner = {
+    val combiner = Module(new CsrCombiner(inputs.size))
+    combiner.io.ins <> VecInit(inputs)
+    combiner.io.out <> output
+    combiner
+  }
+}

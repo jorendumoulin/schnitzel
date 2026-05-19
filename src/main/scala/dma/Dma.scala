@@ -106,3 +106,8 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
   )
 
 }
+
+object Dma {
+  def apply(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int): Dma =
+    Module(new Dma(addrWidth, dataWidth, axiConfig, id))
+}

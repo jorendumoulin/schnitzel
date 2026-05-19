@@ -19,3 +19,15 @@ class HWBarrier(numInp: Int) extends Module {
   io.ins.foreach(_.rsp.rdata := DontCare)
 
 }
+
+object HWBarrier {
+
+  /** Instantiate an HWBarrier and wire its inputs from `inputs`. The barrier
+    * width is derived from the input sequence.
+    */
+  def apply(inputs: Seq[CsrIO]): HWBarrier = {
+    val barrier = Module(new HWBarrier(inputs.size))
+    barrier.io.ins <> VecInit(inputs)
+    barrier
+  }
+}

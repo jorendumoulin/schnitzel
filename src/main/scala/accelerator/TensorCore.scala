@@ -100,3 +100,8 @@ class TensorCore(addrWidth: Int, dataWidth: Int, M: Int = 4, N: Int = 4, K: Int 
     )
   )
 }
+
+object TensorCore {
+  def apply(addrWidth: Int, dataWidth: Int, M: Int = 4, N: Int = 4, K: Int = 4): TensorCore =
+    Module(new TensorCore(addrWidth, dataWidth, M, N, K))
+}
