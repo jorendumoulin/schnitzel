@@ -6,14 +6,11 @@ import icache.InstructionCache
 import core.CoreConfig
 import axi.{AXIBundle, AXIConfig, AXIMux}
 import interconnect.Interconnect
-import chisel3.util.SRAM
-import csr.HWBarrier
+import csr.{CsrCombiner, CsrIO, HWBarrier}
 import dma.Dma
-import csr.CsrCombiner
 import accelerator.TensorCore
-import csr.CsrIO
-import config.ClusterConfig
-import config.MemoryConfig
+import memory.BankedMemory
+import config.{ClusterConfig, MemoryConfig}
 
 class TensorCluster extends Module {
 
@@ -28,10 +25,8 @@ class TensorCluster extends Module {
   val wideAxiCfg = AXIConfig(dataWidth = wideAxiDataWidth)
 
   // Accelerators -- created up front so each core's CSR demux can attach to them.
-  val dma = Module(new Dma(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, wideAxiCfg, 3))
-  val tensorCore = Module(
-    new TensorCore(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, M = 8, N = 8, K = 8)
-  )
+  val dma = Dma(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, axiConfig = wideAxiCfg, id = 3)
+  val tensorCore = TensorCore(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, M = 8, N = 8, K = 8)
 
   // Per-core subsystems (Core + mem split + width converter + AXI adapter + CSR demux).
   val core_0 = CoreSubsystem(
@@ -50,25 +45,17 @@ class TensorCluster extends Module {
   )
 
   // Global synchronization CSR (0x800) - coupled and sent externally
-  val csrCombiner = Module(new CsrCombiner(2))
-  csrCombiner.io.ins(0) <> core_0.globalCsr
-  csrCombiner.io.ins(1) <> core_1.globalCsr
-  csrCombiner.io.out <> io.csr
+  CsrCombiner(inputs = Seq(core_0.globalCsr, core_1.globalCsr), output = io.csr)
 
   // Cluster hw barrier (local synchronization 0x810)
-  val barrier = Module(new HWBarrier(2))
-  barrier.io.ins <> Seq(core_0.localCsr, core_1.localCsr)
+  HWBarrier(inputs = Seq(core_0.localCsr, core_1.localCsr))
 
   // Instruction Cache
   val icache = InstructionCache(Seq(core_0.imem, core_1.imem))
 
-  // Accelerator ports:
-  val accPorts = tensorCore.io.aData ++ tensorCore.io.bData ++ tensorCore.io.cData
-
   // TCDM
-  val numBanks = 64
-  val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM.masked(1024, Vec(tcdmDataWidth / 8, UInt(8.W)), 0, 0, 1)));
-  val tcdm_ports = VecInit(tcdm_sram.map(sram => sram.readwritePorts(0)));
+  val accPorts = tensorCore.io.aData ++ tensorCore.io.bData ++ tensorCore.io.cData
+  val tcdm_ports = BankedMemory(numBanks = 64, depth = 1024, dataWidth = tcdmDataWidth)
 
   Interconnect(
     inputs = Seq(core_0.tcdm, core_1.tcdm) ++ dma.io.data ++ accPorts,
