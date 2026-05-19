@@ -4,9 +4,7 @@ from math import ceil, prod
 import numpy as np
 from xdsl.context import Context
 from xdsl.dialects import builtin
-from xdsl.dialects.tensor import Tensor
-from xdsl.ir import Attribute, SSAValue
-from xdsl.ir.affine import AffineDimExpr, AffineMap
+from xdsl.ir import Attribute
 from xdsl.parser import MemRefType
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
@@ -24,7 +22,6 @@ from snaxc.dialects.tsl import TiledStridedLayoutAttr
 from snaxc.hw.acc_context import AccContext
 from snaxc.hw.accelerators.tensorcore import TensorCore
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
-from snaxc.ir.dart.affine_transform import AffineTransform
 from snaxc.ir.tsl import Stride, TiledStride, TiledStridedLayout
 
 
