@@ -106,9 +106,10 @@ class TensorCluster extends Module {
   )
 
   // AXI Crossbar
-  val axiMux = Module(AXIMux(AXIConfig(dataWidth = wideAxiDataWidth, idWidth = 4), 4))
-  axiMux.io.ins <> VecInit(icache.io.axi, mem_to_axi_0.io.axi, mem_to_axi_1.io.axi, dma.io.axi)
-  axiMux.io.out <> io.axi
+  AXIMux(
+    inputs = Seq(icache.io.axi, mem_to_axi_0.io.axi, mem_to_axi_1.io.axi, dma.io.axi),
+    output = io.axi
+  )
 
   def getConfig: ClusterConfig = ClusterConfig(
     MemoryConfig("L1", 0x1000_0000L, 0x1_0000L),
