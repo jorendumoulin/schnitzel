@@ -20,7 +20,6 @@ from xdsl.pattern_rewriter import (
 from snaxc.dialects import dart
 from snaxc.hw import AccContext
 from snaxc.hw.accelerators.tensorcore import TensorCore
-from snaxc.hw.streamer_accelerator import StreamerAccelerator
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
 from snaxc.ir.dart.scheduler import (
     is_memory_flexible_enough,

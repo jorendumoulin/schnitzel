@@ -71,7 +71,6 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
             ).strides
 
             def create_stride_pattern(streamer: Streamer, strides: list[Stride]):
-
                 # TODO: duplicate from copy_to_dma
 
                 # innermost stride is the inherent access width
