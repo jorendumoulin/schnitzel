@@ -14,7 +14,9 @@ import csr.{CsrDemux, CsrCombiner, CsrIO}
 
 /** Self-contained PHS cluster with 2 RISC-V cores, shared TCDM, DMA, and PHS accelerators.
   *
-  * Core 0 always has DMA (on the CsrDemux catch-all at 0x900). Core 1 has PHS accelerators (catch-all at 0x900).
+  * Core 0 always has DMA (on the CsrDemux catch-all at 0x900). Core 1 hosts one or more PHS accelerators,
+  * each packed tightly into the CSR address space starting at 0x900. Each accel reserves exactly
+  * `numCsrRegs + 1` addresses (regs + start trigger); the next accel's base is the previous one's end.
   *
   * @param phsConfigs
   *   Per-core list of PHS accelerator configs. phsConfigs(0) = core 0 (expected empty), phsConfigs(1) = core 1.
@@ -23,7 +25,28 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
 
   require(phsConfigs.length == 2, "PhsCluster requires exactly 2 cores of configs")
   require(phsConfigs(0).isEmpty, "Core 0 PHS accelerators not yet supported (DMA occupies the catch-all)")
-  require(phsConfigs(1).length == 1, "Currently supports exactly 1 PHS accelerator on core 1")
+  require(phsConfigs(1).nonEmpty, "Core 1 must host at least one PHS accelerator")
+
+  // Per-accel CSR window sized to exactly what the accel needs. The CsrIO addr
+  // is 12 bits, so the usable space ends at 0x1000. The CsrDemux strips the
+  // window base, so each accel internally uses csrBase=0.
+  private val csrStart = 0x900
+  private val csrEnd = 0x1000
+  val core1Accels: Seq[(Int, PhsAcceleratorConfig)] = {
+    val acc = scala.collection.mutable.ArrayBuffer.empty[(Int, PhsAcceleratorConfig)]
+    var cursor = csrStart
+    for (cfg <- phsConfigs(1)) {
+      acc += ((cursor, cfg))
+      cursor += cfg.numCsrRegs + 1
+    }
+    require(
+      cursor <= csrEnd,
+      f"PHS accelerators exhaust CSR address space: need 0x$csrStart%x..0x$cursor%x, " +
+        f"limit 0x$csrEnd%x (12-bit CSR addr). " +
+        f"Reduce per-accel CSR usage or split across cores."
+    )
+    acc.toSeq
+  }
 
   val wideAxiDataWidth = 512
   val tcdmDataWidth = CoreConfig.dataWidth
@@ -63,15 +86,28 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
   csrDemux_0.io.in <> core_0.io.csr
   dma.io.csr <> csrDemux_0.io.outs(2)
 
-  // ---- PHS Accelerator on core 1 (catch-all at 0x900) ----
-  val phsAccel = Module(
-    new PhsAccelerator(CoreConfig.addrWidth, tcdmDataWidth, phsConfigs(1).head, csrBase = 0x900)
-  )
+  // ---- PHS Accelerators on core 1 ----
+  // Each accel uses csrBase=0 internally; the demux below strips the per-window base.
+  val phsAccels = core1Accels.map { case (_, cfg) =>
+    Module(new PhsAccelerator(CoreConfig.addrWidth, tcdmDataWidth, cfg, csrBase = 0))
+  }
 
-  // ---- CSR Demux core 1: barrier(0x800) + local barrier(0x810) + accel catch-all ----
-  val csrDemux_1 = Module(new CsrDemux(3, Seq((0x800L, 0x10L), (0x810L, 0x10L))))
+  // ---- CSR Demux core 1: barrier(0x800) + local barrier(0x810) + one route per PHS accel ----
+  // Last route is the unused catch-all required by CsrDemux's addrMap=numOuts-1 contract.
+  private val accelAddrMap: Seq[(Long, Long)] = core1Accels.map { case (base, cfg) =>
+    (base.toLong, (cfg.numCsrRegs + 1).toLong)
+  }
+  private val csr1AddrMap: Seq[(Long, Long)] = Seq((0x800L, 0x10L), (0x810L, 0x10L)) ++ accelAddrMap
+  val csrDemux_1 = Module(new CsrDemux(csr1AddrMap.length + 1, csr1AddrMap))
   csrDemux_1.io.in <> core_1.io.csr
-  phsAccel.io.csr <> csrDemux_1.io.outs(2)
+  // Routes 0,1 are barriers; routes 2..2+N-1 are PHS accels; last route is the unused catch-all.
+  for ((accel, i) <- phsAccels.zipWithIndex) {
+    accel.io.csr <> csrDemux_1.io.outs(2 + i)
+  }
+  // Tie off the unused catch-all so its IO is fully driven.
+  private val catchAll1 = csrDemux_1.io.outs(csrDemux_1.io.outs.length - 1)
+  catchAll1.req.ready := true.B
+  catchAll1.rsp.rdata := 0.U
 
   // ---- Global synchronization CSR (0x800) ----
   val csrCombiner = Module(new CsrCombiner(2))
@@ -88,7 +124,7 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
   icache.io.imems <> VecInit(Seq(core_0.io.imem, core_1.io.imem))
 
   // ---- TCDM ----
-  val accPorts = phsAccel.io.tcdmPorts.toSeq
+  val accPorts = phsAccels.flatMap(_.io.tcdmPorts.toSeq)
   val numInterconnectPorts = 2 + dma.io.data.length + accPorts.length
   val numBanks = 32
   val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM.masked(1024, Vec(4, UInt(8.W)), 0, 0, 1)))
@@ -121,9 +157,12 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
   def getConfig: PhsClusterConfig = PhsClusterConfig(
     PhsMemoryConfig("L1", 0x1000_0000L, 0x1_0000L),
     List(
-      PhsCoreConfig(1, phsConfigs(1).map(cfg =>
-        PhsAccelPhsEntry("phs", cfg.streamers, cfg.numSwitches, cfg.switchBitwidths, cfg.maskBitwidths, cfg.moduleName, cfg.svPath)
-      ).toList),
+      PhsCoreConfig(1, core1Accels.map { case (base, cfg) =>
+        PhsAccelPhsEntry(
+          "phs", cfg.streamers, cfg.numSwitches, cfg.switchBitwidths,
+          cfg.maskBitwidths, cfg.moduleName, cfg.svPath, base
+        )
+      }.toList),
       PhsCoreConfig(2, List(PhsAccelDmaEntry("dma")))
     )
   )
