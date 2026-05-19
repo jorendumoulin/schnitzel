@@ -20,7 +20,7 @@ DEFAULT_SYSTEM_CONFIG: dict[str, Any] = {
             "memory": {"name": "L1", "start": 0x1000_0000, "size": 0x1_0000},
             "cores": [
                 {"hart_id": 1, "accelerators": []},
-                {"hart_id": 2, "accelerators": [{"type": "dma"}]},
+                {"hart_id": 2, "accelerators": []},
             ],
         }
     ],
