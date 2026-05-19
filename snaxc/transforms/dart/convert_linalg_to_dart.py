@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 from xdsl.context import Context
-from xdsl.dialects.arith import ConstantOp
 from xdsl.dialects import linalg
 from xdsl.dialects.builtin import (
     ArrayAttr,
@@ -9,12 +8,7 @@ from xdsl.dialects.builtin import (
     ShapedType,
     StringAttr,
 )
-from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
 from xdsl.dialects.linalg.ops import YieldOp as LinalgYieldOp
-from xdsl.dialects.tensor import EmptyOp, ExtractSliceOp
-from xdsl.ir import Block, BlockArgument, OpResult, Region, SSAValue
-from xdsl.ir.affine import AffineMap
-from xdsl.parser import MemRefType
 from xdsl.ir import Block, Region, SSAValue
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (

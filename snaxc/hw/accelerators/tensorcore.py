@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Self, Sequence
+from typing import Any, Self
 
 import numpy as np
 from xdsl.ir import Operation

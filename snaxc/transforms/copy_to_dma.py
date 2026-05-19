@@ -218,7 +218,6 @@ class CopyToDmaPattern(RewritePattern):
         # resample to spatial bounds of the streamers and create stride patterns
 
         def create_stride_pattern(streamer: Streamer, strides: list[Stride]):
-
             # innermost stride is the inherent access width
             assert len(strides) > 1
             strides.pop()

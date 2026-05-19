@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Self, Sequence
+from typing import Self
 
 import numpy as np
 from numpy._typing import NDArray
