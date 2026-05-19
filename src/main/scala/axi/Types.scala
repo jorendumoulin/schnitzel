@@ -62,7 +62,7 @@ class RChan(cfg: AXIConfig) extends Bundle {
   val user = UInt(cfg.userWidth.W)
 }
 
-class AXIBundle(cfg: AXIConfig) extends Bundle {
+class AXIBundle(val cfg: AXIConfig) extends Bundle {
   // write:
   val aw = DecoupledIO(new AWChan(cfg))
   val w = DecoupledIO(new WChan(cfg))

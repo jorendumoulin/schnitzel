@@ -7,6 +7,17 @@ import chisel3.util.{Cat, RRArbiter, log2Up}
 object AXIMux {
   def apply(cfg: AXIConfig, numIns: Int): AXIMux =
     new AXIMux(cfg, cfg.copy(idWidth = cfg.idWidth + log2Up(numIns)), numIns)
+
+  /** Instantiate an AXIMux from a Seq of master bundles and one slave bundle,
+    * taking their AXIConfigs and wiring both sides. The slave bundle's idWidth
+    * must equal the masters' idWidth + log2Ceil(inputs.size).
+    */
+  def apply(inputs: Seq[AXIBundle], output: AXIBundle): AXIMux = {
+    val mux = Module(new AXIMux(inputs.head.cfg, output.cfg, inputs.size))
+    mux.io.ins <> VecInit(inputs)
+    mux.io.out <> output
+    mux
+  }
 }
 
 // AXI Multiplexer: connects numIns master ports to one slave port.
