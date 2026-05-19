@@ -181,11 +181,19 @@ rule build_sim:
 rule simulate:
     input:
         sim=f"{SIM_BUILD}/sim",
+        sim_lib=f"{SIM_BUILD}/my_module.cpython-312-x86_64-linux-gnu.so",
         elf=f"{BUILD}/test.elf",
+        spec="test_software.mlir",
+        inputs="inputs.json",
     output:
         log=f"{BUILD}/test.log",
     shell:
         """
-        {input.sim} {input.elf} --vltargs="+ibex_tracer_enable=0" 2>&1 | tee {output.log}
+        python -m snaxc.golden.verify \
+            --elf {input.elf} \
+            --spec {input.spec} \
+            --inputs {input.inputs} \
+            --build-dir {BUILD}/golden \
+            --sim-lib {input.sim_lib} 2>&1 | tee {output.log}
         grep -q "TEST PASSED" {output.log}
         """
