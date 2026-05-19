@@ -55,7 +55,8 @@ def valid_mapping(graph: phs.PEOp, abstract_graph: phs.PEOp, mapping: dict[phs.M
         if isinstance(operation, phs.ChooseOp):
             op = operation
             abst_op = abstract_graph.get_choose_op(op.name_prop.data)
-            assert abst_op is not None, "Could not find equivalent for {op}"
+            if abst_op is None:
+                raise MappingNotFoundError(f"Could not find equivalent ChooseOp for id {op.name_prop.data}")
         elif isinstance(operation, phs.YieldOp):
             op = operation
             abst_op = abstract_graph.get_terminator()
@@ -133,7 +134,8 @@ def decode_abstract_graph(abstract_graph: phs.PEOp, graph: phs.PEOp) -> Sequence
     len_msg = "Expect number of data_operands to be equal, got graph:{} abstract_graph:{}"
     graph_len = len(list(graph.data_operands()))
     abstract_graph_len = len(list(abstract_graph.data_operands()))
-    assert graph_len == abstract_graph_len, len_msg.format(graph_len, abstract_graph_len)
+    if graph_len != abstract_graph_len:
+        raise MappingNotFoundError(len_msg.format(graph_len, abstract_graph_len))
 
     call_switches: list[int | phs.MuxOp] = []  # for final values
     mux_switches: list[phs.MuxOp] = []  # keep track of muxes
