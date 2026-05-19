@@ -48,3 +48,16 @@ class GlobalBarrier(axiConfig: AXIConfig) extends Module {
   io.csr.req.ready := sync
   io.csr.rsp.rdata := DontCare
 }
+
+object GlobalBarrier {
+
+  /** Instantiate a [[GlobalBarrier]] and wire its csr port to `csr` and its
+    * axi port to `axi`. The AXI config is derived from `axi`.
+    */
+  def apply(csr: CsrIO, axi: AXIBundle): GlobalBarrier = {
+    val b = Module(new GlobalBarrier(axi.cfg))
+    b.io.csr <> csr
+    b.io.axi <> axi
+    b
+  }
+}
