@@ -15,7 +15,8 @@ import csr.{CsrDemux, CsrCombiner, CsrIO}
 /** Self-contained PHS cluster with 2 RISC-V cores, shared TCDM, DMA, and PHS accelerators.
   *
   * Core 0 always has DMA (on the CsrDemux catch-all at 0x900). Core 1 hosts one or more PHS accelerators,
-  * each with its own staggered CSR window starting at 0x900 and stepping by 0x100.
+  * each packed tightly into the CSR address space starting at 0x900. Each accel reserves exactly
+  * `numCsrRegs + 1` addresses (regs + start trigger); the next accel's base is the previous one's end.
   *
   * @param phsConfigs
   *   Per-core list of PHS accelerator configs. phsConfigs(0) = core 0 (expected empty), phsConfigs(1) = core 1.
@@ -26,16 +27,26 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
   require(phsConfigs(0).isEmpty, "Core 0 PHS accelerators not yet supported (DMA occupies the catch-all)")
   require(phsConfigs(1).nonEmpty, "Core 1 must host at least one PHS accelerator")
 
-  // Per-accel CSR window: start at 0x900, step by 0x100. Each accel internally
-  // uses csrBase=0 (the CsrDemux strips the base before forwarding the request).
-  private val csrWindow = 0x100
+  // Per-accel CSR window sized to exactly what the accel needs. The CsrIO addr
+  // is 12 bits, so the usable space ends at 0x1000. The CsrDemux strips the
+  // window base, so each accel internally uses csrBase=0.
   private val csrStart = 0x900
-  val core1Accels: Seq[(Int, PhsAcceleratorConfig)] =
-    phsConfigs(1).zipWithIndex.map { case (cfg, i) => (csrStart + i * csrWindow, cfg) }
-  require(
-    core1Accels.forall { case (_, cfg) => cfg.numCsrRegs + 1 <= csrWindow },
-    s"PHS accelerator CSR register count exceeds per-accel window of $csrWindow"
-  )
+  private val csrEnd = 0x1000
+  val core1Accels: Seq[(Int, PhsAcceleratorConfig)] = {
+    val acc = scala.collection.mutable.ArrayBuffer.empty[(Int, PhsAcceleratorConfig)]
+    var cursor = csrStart
+    for (cfg <- phsConfigs(1)) {
+      acc += ((cursor, cfg))
+      cursor += cfg.numCsrRegs + 1
+    }
+    require(
+      cursor <= csrEnd,
+      f"PHS accelerators exhaust CSR address space: need 0x$csrStart%x..0x$cursor%x, " +
+        f"limit 0x$csrEnd%x (12-bit CSR addr). " +
+        f"Reduce per-accel CSR usage or split across cores."
+    )
+    acc.toSeq
+  }
 
   val wideAxiDataWidth = 512
   val tcdmDataWidth = CoreConfig.dataWidth
