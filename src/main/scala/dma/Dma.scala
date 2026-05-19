@@ -18,7 +18,7 @@ import config.AcceleratorConfig
 object DmaDir extends ChiselEnum { val readAxi, writeAxi = Value; }
 
 // DMA instantiates streamer <-> AXI bus
-class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends Module {
+class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig) extends Module {
 
   // Calculate number of tcdm ports to match axi bandwidth
   val numPorts = axiConfig.dataWidth / dataWidth;
@@ -58,7 +58,7 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
   axiAgu.io.config := csrVals.axiStreamerConfig;
   axiAgu.io.start := csrItf.io.start;
 
-  val memToAxi = Module(new DecoupledIOToAXI(addrWidth, axiConfig.dataWidth, axiConfig, id));
+  val memToAxi = Module(new DecoupledIOToAXI(addrWidth, axiConfig.dataWidth, axiConfig));
   io.axi <> memToAxi.io.axi
   // streamer -> axi
   //
@@ -108,6 +108,6 @@ class Dma(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int) extends
 }
 
 object Dma {
-  def apply(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig, id: Int): Dma =
-    Module(new Dma(addrWidth, dataWidth, axiConfig, id))
+  def apply(addrWidth: Int, dataWidth: Int, axiConfig: AXIConfig): Dma =
+    Module(new Dma(addrWidth, dataWidth, axiConfig))
 }

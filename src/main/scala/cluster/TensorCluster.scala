@@ -25,21 +25,19 @@ class TensorCluster extends Module {
   val wideAxiCfg = AXIConfig(dataWidth = wideAxiDataWidth)
 
   // Accelerators -- created up front so each core's CSR demux can attach to them.
-  val dma = Dma(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, axiConfig = wideAxiCfg, id = 3)
+  val dma = Dma(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, axiConfig = wideAxiCfg)
   val tensorCore = TensorCore(addrWidth = CoreConfig.addrWidth, dataWidth = tcdmDataWidth, M = 8, N = 8, K = 8)
 
   // Per-core subsystems (Core + mem split + width converter + AXI adapter + CSR demux).
   val core_0 = CoreSubsystem(
     hartId = 2,
     accelerator = dma.io.csr,
-    axiId = 1,
     tcdmDataWidth = tcdmDataWidth,
     wideAxiCfg = wideAxiCfg
   )
   val core_1 = CoreSubsystem(
     hartId = 1,
     accelerator = tensorCore.io.csr,
-    axiId = 2,
     tcdmDataWidth = tcdmDataWidth,
     wideAxiCfg = wideAxiCfg
   )
