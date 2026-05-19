@@ -6,6 +6,7 @@ last memref-pointer argument (when bufferized with function-boundary buffer-out-
 or via a struct return. Here we only handle the out-param convention (current spec
 form: memref ins + memref out param, no return).
 """
+
 from __future__ import annotations
 
 import ctypes
@@ -31,6 +32,7 @@ def _memref_struct(rank: int) -> type[ctypes.Structure]:
             ("sizes", ctypes.c_int64 * max(rank, 1)),
             ("strides", ctypes.c_int64 * max(rank, 1)),
         ]
+
     MemRef.__name__ = f"MemRef{rank}D"
     return MemRef
 
@@ -52,8 +54,7 @@ def _make_descriptor(arr: np.ndarray) -> ctypes.Structure:
     return desc
 
 
-def run_golden(so_path: Path, fn_name: str, inputs: list[np.ndarray],
-               outputs: list[TensorSpec]) -> list[np.ndarray]:
+def run_golden(so_path: Path, fn_name: str, inputs: list[np.ndarray], outputs: list[TensorSpec]) -> list[np.ndarray]:
     """Invoke `_mlir_ciface_<fn_name>(in0, in1, ..., out0, out1, ...)`.
 
     All inputs and output buffers are passed as MemRef descriptor pointers.

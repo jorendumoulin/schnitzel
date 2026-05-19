@@ -3,6 +3,7 @@
 Pipeline: postproc (linalg -> llvm) -> mlir-translate -> clang.
 Output: a shared library exposing `_mlir_ciface_<fn_name>` for each public func.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -32,8 +33,13 @@ POSTPROC_FLAGS_HOST: tuple[str, ...] = (
 )
 
 
-def compile_spec_to_so(spec_mlir: Path, build_dir: Path, mlir_opt: str = "mlir-opt",
-                       mlir_translate: str = "mlir-translate", clang: str = "clang") -> Path:
+def compile_spec_to_so(
+    spec_mlir: Path,
+    build_dir: Path,
+    mlir_opt: str = "mlir-opt",
+    mlir_translate: str = "mlir-translate",
+    clang: str = "clang",
+) -> Path:
     spec_mlir = Path(spec_mlir).resolve()
     build_dir = Path(build_dir).resolve()
     build_dir.mkdir(parents=True, exist_ok=True)

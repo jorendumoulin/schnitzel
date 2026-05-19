@@ -7,6 +7,7 @@ injects inputs by ELF symbol name, reads outputs, compares.
 Integer outputs: bit-exact (pipeline fails on mismatch).
 Float outputs: bit-exact (logged, not gating) + tolerance (gating).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,15 +19,21 @@ from typing import Any
 
 import numpy as np
 
-from snaxc.golden.lower_to_host import compile_spec_to_so
-from snaxc.golden.golden_runner import TensorSpec, run_golden
 from sim.sim import Simulator
-
+from snaxc.golden.golden_runner import TensorSpec, run_golden
+from snaxc.golden.lower_to_host import compile_spec_to_so
 
 _NP_DTYPES = {
-    "int8": np.int8, "int16": np.int16, "int32": np.int32, "int64": np.int64,
-    "uint8": np.uint8, "uint16": np.uint16, "uint32": np.uint32, "uint64": np.uint64,
-    "float32": np.float32, "float64": np.float64,
+    "int8": np.int8,
+    "int16": np.int16,
+    "int32": np.int32,
+    "int64": np.int64,
+    "uint8": np.uint8,
+    "uint16": np.uint16,
+    "uint32": np.uint32,
+    "uint64": np.uint64,
+    "float32": np.float32,
+    "float64": np.float64,
 }
 
 
@@ -53,8 +60,7 @@ def _materialize_input(name: str, blob: dict[str, Any]) -> InputSpec:
     return InputSpec(name=name, array=arr)
 
 
-def _compare(actual: np.ndarray, expected: np.ndarray, name: str,
-             rtol: float, atol: float) -> bool:
+def _compare(actual: np.ndarray, expected: np.ndarray, name: str, rtol: float, atol: float) -> bool:
     if np.issubdtype(actual.dtype, np.integer):
         ok = np.array_equal(actual, expected)
         if not ok:
@@ -65,21 +71,25 @@ def _compare(actual: np.ndarray, expected: np.ndarray, name: str,
         return ok
 
     # Float path: dual check.
-    a_u = actual.view(np.dtype(f"uint{actual.dtype.itemsize*8}"))
-    e_u = expected.view(np.dtype(f"uint{expected.dtype.itemsize*8}"))
+    a_u = actual.view(np.dtype(f"uint{actual.dtype.itemsize * 8}"))
+    e_u = expected.view(np.dtype(f"uint{expected.dtype.itemsize * 8}"))
     bit_exact = np.array_equal(a_u, e_u)
     if bit_exact:
         print(f"  {name}: bit-exact OK")
     else:
         diff = np.abs(a_u.astype(np.int64) - e_u.astype(np.int64))
-        print(f"  WARN {name}: not bit-exact, max ulp delta={int(diff.max())} "
-              f"({int((diff != 0).sum())}/{actual.size} elements differ)")
+        print(
+            f"  WARN {name}: not bit-exact, max ulp delta={int(diff.max())} "
+            f"({int((diff != 0).sum())}/{actual.size} elements differ)"
+        )
     tol_ok = np.allclose(actual, expected, rtol=rtol, atol=atol, equal_nan=True)
     if not tol_ok:
         worst = np.argmax(np.abs(actual.ravel() - expected.ravel()))
-        print(f"FAIL {name}: tolerance violated (rtol={rtol}, atol={atol}), "
-              f"worst idx={worst} actual={actual.ravel()[worst]} expected={expected.ravel()[worst]}",
-              file=sys.stderr)
+        print(
+            f"FAIL {name}: tolerance violated (rtol={rtol}, atol={atol}), "
+            f"worst idx={worst} actual={actual.ravel()[worst]} expected={expected.ravel()[worst]}",
+            file=sys.stderr,
+        )
     return tol_ok
 
 
@@ -89,11 +99,10 @@ def main() -> int:
     p.add_argument("--spec", required=True, type=Path, help="test_software.mlir")
     p.add_argument("--inputs", required=True, type=Path, help="inputs.json")
     p.add_argument("--build-dir", required=True, type=Path)
-    p.add_argument("--sim-lib", required=True, type=Path,
-                   help="path to my_module.cpython-*.so for this kernel")
-    p.add_argument("--vlt-args", default="",
-                   help="space-separated Verilator runtime args / plusargs "
-                        "(e.g. '+verbose=1 +trace')")
+    p.add_argument("--sim-lib", required=True, type=Path, help="path to my_module.cpython-*.so for this kernel")
+    p.add_argument(
+        "--vlt-args", default="", help="space-separated Verilator runtime args / plusargs (e.g. '+verbose=1 +trace')"
+    )
     args = p.parse_args()
 
     cfg = json.loads(args.inputs.read_text())
@@ -117,8 +126,7 @@ def main() -> int:
     expected = run_golden(so, fn, [i.array for i in inputs], out_specs)
 
     print(f"[verify] launching sim on {args.elf}")
-    sim = Simulator(elf_paths=[str(args.elf)], lib_path=args.sim_lib,
-                    vlt_args=args.vlt_args)
+    sim = Simulator(elf_paths=[str(args.elf)], lib_path=args.sim_lib, vlt_args=args.vlt_args)
     syms = sim.get_symbols()
     for inp in inputs:
         if inp.name not in syms:
