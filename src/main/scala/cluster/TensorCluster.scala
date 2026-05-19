@@ -6,7 +6,7 @@ import icache.InstructionCache
 import core.{Core, DecoupledBusIO, CoreConfig}
 import axi.{AXIBundle, AXIConfig, AXIMux, DecoupledIOToAXI}
 import interconnect.Interconnect
-import chisel3.util.{SRAM, Cat, log2Ceil, log2Up}
+import chisel3.util.SRAM
 import memory.MemDemux
 import csr.HWBarrier
 import dma.Dma
@@ -100,21 +100,10 @@ class TensorCluster extends Module {
   val tcdm_sram = VecInit(Seq.fill(numBanks)(SRAM.masked(1024, Vec(tcdmDataWidth / 8, UInt(8.W)), 0, 0, 1)));
   val tcdm_ports = VecInit(tcdm_sram.map(sram => sram.readwritePorts(0)));
 
-  val interconnect = Module(new Interconnect(58, numBanks, CoreConfig.addrWidth, tcdmDataWidth));
-
-  interconnect.io.ins <> VecInit(Seq(memWidthConverter_0.io.out, memWidthConverter_1.io.out)) ++ dma.io.data ++ accPorts
-
-  interconnect.io.outs.zip(tcdm_ports).foreach { case (out, port) =>
-    port.enable := out.req.valid
-    port.address := out.req.bits.addr(CoreConfig.addrWidth - 1, log2Up(numBanks) + log2Up(tcdmDataWidth / 8))
-    port.isWrite := out.req.bits.wen
-    port.mask.foreach { _ := out.req.bits.ben.asBools }
-    port.writeData := out.req.bits.wdata.asTypeOf(Vec(tcdmDataWidth / 8, UInt(8.W)))
-    out.rsp.bits.data := port.readData.asUInt
-    out.req.ready := true.B
-    val prevReq = RegNext(out.req.fire)
-    out.rsp.valid := prevReq
-  }
+  Interconnect(
+    inputs = Seq(memWidthConverter_0.io.out, memWidthConverter_1.io.out) ++ dma.io.data ++ accPorts,
+    outputs = tcdm_ports
+  )
 
   // AXI Crossbar
   val axiMux = Module(AXIMux(AXIConfig(dataWidth = wideAxiDataWidth, idWidth = 4), 4))

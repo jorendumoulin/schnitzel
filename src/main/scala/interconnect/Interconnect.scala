@@ -4,6 +4,7 @@ import chisel3._
 import core.DecoupledBusIO
 import chisel3.util.log2Up
 import chisel3.util.RRArbiter
+import chisel3.util.MemoryReadWritePort
 import core.BusReq
 
 class Interconnect(
@@ -70,4 +71,39 @@ class Interconnect(
   // We should always be ready for bank response
   io.outs.foreach(_.rsp.ready := true.B)
 
+}
+
+object Interconnect {
+
+  /** Instantiate an Interconnect, wire its inputs from `inputs`, and wire its
+    * outputs to a set of 1-cycle-latency SRAM read/write ports. Address and
+    * data widths are derived from the input bundles; bank count comes from the
+    * number of SRAM ports.
+    */
+  def apply[T <: Data](
+      inputs: Seq[DecoupledBusIO],
+      outputs: Seq[MemoryReadWritePort[T]]
+  ): Interconnect = {
+    val numInp = inputs.size
+    val numOut = outputs.size
+    val addrWidth = inputs.head.req.bits.addr.getWidth
+    val dataWidth = inputs.head.req.bits.wdata.getWidth
+
+    val interconnect = Module(new Interconnect(numInp, numOut, addrWidth, dataWidth))
+
+    interconnect.io.ins <> VecInit(inputs)
+
+    interconnect.io.outs.zip(outputs).foreach { case (out, port) =>
+      port.enable := out.req.valid
+      port.address := out.req.bits.addr(addrWidth - 1, log2Up(numOut) + log2Up(dataWidth / 8))
+      port.isWrite := out.req.bits.wen
+      port.mask.foreach { _ := out.req.bits.ben.asBools }
+      port.writeData := out.req.bits.wdata.asTypeOf(port.writeData)
+      out.rsp.bits.data := port.readData.asUInt
+      out.req.ready := true.B
+      out.rsp.valid := RegNext(out.req.fire)
+    }
+
+    interconnect
+  }
 }
