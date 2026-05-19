@@ -125,3 +125,16 @@ class AXIDemux(cfg: AXIConfig, numOuts: Int, addrMap: Seq[(Long, Long)]) extends
   bArb.io.out.ready := io.in.b.ready
 
 }
+
+object AXIDemux {
+
+  /** Instantiate an [[AXIDemux]] and wire its input to `input`. The AXI config
+    * is derived from `input`; `numOuts` is `addrMap.length + 1` (last port is
+    * the catch-all).
+    */
+  def apply(input: AXIBundle, addrMap: Seq[(Long, Long)]): AXIDemux = {
+    val demux = Module(new AXIDemux(input.cfg, addrMap.length + 1, addrMap))
+    demux.io.in <> input
+    demux
+  }
+}
