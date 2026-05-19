@@ -8,16 +8,22 @@ import numpy as np
 class Simulator:
     _lib: ModuleType
 
-    def __init__(self, elf_paths: list[str | Path] | None = None, lib_path: str | Path | None = None):
+    def __init__(
+        self,
+        elf_paths: list[str | Path] | None = None,
+        lib_path: str | Path | None = None,
+        vlt_args: str | list[str] = "",
+    ):
         self.load_lib(lib_path)
         self._elfs = [str(p) for p in (elf_paths or [])]
+        self._vlt_args = vlt_args if isinstance(vlt_args, str) else " ".join(vlt_args)
         self._sim = None
 
     def sim(self):
         if self._sim is None:
             if not self._elfs:
                 raise RuntimeError("No ELF paths provided")
-            self._sim = self._lib.Sim(self._elfs)
+            self._sim = self._lib.Sim(self._elfs, self._vlt_args)
         return self._sim
 
     def get_symbols(self) -> dict[str, int]:

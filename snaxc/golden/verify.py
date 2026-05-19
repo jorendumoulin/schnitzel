@@ -91,6 +91,9 @@ def main() -> int:
     p.add_argument("--build-dir", required=True, type=Path)
     p.add_argument("--sim-lib", required=True, type=Path,
                    help="path to my_module.cpython-*.so for this kernel")
+    p.add_argument("--vlt-args", default="",
+                   help="space-separated Verilator runtime args / plusargs "
+                        "(e.g. '+verbose=1 +trace')")
     args = p.parse_args()
 
     cfg = json.loads(args.inputs.read_text())
@@ -114,7 +117,8 @@ def main() -> int:
     expected = run_golden(so, fn, [i.array for i in inputs], out_specs)
 
     print(f"[verify] launching sim on {args.elf}")
-    sim = Simulator(elf_paths=[str(args.elf)], lib_path=args.sim_lib)
+    sim = Simulator(elf_paths=[str(args.elf)], lib_path=args.sim_lib,
+                    vlt_args=args.vlt_args)
     syms = sim.get_symbols()
     for inp in inputs:
         if inp.name not in syms:
