@@ -3,7 +3,7 @@ package streamer
 import chisel3._
 import chisel3.util.Queue
 import core.DecoupledBusIO
-import chisel3.util.{Decoupled, RRArbiter, log2Ceil}
+import chisel3.util.{Decoupled, RRArbiter, log2Ceil, log2Up}
 import dataclass.data
 import streamer.AguOutput
 import core.BusReq
@@ -70,17 +70,29 @@ class Streamer(
   // In readWrite mode, the AGU doesn't advance on isFirst until writeData fires,
   // but the readReqQueue must issue the TCDM read exactly once before that.
   // This register prevents duplicate enqueues while the AGU is stalled.
+  // Generalized below to gate pure-read mode too, so a stalled AGU never
+  // re-enqueues the same address (which would also miscount credits).
   val firstReadIssued = RegInit(false.B)
+
+  // Per-lane credit tracking: counts free rspQueue slots accounting for
+  // in-flight reqs. Decremented when a req is admitted to readReqQueue (a
+  // future rsp committed to land in rspQueue), incremented when rspQueue
+  // drains. Gating both readReqQueue.enq.valid and AGU.addrs.ready on
+  // credits prevents rspQueue overflow regardless of bank-arbitration timing.
+  // Necessary because the interconnect's `outs.rsp.ready` is hardwired true
+  // and does not propagate back-pressure when the streamer's rspQueue is full.
+  val credits = Seq.fill(numPorts)(RegInit(queueDepth.U(log2Up(queueDepth + 1).W)))
 
   // Queue to request reads from TCDM
   // For the reads, no data is necessary, so we just make a queue of addresses instead
   val readReqQueues = (0 until numPorts).map { i =>
     val readReqQueue = Module(new Queue(UInt(addrWidth.W), queueDepth))
     readReqQueue.io.enq.bits := agu.io.addrs.bits.addrs(i)
-    readReqQueue.io.enq.valid := agu.io.addrs.valid && agu.io.addrs.bits.isFirst && laneEnabled(i) && (
-      (io.dir === StreamerDir.read) ||
-        (io.dir === StreamerDir.readWrite && !firstReadIssued)
-    )
+    readReqQueue.io.enq.valid := agu.io.addrs.valid && agu.io.addrs.bits.isFirst &&
+      laneEnabled(i) && !firstReadIssued && credits(i) =/= 0.U && (
+        (io.dir === StreamerDir.read) ||
+          (io.dir === StreamerDir.readWrite)
+      )
     readReqQueue
   }
 
@@ -129,8 +141,16 @@ class Streamer(
   // accumulation in reductions).
   val needsRead = isRead || (inReadWrite && agu.io.addrs.bits.isFirst)
   val needsWrite = isWrite || (inReadWrite && agu.io.addrs.bits.isLast)
+
+  // Hold off the AGU until every enabled lane has a credit. Without this, the
+  // AGU could issue an addr whose rsp would arrive on a full rspQueue and be
+  // silently dropped at the input boundary.
+  val allLaneCreditsAvailable = credits.zip(laneEnabled).map {
+    case (c, en) => !en || c =/= 0.U
+  }.reduce(_ && _)
+
   agu.io.addrs.ready :=
-    (!needsRead || allReadReqQueuesReady) &&
+    (!needsRead || (allReadReqQueuesReady && allLaneCreditsAvailable)) &&
       (!needsWrite || allWriteReqQueuesReady) &&
       (isRead || io.writeData.valid)
 
@@ -151,8 +171,13 @@ class Streamer(
     bypassState := BypassState.bypass
   }
 
-  // Prevent duplicate readReqQueue enqueues while AGU stalls on iter 0
-  when(!inReadWrite || agu.io.addrs.fire) {
+  // Prevent duplicate readReqQueue enqueues while AGU stalls. Reset on AGU
+  // advance (next address available); set when every enabled lane has
+  // enqueued for the current address. Generalized to all modes (was
+  // previously gated on inReadWrite, which left pure-read mode unprotected
+  // and allowed the same address to be re-enqueued each cycle during a
+  // partial-stall — wasted bandwidth and broken credit accounting).
+  when(agu.io.addrs.fire) {
     firstReadIssued := false.B
   }.elsewhen(readReqQueues.zip(laneEnabled).map { case (q, en) => q.io.enq.fire || !en }.reduce(_ && _)) {
     firstReadIssued := true.B
@@ -186,6 +211,20 @@ class Streamer(
   for (i <- 0 until numPorts) {
     when(readReqQueues(i).io.deq.fire =/= rspQueues(i).io.enq.fire) {
       readPending(i) := readReqQueues(i).io.deq.fire
+    }
+  }
+
+  // Credit update: decrement when a req is admitted (a future rsp committed to
+  // land in this lane's rspQueue), increment when a rsp is drained. When both
+  // happen the same cycle the credit is unchanged. Initial value = queueDepth
+  // matches an empty rspQueue with no in-flight reqs.
+  for (i <- 0 until numPorts) {
+    val reqAdmitted = readReqQueues(i).io.enq.fire
+    val rspDrained = rspQueues(i).io.deq.fire
+    when(reqAdmitted && !rspDrained) {
+      credits(i) := credits(i) - 1.U
+    }.elsewhen(!reqAdmitted && rspDrained) {
+      credits(i) := credits(i) + 1.U
     }
   }
 
