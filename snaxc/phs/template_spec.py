@@ -3,13 +3,9 @@ from __future__ import annotations
 import itertools
 from collections.abc import Iterable
 
-from xdsl.dialects.builtin import DenseArrayBase
 from xdsl.ir.affine import AffineMap
 
-from snaxc.dialects import phs
 from snaxc.ir.dart.access_pattern import Template, TemplatePattern
-
-PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
 
 
 class TemplateSpec:
@@ -123,27 +119,3 @@ class TemplateSpec:
         template_bounds = self.template_bounds
         return Template(TemplatePattern(template_bounds, tp) for tp in template)
 
-    @staticmethod
-    def derive_template_spec(pe: phs.PEOp, bounds: tuple[int, ...]) -> TemplateSpec:
-        """Derive a TemplateSpec from a PEOp and array bounds using identity maps."""
-        num_data = len(pe.data_operands())
-        num_outputs = len(pe.get_terminator().operands)
-        num_dims = len(bounds)
-        # paired_outputs comes from the encode pass (initial = all outputs) and
-        # may have been shrunk by the prune-unused-carries pass.
-        paired_attr = pe.attributes.get(PAIRED_OUTPUTS_ATTR_NAME)
-        if paired_attr is None:
-            # Legacy fallback for tests that build a PEOp directly without
-            # going through the encode pass: assume every output is paired.
-            paired_outputs = tuple(range(min(num_outputs, num_data)))
-        else:
-            assert isinstance(paired_attr, DenseArrayBase)
-            paired_outputs = tuple(int(v) for v in paired_attr.get_values())
-        input_maps = tuple(AffineMap.identity(num_dims) for _ in range(num_data))
-        output_maps = tuple(AffineMap.identity(num_dims) for _ in range(num_outputs))
-        return TemplateSpec(
-            input_maps=input_maps,
-            output_maps=output_maps,
-            template_bounds=bounds,
-            paired_outputs=paired_outputs,
-        )

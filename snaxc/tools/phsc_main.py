@@ -84,8 +84,10 @@ def _build_template_spec_from_linalg(
             template_bounds=bounds,
             paired_outputs=paired_outputs,
         )
-    # No matching linalg.generic — fall back to identity maps.
-    return TemplateSpec.derive_template_spec(pe, bounds)
+    raise AssertionError(
+        f"No linalg.generic with {MAGIC_ATTR_NAME} = @{pe_name} found — "
+        "every PEOp must originate from a tagged linalg.generic."
+    )
 
 
 class PHSCMain(SNAXCMain):
