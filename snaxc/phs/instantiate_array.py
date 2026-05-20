@@ -20,11 +20,13 @@ two patterns and Phase 3 to materialize new connections behind muxes.
 """
 
 import itertools
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from xdsl.dialects import arith, builtin, hw
 from xdsl.ir import Attribute, Block, Region, SSAValue
 from xdsl.ir.affine import AffineMap
+from xdsl.parser import SymbolRefAttr
 from xdsl.utils.hints import isa
 
 from snaxc.dialects import phs
@@ -294,7 +296,17 @@ def materialize(
 # =====================================================================
 
 
-def build_pe_array_body(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
+def build_pe_array_body(
+    pe: phs.PEOp,
+    spec: TemplateSpec,
+    *,
+    pe_ref: str | SymbolRefAttr,
+    bounds: Sequence[int],
+    num_pure_inputs: int,
+    paired_outputs: Sequence[int],
+    input_modes: Sequence[Sequence[AffineMap]],
+    output_modes: Sequence[Sequence[AffineMap]],
+) -> phs.PEArrayOp:
     layout = compute_layout(pe, spec)
     block = Block(arg_types=layout.in_types)
     switches = pe.get_switches()
@@ -372,4 +384,10 @@ def build_pe_array_body(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
         name=f"{pe.name_prop.data}_array",
         function_type=function_type,
         region=Region(block),
+        pe_ref=pe_ref,
+        bounds=bounds,
+        num_pure_inputs=num_pure_inputs,
+        paired_outputs=paired_outputs,
+        input_modes=input_modes,
+        output_modes=output_modes,
     )

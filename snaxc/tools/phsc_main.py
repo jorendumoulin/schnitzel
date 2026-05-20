@@ -330,14 +330,17 @@ class PHSCMain(SNAXCMain):
 
     def setup_hardware_pipeline(self):
         hardware_pass_pipeline: list[ModulePass] = []
-        hardware_pass_pipeline.append(PhsKeepPhsPass())
         hardware_pass_pipeline.append(PhsConvertFloatToInt())
         hardware_pass_pipeline.append(ConvertFloatToHardfloatPass())
         # Lower integer min/max to cmpi+select; circt-opt's --map-arith-to-comb
         # rejects `arith.maxsi`/`minsi`/`maxui`/`minui`.
         hardware_pass_pipeline.append(ExpandIntegerMinMaxPass())
         hardware_pass_pipeline.append(PhsRemoveOneOptionSwitchesPass())
+        # Run before phs-keep-phs so the originating linalg.generics (which
+        # carry the affine maps and bounds for each dataflow mode) are still
+        # present when the array is built.
         hardware_pass_pipeline.append(InstantiatePEArrayPass())
+        hardware_pass_pipeline.append(PhsKeepPhsPass())
         hardware_pass_pipeline.append(ConvertPEToHWPass())
         hardware_pass_pipeline.append(FinalizePhsToHWPass())
         # Split fused `add_rec_fn` / `mul_rec_fn` so the rounder becomes a

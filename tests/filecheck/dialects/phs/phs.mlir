@@ -45,7 +45,7 @@ phs.pe @myfirstswitchlessaccelerator (%0: f32, %1: f32) {
   phs.yield %2 : f32
 }
 
-phs.pe_array @myarray(%0: !hw.array<2xi32>, %1: index) -> (!hw.array<2xi32>) {
+phs.pe_array @myarray targets @myfirstswitchlessaccelerator with %1 (%0: !hw.array<2xi32>) -> (!hw.array<2xi32>) attributes {bounds = array<i64: 2>, num_pure_inputs = 2 : i64, paired_outputs = array<i64>, input_modes = [[affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>]], output_modes = [[affine_map<(d0) -> (d0)>]]} {
   %2 = arith.constant 0 : i1
   %3 = hw.array_get %0[%2] : !hw.array<2xi32>, i1
   %4 = phs.instance "pe_0" @myfirstswitchlessaccelerator(%3, %3 : i32, i32) switches(%1 : index) -> i32
@@ -54,6 +54,20 @@ phs.pe_array @myarray(%0: !hw.array<2xi32>, %1: index) -> (!hw.array<2xi32>) {
   %7 = phs.instance "pe_1" @myfirstswitchlessaccelerator(%6, %6 : i32, i32) switches(%1 : index) -> i32
   %8 = hw.array_create %7, %4 : i32
   phs.yield %8 : !hw.array<2xi32>
+}
+
+// Structured form with pe_ref + bounds + per-mode affine maps
+phs.pe_array @myarray_structured targets @myfirstswitchlessaccelerator(%0: !hw.array<2xi32>, %1: !hw.array<2xi32>) -> (!hw.array<2xi32>) attributes {bounds = array<i64: 2>, num_pure_inputs = 2 : i64, paired_outputs = array<i64>, input_modes = [[affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>]], output_modes = [[affine_map<(d0) -> (d0)>]]} {
+  %2 = arith.constant 0 : i1
+  %3 = hw.array_get %0[%2] : !hw.array<2xi32>, i1
+  %4 = hw.array_get %1[%2] : !hw.array<2xi32>, i1
+  %5 = phs.instance "pe_0" @myfirstswitchlessaccelerator(%3, %4 : i32, i32) -> i32
+  %6 = arith.constant 1 : i1
+  %7 = hw.array_get %0[%6] : !hw.array<2xi32>, i1
+  %8 = hw.array_get %1[%6] : !hw.array<2xi32>, i1
+  %9 = phs.instance "pe_1" @myfirstswitchlessaccelerator(%7, %8 : i32, i32) -> i32
+  %10 = hw.array_create %9, %5 : i32
+  phs.yield %10 : !hw.array<2xi32>
 }
 
 // CHECK: builtin.module {
@@ -98,14 +112,15 @@ phs.pe_array @myarray(%0: !hw.array<2xi32>, %1: index) -> (!hw.array<2xi32>) {
 // CHECK-NEXT:     %2 = arith.mulf %0, %1 : f32
 // CHECK-NEXT:     phs.yield %2 : f32
 // CHECK-NEXT:   }
-// CHECK-NEXT:   phs.pe_array @myarray(%0: !hw.array<2xi32>, %1: index) -> (!hw.array<2xi32>) {
-// CHECK-NEXT:     %2 = arith.constant false
-// CHECK-NEXT:     %3 = hw.array_get %0[%2] : !hw.array<2xi32>, i1
-// CHECK-NEXT:     %4 = phs.instance "pe_0" @myfirstswitchlessaccelerator(%3, %3 : i32, i32) switches(%1 : index) -> i32
-// CHECK-NEXT:     %5 = arith.constant true
-// CHECK-NEXT:     %6 = hw.array_get %0[%5] : !hw.array<2xi32>, i1
-// CHECK-NEXT:     %7 = phs.instance "pe_1" @myfirstswitchlessaccelerator(%6, %6 : i32, i32) switches(%1 : index) -> i32
-// CHECK-NEXT:     %8 = hw.array_create %7, %4 : i32
-// CHECK-NEXT:     phs.yield %8 : !hw.array<2xi32>
+// CHECK-NEXT:   phs.pe_array @myarray targets @myfirstswitchlessaccelerator with %0{{.*}}!hw.array<2xi32>) -> (!hw.array<2xi32>)
+// CHECK:          phs.instance "pe_0" @myfirstswitchlessaccelerator
+// CHECK:          phs.instance "pe_1" @myfirstswitchlessaccelerator
+// CHECK:          phs.yield
+// CHECK:        phs.pe_array @myarray_structured targets @myfirstswitchlessaccelerator
+// CHECK-SAME:     bounds = array<i64: 2>
+// CHECK-SAME:     num_pure_inputs = 2
+// CHECK-SAME:     input_modes = {{\[}}{{\[}}affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>{{\]}}{{\]}}
+// CHECK-SAME:     output_modes = {{\[}}{{\[}}affine_map<(d0) -> (d0)>{{\]}}{{\]}}
+// CHECK:        phs.yield
 // CHECK-NEXT:   }
 // CHECK-NEXT: }

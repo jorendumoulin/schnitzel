@@ -11,6 +11,20 @@ from snaxc.phs.instantiate_array import build_pe_array_body
 from snaxc.phs.template_spec import TemplateSpec
 
 
+def _build(pe: phs.PEOp, spec: TemplateSpec) -> phs.PEArrayOp:
+    """Thin helper: feed spec's fields into build_pe_array_body's now-required kwargs."""
+    return build_pe_array_body(
+        pe,
+        spec,
+        pe_ref=pe.name_prop.data,
+        bounds=spec.template_bounds,
+        num_pure_inputs=spec.num_pure_inputs,
+        paired_outputs=spec.paired_outputs,
+        input_modes=[spec.input_maps],
+        output_modes=[spec.output_maps],
+    )
+
+
 def _build_ctx() -> AccContext:
     ctx = AccContext(allow_unregistered=True)
     ctx.load_dialect(Phs)
@@ -43,7 +57,7 @@ def test_merge_identity_is_noop() -> None:
         output_maps=(identity,),
         template_bounds=(4,),
     )
-    array_op = build_pe_array_body(pe, spec)
+    array_op = _build(pe, spec)
 
     muxes_before = sum(1 for op in array_op.body.block.ops if isinstance(op, phs.MuxOp))
     switches_before = array_op.array_switch_no.value.data
@@ -68,7 +82,7 @@ def test_merge_incompatible_port_structure_fails() -> None:
         output_maps=(identity,),
         template_bounds=(2,),
     )
-    array_op = build_pe_array_body(pe, spec_parallel)
+    array_op = _build(pe, spec_parallel)
 
     spec_chained = TemplateSpec(
         input_maps=(scalar, identity),
@@ -105,7 +119,7 @@ def test_merge_adds_single_mux_per_divergence() -> None:
         output_maps=(identity,),
         template_bounds=(2,),
     )
-    array_op = build_pe_array_body(pe, spec_a)
+    array_op = _build(pe, spec_a)
 
     # Merging the same spec in should be a no-op.
     merge_pe_array_wiring(array_op, spec_a, pe)
@@ -150,7 +164,7 @@ def test_merge_basic_flow() -> None:
         output_maps=(identity,),
         template_bounds=(4,),
     )
-    array_op = build_pe_array_body(pe, spec)
+    array_op = _build(pe, spec)
 
     # Verify initial state
     assert array_op.array_switch_no.value.data == 0
