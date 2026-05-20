@@ -102,11 +102,29 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
       tcdmPortIdx += 1
     }
 
-    // Wire CSR config: take registers [csrOffset..csrOffset+numRegs), reverse
-    // for correct bit mapping (register 0 -> baseAddr at MSB), then reinterpret
-    // as AffineAguConfig bundle. This matches the pattern in AluAccelerator.
+    // Wire CSR config by explicit field assignment. The Python `param_values`
+    // (see snaxc/hw/accelerators/phs.py) lays out the CSRs as:
+    //   reg 0          : baseAddr
+    //   reg 1..T       : temporalStrides(0..T-1)
+    //   reg T+1..2T    : temporalBounds(0..T-1)
+    //   reg 2T+1..2T+S : spatialStrides(0..S-1)
+    // The previous `VecInit(regs.reverse).asTypeOf(...)` shortcut got
+    // baseAddr right (highest field, MSB) but flipped the index order
+    // within each inner Vec: a 2D config landed `ts_0` into
+    // `temporalStrides(T-1)` instead of `temporalStrides(0)`, and likewise
+    // for ub/ss. Harmless for 1D (single-element Vec) but breaks 2D and
+    // beyond. Wire each field explicitly to match the Python layout.
     val regs = (0 until numRegs).map(j => csrItf.io.vals(csrOffset + j))
-    s.io.config := VecInit(regs.reverse).asTypeOf(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes))
+    val cfg = Wire(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes))
+    cfg.baseAddr := regs(0)
+    for (k <- 0 until sc.nTemporalDims) {
+      cfg.temporalStrides(k) := regs(1 + k)
+      cfg.temporalBounds(k) := regs(1 + sc.nTemporalDims + k)
+    }
+    for (k <- 0 until sc.spatialDimSizes.length) {
+      cfg.spatialStrides(k) := regs(1 + 2 * sc.nTemporalDims + k)
+    }
+    s.io.config := cfg
     // spatialDimMask is wired below for write streamers (from the blackbox).
     // Default to all-enabled here; read streamers keep this value.
     s.io.spatialDimMask := VecInit(Seq.fill(sc.spatialDimSizes.length)(true.B))
