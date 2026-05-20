@@ -13,19 +13,19 @@ from snaxc.dialects import phs
 
 def erase_phs(mod: builtin.ModuleOp, rewriter: Rewriter):
     """
-    Erase all phs.PEOps
+    Erase all phs.PEOp and phs.PEArrayOp top-level ops.
     """
     for operation in mod.ops:
-        if isinstance(operation, phs.PEOp):
+        if isinstance(operation, phs.PEOp | phs.PEArrayOp):
             rewriter.erase_op(operation)
 
 
 def keep_phs(mod: builtin.ModuleOp, rewriter: Rewriter):
     """
-    Keep only phs.PEOps
+    Keep only phs.PEOp and phs.PEArrayOp top-level ops.
     """
     for operation in mod.ops:
-        if not isinstance(operation, phs.PEOp):
+        if not isinstance(operation, phs.PEOp | phs.PEArrayOp):
             rewriter.erase_op(operation)
 
 

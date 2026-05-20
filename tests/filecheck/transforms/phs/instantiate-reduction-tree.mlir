@@ -17,7 +17,7 @@ phs.pe @acc1 with %0 (%1: i32, %2: i32) {
   phs.yield %3 : i32
 }
 
-phs.pe_array @acc1_array(%0: !hw.array<4xi32>, %1: index) -> (i32) {
+phs.pe_array @acc1_array targets @acc1 with %1 (%0: !hw.array<4xi32>) -> (i32) attributes {bounds = array<i64: 4>, num_pure_inputs = 1 : i64, paired_outputs = array<i64>, input_modes = [[affine_map<(d0) -> (d0)>]], output_modes = [[affine_map<(d0) -> ()>]]} {
   %2 = arith.constant 0 : i2
   %3 = hw.array_get %0[%2] : !hw.array<4xi32>, i2
   %4 = arith.constant 1 : i2

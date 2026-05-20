@@ -5,7 +5,6 @@ import sys
 from collections.abc import Sequence
 from io import StringIO
 
-from xdsl.dialects import builtin
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
@@ -19,7 +18,6 @@ from snaxc.hw.acc_context import AccContext
 from snaxc.hw.config_parser import parse_config
 from snaxc.hw.phs_accelerator import PhsAccelerator
 from snaxc.phs.export_to_schnitzel import call_phs_driver
-from snaxc.phs.template_spec import TemplateSpec
 from snaxc.tools.snaxc_main import SNAXCMain
 from snaxc.transforms.hardfloat.convert_float_to_hardfloat import ConvertFloatToHardfloatPass
 from snaxc.transforms.hardfloat.convert_hardfloat_to_hw import ConvertHardfloatToHw
@@ -35,10 +33,29 @@ from snaxc.transforms.phs.expand_integer_minmax import ExpandIntegerMinMaxPass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
-from snaxc.transforms.phs.instantiate_pe_array import BOUNDS_ATTR_NAME, InstantiatePEArrayPass
+from snaxc.transforms.phs.instantiate_pe_array import InstantiatePEArrayPass
 from snaxc.transforms.phs.prune_unused_carries import PrunePEUnusedCarriesPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
 from snaxc.transforms.phs.schedule_preset.separate_linalg import PhsScheduleSeparateLinalgPass
+
+
+def _harvest_accelerators(hardware_module: ModuleOp, pe_clones: dict[str, phs.PEOp]) -> list[PhsAccelerator]:
+    """
+    Build one ``PhsAccelerator`` per ``phs.pe_array`` op currently in the
+    module. The TemplateSpec is read directly off the PEArrayOp; the
+    abstract PE used for decode_abstract_graph is taken from ``pe_clones``
+    (snapshotted before the HW-pipeline lowering passes ran, so its body
+    still matches what convert_generic_body_to_phs produces at dispatch
+    time).
+    """
+    accelerators: list[PhsAccelerator] = []
+    for op in hardware_module.ops:
+        if not isinstance(op, phs.PEArrayOp):
+            continue
+        pe_name = op.pe_ref.string_value()
+        assert pe_name in pe_clones, f"No PE clone stashed for @{pe_name}"
+        accelerators.append(PhsAccelerator(pe_clones[pe_name], op.get_template_spec(0)))
+    return accelerators
 
 
 class PHSCMain(SNAXCMain):
@@ -68,23 +85,23 @@ class PHSCMain(SNAXCMain):
         module.verify()
         hardware_module = module.clone()
 
-        accelerators: list[PhsAccelerator] = []
-        for hw_op in hardware_module.ops:
-            if isinstance(hw_op, phs.PEOp):
-                assert BOUNDS_ATTR_NAME in hw_op.attributes, (
-                    f"PEOp @{hw_op.name_prop.data} missing {BOUNDS_ATTR_NAME} attribute"
-                )
-                bounds_attr = hw_op.attributes[BOUNDS_ATTR_NAME]
-                assert isinstance(bounds_attr, builtin.DenseArrayBase)
-                template_spec = TemplateSpec.derive_template_spec(hw_op, bounds_attr.get_values())
-                # Use a clone to prevent downstream changes messing up accelerator registration
-                accelerator = PhsAccelerator(hw_op.clone(), template_spec)
-                accelerators.append(accelerator)
+        # Snapshot each PEOp in its post-input-pipeline form. These clones are
+        # the "abstract" PEs the software pipeline uses for switch decoding
+        # (decode_abstract_graph). They have to be captured before the HW
+        # pipeline rewrites the PE bodies (float→int, hardfloat lowering,
+        # min/max expansion, switch pruning).
+        pe_clones: dict[str, phs.PEOp] = {}
+        for op in hardware_module.ops:
+            if isinstance(op, phs.PEOp):
+                pe_clones[op.name_prop.data] = op.clone()
 
-        # Remaining pipelines can only be setup after accelerators have been registered
         self.setup_hardware_pipeline()
-        self.setup_software_pipeline()
 
+        # Stage 1: HW-pipeline passes up to and including instantiate-pe-array
+        # so phs.pe_array ops exist and carry the canonical TemplateSpec.
+        self.pre_array_pipeline.apply(self.ctx, hardware_module)
+        accelerators = _harvest_accelerators(hardware_module, pe_clones)
+        # Stage 2: lower PE bodies to hw.module + rest of the hw pipeline.
         self.hardware_pipeline.apply(self.ctx, hardware_module)
         hardware_module.verify()
 
@@ -167,6 +184,10 @@ class PHSCMain(SNAXCMain):
                             core.accelerators[i] = acc
                             acc.resolve_parents(core)
                             break
+
+        # Software pipeline depends on accelerators being registered in
+        # ctx.system, which only happens after call_phs_driver above.
+        self.setup_software_pipeline()
 
         # If an optional explicit software file is requested, overwrite the previous module
         if self.args.software_file:
@@ -329,15 +350,29 @@ class PHSCMain(SNAXCMain):
         self.input_pipeline = PassPipeline(tuple(input_pass_pipeline), self.pipeline_callback)
 
     def setup_hardware_pipeline(self):
-        hardware_pass_pipeline: list[ModulePass] = []
-        hardware_pass_pipeline.append(PhsKeepPhsPass())
-        hardware_pass_pipeline.append(PhsConvertFloatToInt())
-        hardware_pass_pipeline.append(ConvertFloatToHardfloatPass())
+        # Split into two stages. Stage 1 ends at instantiate-pe-array so the
+        # accelerator harvest can read the canonical TemplateSpec directly
+        # off the freshly-built phs.pe_array. The PE-body lowering passes
+        # (PhsConvertFloatToInt, hardfloat, min/max, remove-one-option-
+        # switches) stay in stage 1 because they mutate the same PEOp the
+        # PEArrayOp instances refer to — running them before
+        # instantiate-pe-array keeps the array body's phs.instance ops in
+        # sync.
+        pre_pipeline: list[ModulePass] = []
+        pre_pipeline.append(PhsConvertFloatToInt())
+        pre_pipeline.append(ConvertFloatToHardfloatPass())
         # Lower integer min/max to cmpi+select; circt-opt's --map-arith-to-comb
         # rejects `arith.maxsi`/`minsi`/`maxui`/`minui`.
-        hardware_pass_pipeline.append(ExpandIntegerMinMaxPass())
-        hardware_pass_pipeline.append(PhsRemoveOneOptionSwitchesPass())
-        hardware_pass_pipeline.append(InstantiatePEArrayPass())
+        pre_pipeline.append(ExpandIntegerMinMaxPass())
+        pre_pipeline.append(PhsRemoveOneOptionSwitchesPass())
+        # Run before phs-keep-phs so the originating linalg.generics (which
+        # carry the affine maps and bounds for each dataflow mode) are still
+        # present when the array is built.
+        pre_pipeline.append(InstantiatePEArrayPass())
+        self.pre_array_pipeline = PassPipeline(tuple(pre_pipeline), self.pipeline_callback)
+
+        hardware_pass_pipeline: list[ModulePass] = []
+        hardware_pass_pipeline.append(PhsKeepPhsPass())
         hardware_pass_pipeline.append(ConvertPEToHWPass())
         hardware_pass_pipeline.append(FinalizePhsToHWPass())
         # Split fused `add_rec_fn` / `mul_rec_fn` so the rounder becomes a

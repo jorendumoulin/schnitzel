@@ -4,16 +4,21 @@ from collections.abc import Iterator, Sequence
 
 from xdsl.dialects.builtin import (
     I64,
+    AffineMapAttr,
     ArrayAttr,
+    DenseArrayBase,
     DictionaryAttr,
     FunctionType,
     IndexType,
     IntegerAttr,
+    IntegerType,
     StringAttr,
+    i64,
 )
 from xdsl.dialects.func import FuncOpCallableInterface
 from xdsl.dialects.utils import AbstractYieldOperation
 from xdsl.ir import Attribute, Block, BlockArgument, Dialect, Region, SSAValue
+from xdsl.ir.affine import AffineMap
 from xdsl.irdl import (
     AttrSizedOperandSegments,
     IRDLOperation,
@@ -34,6 +39,12 @@ from xdsl.parser import Parser, SymbolRefAttr
 from xdsl.printer import Printer
 from xdsl.traits import HasParent, IsolatedFromAbove, IsTerminator, Pure, SymbolOpInterface, SymbolTable
 from xdsl.utils.exceptions import VerifyException
+from xdsl.utils.hints import isa
+
+
+def _dense_int_values(attr: DenseArrayBase[IntegerType]) -> tuple[int, ...]:
+    """Read int values from a DenseArrayBase of integer element type."""
+    return tuple(int(v) for v in attr.get_values())
 
 
 @irdl_op_definition
@@ -591,6 +602,50 @@ class PEInstanceOp(IRDLOperation):
 
     irdl_options = (AttrSizedOperandSegments(),)
 
+    traits = lazy_traits_def(lambda: (HasParent(PEArrayOp),))
+
+    def get_parent_array(self) -> PEArrayOp:
+        parent = self.parent_op()
+        assert isinstance(parent, PEArrayOp), "phs.instance not in a PEArrayOp"
+        return parent
+
+    def get_pe(self) -> PEOp:
+        """Resolve the PE this instance references via the parent PEArrayOp."""
+        return self.get_parent_array().get_pe()
+
+    def verify_(self) -> None:
+        pe = self.get_pe()
+        pe_data = pe.data_operands()
+        pe_switches = pe.get_switches()
+
+        if len(self.data_operands) != len(pe_data):
+            raise VerifyException(
+                f"phs.instance: {len(self.data_operands)} data operands but PE @{pe.name_prop.data} "
+                f"expects {len(pe_data)}"
+            )
+        for i, (op, pe_op) in enumerate(zip(self.data_operands, pe_data, strict=True)):
+            if op.type != pe_op.type:
+                raise VerifyException(
+                    f"phs.instance data operand {i} type {op.type} != PE @{pe.name_prop.data} "
+                    f"data operand type {pe_op.type}"
+                )
+
+        if len(self.switches) != len(pe_switches):
+            raise VerifyException(
+                f"phs.instance: {len(self.switches)} switches but PE @{pe.name_prop.data} expects {len(pe_switches)}"
+            )
+
+        pe_results = pe.get_terminator().operands
+        if len(self.res) != len(pe_results):
+            raise VerifyException(
+                f"phs.instance: {len(self.res)} results but PE @{pe.name_prop.data} yields {len(pe_results)}"
+            )
+        for i, (r, pe_r) in enumerate(zip(self.res, pe_results, strict=True)):
+            if r.type != pe_r.type:
+                raise VerifyException(
+                    f"phs.instance result {i} type {r.type} != PE @{pe.name_prop.data} yield type {pe_r.type}"
+                )
+
     def __init__(
         self,
         instance_name: str,
@@ -688,12 +743,32 @@ class PEArrayOp(IRDLOperation):
     # PE-level switches come before these.
     array_switch_no = prop_def(IntegerAttr[I64])
 
+    # Reference to the single PEOp that all phs.instance children target.
+    pe_ref = prop_def(SymbolRefAttr)
+    # Iteration-space bounds of the array.
+    bounds = prop_def(DenseArrayBase)
+    # Number of pure-input data ports; the trailing ports are carry/readWrite.
+    num_pure_inputs = prop_def(IntegerAttr[I64])
+    # For each carry-input k, the output index it is paired with.
+    paired_outputs = prop_def(DenseArrayBase)
+    # Per-mode list of input affine maps. input_modes[i] describes mode i's inputs.
+    input_modes = prop_def(ArrayAttr[ArrayAttr[AffineMapAttr]])
+    # Per-mode list of output affine maps.
+    output_modes = prop_def(ArrayAttr[ArrayAttr[AffineMapAttr]])
+
     traits = traits_def(IsolatedFromAbove(), SymbolOpInterface())
 
     def __init__(
         self,
         name: str,
         function_type: FunctionType | tuple[Sequence[Attribute], Sequence[Attribute]],
+        *,
+        pe_ref: str | SymbolRefAttr,
+        bounds: Sequence[int] | DenseArrayBase,
+        num_pure_inputs: int,
+        paired_outputs: Sequence[int] | DenseArrayBase,
+        input_modes: Sequence[Sequence[AffineMap]] | ArrayAttr[ArrayAttr[AffineMapAttr]],
+        output_modes: Sequence[Sequence[AffineMap]] | ArrayAttr[ArrayAttr[AffineMapAttr]],
         region: Region | None = None,
         array_switch_no: int = 0,
     ):
@@ -702,11 +777,29 @@ class PEArrayOp(IRDLOperation):
             function_type = FunctionType.from_lists(inputs, outputs)
         if not isinstance(region, Region):
             region = Region(Block(arg_types=function_type.inputs))
+
+        if isinstance(pe_ref, str):
+            pe_ref = SymbolRefAttr(pe_ref)
+        if not isinstance(bounds, DenseArrayBase):
+            bounds = DenseArrayBase.from_list(i64, list(bounds))
+        if not isinstance(paired_outputs, DenseArrayBase):
+            paired_outputs = DenseArrayBase.from_list(i64, list(paired_outputs))
+        if not isinstance(input_modes, ArrayAttr):
+            input_modes = ArrayAttr([ArrayAttr([AffineMapAttr(m) for m in mode]) for mode in input_modes])
+        if not isinstance(output_modes, ArrayAttr):
+            output_modes = ArrayAttr([ArrayAttr([AffineMapAttr(m) for m in mode]) for mode in output_modes])
+
         super().__init__(
             properties={
                 "sym_name": StringAttr(name),
                 "function_type": function_type,
                 "array_switch_no": IntegerAttr(array_switch_no, 64),
+                "pe_ref": pe_ref,
+                "bounds": bounds,
+                "num_pure_inputs": IntegerAttr(num_pure_inputs, 64),
+                "paired_outputs": paired_outputs,
+                "input_modes": input_modes,
+                "output_modes": output_modes,
             },
             regions=[region],
         )
@@ -728,6 +821,54 @@ class PEArrayOp(IRDLOperation):
         )
         return new_arg
 
+    def verify_(self) -> None:
+        if len(self.input_modes) != len(self.output_modes):
+            raise VerifyException(
+                f"PEArrayOp input_modes/output_modes length mismatch: "
+                f"{len(self.input_modes)} vs {len(self.output_modes)}"
+            )
+        if len(self.input_modes) == 0:
+            raise VerifyException("PEArrayOp must declare at least one dataflow mode")
+
+        num_dims = len(self.get_bounds())
+        max_out = self.get_max_outputs()
+        paired = self.get_paired_outputs()
+        pe = self.get_pe()
+        num_data = len(pe.data_operands())
+
+        for mode_idx in range(len(self.input_modes)):
+            in_maps = self.get_input_maps(mode_idx)
+            out_maps = self.get_output_maps(mode_idx)
+            if len(in_maps) > num_data:
+                raise VerifyException(
+                    f"PEArrayOp mode {mode_idx}: {len(in_maps)} input maps exceed PE data operand count {num_data}"
+                )
+            if len(out_maps) > max_out:
+                raise VerifyException(
+                    f"PEArrayOp mode {mode_idx}: {len(out_maps)} output maps exceed max_outputs {max_out}"
+                )
+            for m in (*in_maps, *out_maps):
+                if m.num_symbols != 0:
+                    raise VerifyException(f"PEArrayOp mode {mode_idx}: affine map {m} has symbols")
+                if m.num_dims != num_dims:
+                    raise VerifyException(
+                        f"PEArrayOp mode {mode_idx}: map {m} has {m.num_dims} dims, expected {num_dims}"
+                    )
+
+        if len(set(paired)) != len(paired):
+            raise VerifyException(f"PEArrayOp paired_outputs has duplicates: {paired}")
+        for k in paired:
+            if not (0 <= k < max_out):
+                raise VerifyException(f"PEArrayOp paired_outputs entry {k} out of range [0, {max_out})")
+
+        npi = self.num_pure_inputs.value.data
+        first_mode_inputs = len(self.get_input_maps(0))
+        if npi + len(paired) != first_mode_inputs:
+            raise VerifyException(
+                f"PEArrayOp num_pure_inputs ({npi}) + #paired_outputs ({len(paired)}) != "
+                f"mode-0 input map count ({first_mode_inputs})"
+            )
+
     def get_instances(self) -> list[PEInstanceOp]:
         """Get all PEInstanceOp operations in the body."""
         return [op for op in self.body.ops if isinstance(op, PEInstanceOp)]
@@ -737,9 +878,53 @@ class PEArrayOp(IRDLOperation):
         assert isinstance(yield_op, YieldOp)
         return yield_op
 
+    def get_pe(self) -> PEOp:
+        """Resolve pe_ref via the enclosing SymbolTable to the PEOp."""
+        from xdsl.dialects.builtin import ModuleOp
+
+        toplevel = self.get_toplevel_object()
+        assert isinstance(toplevel, ModuleOp)
+        table = toplevel.get_trait(SymbolTable)
+        assert table is not None
+        pe = table.lookup_symbol(toplevel, self.pe_ref)
+        assert isinstance(pe, PEOp), f"pe_ref {self.pe_ref} does not resolve to a PEOp"
+        return pe
+
+    def get_bounds(self) -> tuple[int, ...]:
+        assert isa(self.bounds, DenseArrayBase[IntegerType])
+        return _dense_int_values(self.bounds)
+
+    def get_input_maps(self, mode: int) -> tuple[AffineMap, ...]:
+        return tuple(m.data for m in self.input_modes.data[mode].data)
+
+    def get_output_maps(self, mode: int) -> tuple[AffineMap, ...]:
+        return tuple(m.data for m in self.output_modes.data[mode].data)
+
+    def get_paired_outputs(self) -> tuple[int, ...]:
+        assert isa(self.paired_outputs, DenseArrayBase[IntegerType])
+        return _dense_int_values(self.paired_outputs)
+
+    def get_max_outputs(self) -> int:
+        """Derived from output_modes: maximum number of outputs across all modes."""
+        return max(len(mode.data) for mode in self.output_modes.data)
+
+    def get_template_spec(self, mode: int = 0):
+        """Build a TemplateSpec for the given mode index from the array's properties."""
+        from snaxc.phs.template_spec import TemplateSpec
+
+        return TemplateSpec(
+            input_maps=self.get_input_maps(mode),
+            output_maps=self.get_output_maps(mode),
+            template_bounds=self.get_bounds(),
+            paired_outputs=self.get_paired_outputs(),
+        )
+
     def print(self, printer: Printer):
         printer.print_string(" @")
         printer.print_string(self.name_prop.data)
+
+        printer.print_string(" targets ")
+        printer.print_attribute(self.pe_ref)
 
         # Print array switches if any
         array_sw_count = self.array_switch_no.value.data
@@ -771,8 +956,25 @@ class PEArrayOp(IRDLOperation):
             if i > 0:
                 printer.print_string(", ")
             printer.print_attribute(opnd.type)
-        printer.print_string(") {")
+        printer.print_string(")")
 
+        extra: list[tuple[str, Attribute]] = [
+            ("bounds", self.bounds),
+            ("num_pure_inputs", self.num_pure_inputs),
+            ("paired_outputs", self.paired_outputs),
+            ("input_modes", self.input_modes),
+            ("output_modes", self.output_modes),
+        ]
+        printer.print_string(" attributes {")
+        for i, (k, v) in enumerate(extra):
+            if i > 0:
+                printer.print_string(", ")
+            printer.print_string(k)
+            printer.print_string(" = ")
+            printer.print_attribute(v)
+        printer.print_string("}")
+
+        printer.print_string(" {")
         with printer.indented():
             for op in block.ops:
                 printer.print_string("\n")
@@ -782,6 +984,10 @@ class PEArrayOp(IRDLOperation):
     @classmethod
     def parse(cls: type[PEArrayOp], parser: Parser) -> PEArrayOp:
         name_prop = parser.parse_symbol_name()
+
+        parser.parse_keyword("targets")
+        pe_ref = parser.parse_attribute()
+        assert isinstance(pe_ref, SymbolRefAttr)
 
         # Parse optional array switches: "with %sw0, %sw1"
         array_switches: list[Parser.Argument] = []
@@ -812,15 +1018,45 @@ class PEArrayOp(IRDLOperation):
         # Parse output types
         out_types: list[Attribute] = parser.parse_comma_separated_list(Parser.Delimiter.PAREN, parser.parse_type)
 
+        extra_attrs: dict[str, Attribute] = {}
+        parser.parse_keyword("attributes")
+        parser.parse_punctuation("{")
+        while True:
+            key = parser.parse_identifier()
+            parser.parse_punctuation("=")
+            value = parser.parse_attribute()
+            extra_attrs[key] = value
+            if not parser.parse_optional_punctuation(","):
+                break
+        parser.parse_punctuation("}")
+
         all_args = [*block_args, *array_switches]
         region = parser.parse_region(arguments=all_args)
 
         in_types = [arg.type for arg in all_args]
+
+        bounds_arg = extra_attrs["bounds"]
+        npi_arg = extra_attrs["num_pure_inputs"]
+        paired_arg = extra_attrs["paired_outputs"]
+        input_modes_arg = extra_attrs["input_modes"]
+        output_modes_arg = extra_attrs["output_modes"]
+        assert isa(bounds_arg, DenseArrayBase[IntegerType])
+        assert isa(npi_arg, IntegerAttr[I64])
+        assert isa(paired_arg, DenseArrayBase[IntegerType])
+        assert isa(input_modes_arg, ArrayAttr[ArrayAttr[AffineMapAttr]])
+        assert isa(output_modes_arg, ArrayAttr[ArrayAttr[AffineMapAttr]])
+
         return cls(
             name=name_prop.data,
             function_type=(in_types, out_types),
             region=region,
             array_switch_no=len(array_switches),
+            pe_ref=pe_ref,
+            bounds=bounds_arg,
+            num_pure_inputs=npi_arg.value.data,
+            paired_outputs=paired_arg,
+            input_modes=input_modes_arg,
+            output_modes=output_modes_arg,
         )
 
 
