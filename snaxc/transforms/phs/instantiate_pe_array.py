@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.ir import Attribute
 from xdsl.ir.affine import AffineMap
 from xdsl.parser import SymbolRefAttr
 from xdsl.passes import ModulePass
@@ -18,7 +19,8 @@ PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
 MAGIC_ATTR_NAME = "phs_acc"
 
 
-def _dense_ints(attr: builtin.DenseArrayBase) -> tuple[int, ...]:
+def _dense_ints(attr: Attribute) -> tuple[int, ...]:
+    assert isinstance(attr, builtin.DenseArrayBase)
     return tuple(int(v) for v in attr.get_values())  # pyright: ignore[reportAttributeAccessIssue,reportUnknownMemberType,reportUnknownVariableType,reportUnknownArgumentType]
 
 
@@ -44,7 +46,7 @@ def _collect_modes_from_linalg(
         bounds_attr_lin = op.attributes.get(BOUNDS_ATTR_NAME)
         if not isinstance(bounds_attr_lin, builtin.DenseArrayBase):
             continue
-        bounds = _dense_ints(bounds_attr_lin)
+        bounds = _dense_ints(bounds_attr_lin)  # pyright: ignore[reportUnknownArgumentType]
         modes.append((in_maps, out_maps, bounds))
     return modes
 
@@ -65,7 +67,7 @@ class InstantiatePEArrays(RewritePattern):
                 return
             bounds_attr = pe.attributes[BOUNDS_ATTR_NAME]
             assert isinstance(bounds_attr, builtin.DenseArrayBase)
-            pe_bounds = _dense_ints(bounds_attr)
+            pe_bounds = _dense_ints(bounds_attr)  # pyright: ignore[reportUnknownArgumentType]
             num_data = len(pe.data_operands())
             num_outputs = len(pe.get_terminator().operands)
             num_dims = len(pe_bounds)
@@ -84,7 +86,7 @@ class InstantiatePEArrays(RewritePattern):
             paired_outputs = tuple(range(min(len(modes[0][1]), len(modes[0][0]))))
         else:
             assert isinstance(paired_attr, builtin.DenseArrayBase)
-            paired_outputs = _dense_ints(paired_attr)
+            paired_outputs = _dense_ints(paired_attr)  # pyright: ignore[reportUnknownArgumentType]
 
         num_data = len(pe.data_operands())
         num_pure_inputs = num_data - len(paired_outputs)

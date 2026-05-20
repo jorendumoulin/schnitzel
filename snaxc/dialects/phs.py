@@ -1048,11 +1048,11 @@ class PEArrayOp(IRDLOperation):
             region=region,
             array_switch_no=len(array_switches),
             pe_ref=pe_ref,
-            bounds=bounds_arg,
+            bounds=bounds_arg,  # pyright: ignore[reportUnknownArgumentType]
             num_pure_inputs=npi_arg.value.data,
-            paired_outputs=paired_arg,
-            input_modes=input_modes_arg,
-            output_modes=output_modes_arg,
+            paired_outputs=paired_arg,  # pyright: ignore[reportUnknownArgumentType]
+            input_modes=input_modes_arg,  # pyright: ignore[reportUnknownArgumentType]
+            output_modes=output_modes_arg,  # pyright: ignore[reportUnknownArgumentType]
         )
 
 
