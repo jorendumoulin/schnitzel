@@ -22,7 +22,7 @@ func.func @host(%a: memref<4xi32>, %b: memref<4xi32>, %c: memref<4xi32>) {
 
 // CHECK:      phs.pe_array @myacc_array targets @myacc
 // CHECK-SAME:   bounds = array<i64: 4>
-// CHECK-SAME:   num_pure_inputs = 1
-// CHECK-SAME:   paired_outputs = array<i64: 0>
+// CHECK-SAME:   num_pure_inputs = 2
+// CHECK-SAME:   paired_outputs = array<i64>
 // CHECK-SAME:   input_modes = {{\[}}{{\[}}affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>{{\]}}{{\]}}
 // CHECK-SAME:   output_modes = {{\[}}{{\[}}affine_map<(d0) -> (d0)>{{\]}}{{\]}}

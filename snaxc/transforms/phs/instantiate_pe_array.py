@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.dialects.builtin import DenseArrayBase, IntegerType
+from xdsl.dialects.linalg.attrs import IteratorType
 from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
-from xdsl.ir.affine import AffineMap
+from xdsl.ir.affine import AffineConstantExpr, AffineDimExpr, AffineExpr, AffineMap
 from xdsl.parser import SymbolRefAttr
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import PatternRewriter, PatternRewriteWalker, RewritePattern, op_type_rewrite_pattern
@@ -24,12 +25,42 @@ def _dense_ints(attr: DenseArrayBase[IntegerType]) -> tuple[int, ...]:
     return tuple(int(v) for v in attr.get_values())
 
 
+def _project_to_parallel(affine_map: AffineMap, parallel_dims: tuple[int, ...]) -> AffineMap:
+    """
+    Restrict an affine map to a subset of its iteration dims (the parallel ones).
+
+    Result expressions referencing any non-parallel dim are dropped (they describe
+    the temporal access pattern that the streamer handles, not the per-PE spatial
+    access pattern). Remaining domain dims are renumbered contiguously so the
+    map's num_dims equals len(parallel_dims).
+    """
+    parallel_set = set(parallel_dims)
+    new_dims: list[AffineExpr] = []
+    for d in range(affine_map.num_dims):
+        if d in parallel_set:
+            new_dims.append(AffineDimExpr(parallel_dims.index(d)))
+        else:
+            new_dims.append(AffineConstantExpr(0))
+
+    new_results: list[AffineExpr] = []
+    for expr in affine_map.results:
+        if all(d in parallel_set for d in expr.used_dims()):
+            new_results.append(expr.replace_dims_and_symbols(new_dims, []))
+
+    return AffineMap(len(parallel_dims), 0, tuple(new_results))
+
+
 def _collect_modes_from_linalg(
-    pe: phs.PEOp, module: builtin.ModuleOp
+    pe: phs.PEOp, module: builtin.ModuleOp, paired_outputs: tuple[int, ...]
 ) -> list[tuple[tuple[AffineMap, ...], tuple[AffineMap, ...], tuple[int, ...]]]:
     """
     Walk the module for linalg.generics tagged with phs_acc == pe.sym_name.
     Each match becomes one dataflow mode of the resulting pe_array.
+
+    input_maps for the resulting mode are built as:
+        pure_inputs (from linalg ins=) + carry_inputs (mirror of paired output maps)
+    matching the encode-pass convention that the PE block-arg ordering is
+    [pure-input-args..., carry-input-args...].
     """
     pe_name = pe.name_prop.data
     modes: list[tuple[tuple[AffineMap, ...], tuple[AffineMap, ...], tuple[int, ...]]] = []
@@ -40,26 +71,64 @@ def _collect_modes_from_linalg(
         if not isinstance(acc, SymbolRefAttr) or acc.string_value() != pe_name:
             continue
         num_ins = len(op.inputs)
-        in_maps = tuple(m.data for m in op.indexing_maps.data[:num_ins])
-        out_maps = tuple(m.data for m in op.indexing_maps.data[num_ins:])
+        raw_pure_in_maps = tuple(m.data for m in op.indexing_maps.data[:num_ins])
+        raw_out_maps = tuple(m.data for m in op.indexing_maps.data[num_ins:])
+
+        # The linalg indexing_maps cover the full iteration space (parallel +
+        # reduction). phs_array_bounds counts only the spatial (parallel) dims
+        # the PE array unrolls; the streamer cycles the temporal/reduction
+        # dims. Project the maps onto the parallel-dim subset.
+        parallel_dims = tuple(
+            i for i, it in enumerate(op.iterator_types.data) if it.data == IteratorType.PARALLEL
+        )
+        pure_in_maps = tuple(_project_to_parallel(m, parallel_dims) for m in raw_pure_in_maps)
+        out_maps = tuple(_project_to_parallel(m, parallel_dims) for m in raw_out_maps)
+        carry_in_maps = tuple(out_maps[k] for k in paired_outputs)
+        in_maps = pure_in_maps + carry_in_maps
 
         bounds_attr_lin = op.attributes.get(BOUNDS_ATTR_NAME)
         if not isa(bounds_attr_lin, DenseArrayBase[IntegerType]):
             continue
         bounds = _dense_ints(bounds_attr_lin)
+        assert len(bounds) == len(parallel_dims), (
+            f"phs_array_bounds {bounds} count {len(bounds)} != #parallel iterator dims "
+            f"{len(parallel_dims)} on linalg.generic for @{pe_name}"
+        )
         modes.append((in_maps, out_maps, bounds))
     return modes
+
+
+def _compute_paired_outputs(pe: phs.PEOp, module: builtin.ModuleOp | None) -> tuple[int, ...]:
+    """Resolve carry→output pairing from PE attribute, or infer from PE arity."""
+    paired_attr = pe.attributes.get(PAIRED_OUTPUTS_ATTR_NAME)
+    if isa(paired_attr, DenseArrayBase[IntegerType]):
+        return _dense_ints(paired_attr)
+    # Infer: carry count = PE data operands - #linalg pure inputs. Default 0
+    # carries when no linalg source is available.
+    pe_data = len(pe.data_operands())
+    pe_name = pe.name_prop.data
+    if module is not None:
+        for op in module.walk():
+            if isinstance(op, LinalgGenericOp):
+                acc = op.attributes.get(MAGIC_ATTR_NAME)
+                if isinstance(acc, SymbolRefAttr) and acc.string_value() == pe_name:
+                    carries = max(0, pe_data - len(op.inputs))
+                    return tuple(range(carries))
+    return ()
 
 
 @dataclass(frozen=True)
 class InstantiatePEArrays(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, pe: phs.PEOp, rewriter: PatternRewriter):
-        # Try to collect modes from the originating linalg.generics first.
         toplevel = pe.get_toplevel_object()
+        module = toplevel if isinstance(toplevel, builtin.ModuleOp) else None
+
+        paired_outputs = _compute_paired_outputs(pe, module)
+
         modes: list[tuple[tuple[AffineMap, ...], tuple[AffineMap, ...], tuple[int, ...]]] = []
-        if isinstance(toplevel, builtin.ModuleOp):
-            modes = _collect_modes_from_linalg(pe, toplevel)
+        if module is not None:
+            modes = _collect_modes_from_linalg(pe, module, paired_outputs)
 
         # Fall back to PE-attached bounds + identity maps when no linalg sources exist.
         if not modes:
@@ -79,14 +148,6 @@ class InstantiatePEArrays(RewritePattern):
         bounds = modes[0][2]
         for _, _, b in modes:
             assert b == bounds, f"All modes must share bounds; got {b} vs {bounds}"
-
-        # paired_outputs from the PE attribute (encode pass + prune pass).
-        paired_attr = pe.attributes.get(PAIRED_OUTPUTS_ATTR_NAME)
-        if paired_attr is None:
-            paired_outputs = tuple(range(min(len(modes[0][1]), len(modes[0][0]))))
-        else:
-            assert isa(paired_attr, DenseArrayBase[IntegerType])
-            paired_outputs = _dense_ints(paired_attr)
 
         num_data = len(pe.data_operands())
         num_pure_inputs = num_data - len(paired_outputs)
