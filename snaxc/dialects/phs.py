@@ -11,6 +11,7 @@ from xdsl.dialects.builtin import (
     FunctionType,
     IndexType,
     IntegerAttr,
+    IntegerType,
     StringAttr,
     i64,
 )
@@ -38,11 +39,13 @@ from xdsl.parser import Parser, SymbolRefAttr
 from xdsl.printer import Printer
 from xdsl.traits import HasParent, IsolatedFromAbove, IsTerminator, Pure, SymbolOpInterface, SymbolTable
 from xdsl.utils.exceptions import VerifyException
+from xdsl.utils.hints import isa
 
 
 def _dense_int_values(attr: DenseArrayBase) -> tuple[int, ...]:
-    """Read int values from a DenseArrayBase, sidestepping covariance issues."""
-    return tuple(int(v) for v in attr.get_values())  # pyright: ignore[reportAttributeAccessIssue,reportUnknownMemberType,reportUnknownVariableType,reportUnknownArgumentType]
+    """Read int values from a DenseArrayBase, asserting integer element type."""
+    assert isa(attr, DenseArrayBase[IntegerType])
+    return tuple(int(v) for v in attr.get_values())
 
 
 @irdl_op_definition
@@ -1036,11 +1039,11 @@ class PEArrayOp(IRDLOperation):
         paired_arg = extra_attrs["paired_outputs"]
         input_modes_arg = extra_attrs["input_modes"]
         output_modes_arg = extra_attrs["output_modes"]
-        assert isinstance(bounds_arg, DenseArrayBase)
-        assert isinstance(npi_arg, IntegerAttr)
-        assert isinstance(paired_arg, DenseArrayBase)
-        assert isinstance(input_modes_arg, ArrayAttr)
-        assert isinstance(output_modes_arg, ArrayAttr)
+        assert isa(bounds_arg, DenseArrayBase[IntegerType])
+        assert isa(npi_arg, IntegerAttr[I64])
+        assert isa(paired_arg, DenseArrayBase[IntegerType])
+        assert isa(input_modes_arg, ArrayAttr[ArrayAttr[AffineMapAttr]])
+        assert isa(output_modes_arg, ArrayAttr[ArrayAttr[AffineMapAttr]])
 
         return cls(
             name=name_prop.data,
@@ -1048,11 +1051,11 @@ class PEArrayOp(IRDLOperation):
             region=region,
             array_switch_no=len(array_switches),
             pe_ref=pe_ref,
-            bounds=bounds_arg,  # pyright: ignore[reportUnknownArgumentType]
+            bounds=bounds_arg,
             num_pure_inputs=npi_arg.value.data,
-            paired_outputs=paired_arg,  # pyright: ignore[reportUnknownArgumentType]
-            input_modes=input_modes_arg,  # pyright: ignore[reportUnknownArgumentType]
-            output_modes=output_modes_arg,  # pyright: ignore[reportUnknownArgumentType]
+            paired_outputs=paired_arg,
+            input_modes=input_modes_arg,
+            output_modes=output_modes_arg,
         )
 
 
