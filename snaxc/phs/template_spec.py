@@ -118,4 +118,3 @@ class TemplateSpec:
         template = [*self.input_maps[: self.num_pure_inputs], *self.output_maps]
         template_bounds = self.template_bounds
         return Template(TemplatePattern(template_bounds, tp) for tp in template)
-

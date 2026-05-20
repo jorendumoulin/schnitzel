@@ -39,9 +39,7 @@ from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSw
 from snaxc.transforms.phs.schedule_preset.separate_linalg import PhsScheduleSeparateLinalgPass
 
 
-def _harvest_accelerators(
-    hardware_module: ModuleOp, pe_clones: dict[str, phs.PEOp]
-) -> list[PhsAccelerator]:
+def _harvest_accelerators(hardware_module: ModuleOp, pe_clones: dict[str, phs.PEOp]) -> list[PhsAccelerator]:
     """
     Build one ``PhsAccelerator`` per ``phs.pe_array`` op currently in the
     module. The TemplateSpec is read directly off the PEArrayOp; the
