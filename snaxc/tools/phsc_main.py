@@ -35,10 +35,57 @@ from snaxc.transforms.phs.expand_integer_minmax import ExpandIntegerMinMaxPass
 from snaxc.transforms.phs.export_phs import PhsKeepPhsPass, PhsRemovePhsPass
 from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
 from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
-from snaxc.transforms.phs.instantiate_pe_array import BOUNDS_ATTR_NAME, InstantiatePEArrayPass
+from snaxc.transforms.phs.instantiate_pe_array import (
+    BOUNDS_ATTR_NAME,
+    InstantiatePEArrayPass,
+    MAGIC_ATTR_NAME,
+    PAIRED_OUTPUTS_ATTR_NAME,
+)
 from snaxc.transforms.phs.prune_unused_carries import PrunePEUnusedCarriesPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
 from snaxc.transforms.phs.schedule_preset.separate_linalg import PhsScheduleSeparateLinalgPass
+from xdsl.dialects.builtin import DenseArrayBase, IntegerType
+from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
+from xdsl.parser import SymbolRefAttr
+from xdsl.utils.hints import isa
+
+
+def _build_template_spec_from_linalg(
+    pe: phs.PEOp, module: ModuleOp, bounds: tuple[int, ...]
+) -> TemplateSpec:
+    """
+    Derive a TemplateSpec from the linalg.generic that targets this PE.
+    Carry-input maps mirror the paired output maps (encode-pass convention:
+    PE block-arg order = pure inputs + carry inputs).
+    """
+    pe_name = pe.name_prop.data
+    paired_attr = pe.attributes.get(PAIRED_OUTPUTS_ATTR_NAME)
+    if isa(paired_attr, DenseArrayBase[IntegerType]):
+        paired_outputs = tuple(int(v) for v in paired_attr.get_values())
+    else:
+        paired_outputs = None
+
+    for op in module.walk():
+        if not isinstance(op, LinalgGenericOp):
+            continue
+        acc = op.attributes.get(MAGIC_ATTR_NAME)
+        if not isinstance(acc, SymbolRefAttr) or acc.string_value() != pe_name:
+            continue
+        num_ins = len(op.inputs)
+        pure_in_maps = tuple(m.data for m in op.indexing_maps.data[:num_ins])
+        out_maps = tuple(m.data for m in op.indexing_maps.data[num_ins:])
+        if paired_outputs is None:
+            carries = max(0, len(pe.data_operands()) - num_ins)
+            paired_outputs = tuple(range(carries))
+        carry_in_maps = tuple(out_maps[k] for k in paired_outputs)
+        return TemplateSpec(
+            input_maps=pure_in_maps + carry_in_maps,
+            output_maps=out_maps,
+            template_bounds=bounds,
+            paired_outputs=paired_outputs,
+        )
+    # No matching linalg.generic — fall back to identity maps.
+    return TemplateSpec.derive_template_spec(pe, bounds)
 
 
 class PHSCMain(SNAXCMain):
@@ -76,7 +123,9 @@ class PHSCMain(SNAXCMain):
                 )
                 bounds_attr = hw_op.attributes[BOUNDS_ATTR_NAME]
                 assert isinstance(bounds_attr, builtin.DenseArrayBase)
-                template_spec = TemplateSpec.derive_template_spec(hw_op, bounds_attr.get_values())
+                template_spec = _build_template_spec_from_linalg(
+                    hw_op, hardware_module, tuple(int(v) for v in bounds_attr.get_values())
+                )
                 # Use a clone to prevent downstream changes messing up accelerator registration
                 accelerator = PhsAccelerator(hw_op.clone(), template_spec)
                 accelerators.append(accelerator)
