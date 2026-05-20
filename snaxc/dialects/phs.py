@@ -611,6 +611,42 @@ class PEInstanceOp(IRDLOperation):
         """Resolve the PE this instance references via the parent PEArrayOp."""
         return self.get_parent_array().get_pe()
 
+    def verify_(self) -> None:
+        pe = self.get_pe()
+        pe_data = pe.data_operands()
+        pe_switches = pe.get_switches()
+
+        if len(self.data_operands) != len(pe_data):
+            raise VerifyException(
+                f"phs.instance: {len(self.data_operands)} data operands but PE @{pe.name_prop.data} "
+                f"expects {len(pe_data)}"
+            )
+        for i, (op, pe_op) in enumerate(zip(self.data_operands, pe_data, strict=True)):
+            if op.type != pe_op.type:
+                raise VerifyException(
+                    f"phs.instance data operand {i} type {op.type} != PE @{pe.name_prop.data} "
+                    f"data operand type {pe_op.type}"
+                )
+
+        if len(self.switches) != len(pe_switches):
+            raise VerifyException(
+                f"phs.instance: {len(self.switches)} switches but PE @{pe.name_prop.data} "
+                f"expects {len(pe_switches)}"
+            )
+
+        pe_results = pe.get_terminator().operands
+        if len(self.res) != len(pe_results):
+            raise VerifyException(
+                f"phs.instance: {len(self.res)} results but PE @{pe.name_prop.data} "
+                f"yields {len(pe_results)}"
+            )
+        for i, (r, pe_r) in enumerate(zip(self.res, pe_results, strict=True)):
+            if r.type != pe_r.type:
+                raise VerifyException(
+                    f"phs.instance result {i} type {r.type} != PE @{pe.name_prop.data} "
+                    f"yield type {pe_r.type}"
+                )
+
     def __init__(
         self,
         instance_name: str,
