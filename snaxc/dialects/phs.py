@@ -630,21 +630,18 @@ class PEInstanceOp(IRDLOperation):
 
         if len(self.switches) != len(pe_switches):
             raise VerifyException(
-                f"phs.instance: {len(self.switches)} switches but PE @{pe.name_prop.data} "
-                f"expects {len(pe_switches)}"
+                f"phs.instance: {len(self.switches)} switches but PE @{pe.name_prop.data} expects {len(pe_switches)}"
             )
 
         pe_results = pe.get_terminator().operands
         if len(self.res) != len(pe_results):
             raise VerifyException(
-                f"phs.instance: {len(self.res)} results but PE @{pe.name_prop.data} "
-                f"yields {len(pe_results)}"
+                f"phs.instance: {len(self.res)} results but PE @{pe.name_prop.data} yields {len(pe_results)}"
             )
         for i, (r, pe_r) in enumerate(zip(self.res, pe_results, strict=True)):
             if r.type != pe_r.type:
                 raise VerifyException(
-                    f"phs.instance result {i} type {r.type} != PE @{pe.name_prop.data} "
-                    f"yield type {pe_r.type}"
+                    f"phs.instance result {i} type {r.type} != PE @{pe.name_prop.data} yield type {pe_r.type}"
                 )
 
     def __init__(
@@ -842,8 +839,7 @@ class PEArrayOp(IRDLOperation):
             out_maps = self.get_output_maps(mode_idx)
             if len(in_maps) > num_data:
                 raise VerifyException(
-                    f"PEArrayOp mode {mode_idx}: {len(in_maps)} input maps exceed "
-                    f"PE data operand count {num_data}"
+                    f"PEArrayOp mode {mode_idx}: {len(in_maps)} input maps exceed PE data operand count {num_data}"
                 )
             if len(out_maps) > max_out:
                 raise VerifyException(
