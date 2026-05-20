@@ -3,9 +3,8 @@ from dataclasses import dataclass
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.dialects.builtin import DenseArrayBase, IntegerType
-from xdsl.dialects.linalg.attrs import IteratorType
 from xdsl.dialects.linalg.ops import GenericOp as LinalgGenericOp
-from xdsl.ir.affine import AffineConstantExpr, AffineDimExpr, AffineExpr, AffineMap
+from xdsl.ir.affine import AffineMap
 from xdsl.parser import SymbolRefAttr
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import PatternRewriter, PatternRewriteWalker, RewritePattern, op_type_rewrite_pattern
@@ -23,31 +22,6 @@ MAGIC_ATTR_NAME = "phs_acc"
 
 def _dense_ints(attr: DenseArrayBase[IntegerType]) -> tuple[int, ...]:
     return tuple(int(v) for v in attr.get_values())
-
-
-def _project_to_parallel(affine_map: AffineMap, parallel_dims: tuple[int, ...]) -> AffineMap:
-    """
-    Restrict an affine map to a subset of its iteration dims (the parallel ones).
-
-    Result expressions referencing any non-parallel dim are dropped (they describe
-    the temporal access pattern that the streamer handles, not the per-PE spatial
-    access pattern). Remaining domain dims are renumbered contiguously so the
-    map's num_dims equals len(parallel_dims).
-    """
-    parallel_set = set(parallel_dims)
-    new_dims: list[AffineExpr] = []
-    for d in range(affine_map.num_dims):
-        if d in parallel_set:
-            new_dims.append(AffineDimExpr(parallel_dims.index(d)))
-        else:
-            new_dims.append(AffineConstantExpr(0))
-
-    new_results: list[AffineExpr] = []
-    for expr in affine_map.results:
-        if all(d in parallel_set for d in expr.used_dims()):
-            new_results.append(expr.replace_dims_and_symbols(new_dims, []))
-
-    return AffineMap(len(parallel_dims), 0, tuple(new_results))
 
 
 def _collect_modes_from_linalg(
@@ -71,18 +45,10 @@ def _collect_modes_from_linalg(
         if not isinstance(acc, SymbolRefAttr) or acc.string_value() != pe_name:
             continue
         num_ins = len(op.inputs)
-        raw_pure_in_maps = tuple(m.data for m in op.indexing_maps.data[:num_ins])
-        raw_out_maps = tuple(m.data for m in op.indexing_maps.data[num_ins:])
-
-        # The linalg indexing_maps cover the full iteration space (parallel +
-        # reduction). phs_array_bounds counts only the spatial (parallel) dims
-        # the PE array unrolls; the streamer cycles the temporal/reduction
-        # dims. Project the maps onto the parallel-dim subset.
-        parallel_dims = tuple(
-            i for i, it in enumerate(op.iterator_types.data) if it.data == IteratorType.PARALLEL
-        )
-        pure_in_maps = tuple(_project_to_parallel(m, parallel_dims) for m in raw_pure_in_maps)
-        out_maps = tuple(_project_to_parallel(m, parallel_dims) for m in raw_out_maps)
+        pure_in_maps = tuple(m.data for m in op.indexing_maps.data[:num_ins])
+        out_maps = tuple(m.data for m in op.indexing_maps.data[num_ins:])
+        # Carry-input slots mirror their paired output access pattern. Convention:
+        # input_maps = [pure inputs from linalg ins...] + [carry inputs...].
         carry_in_maps = tuple(out_maps[k] for k in paired_outputs)
         in_maps = pure_in_maps + carry_in_maps
 
@@ -90,10 +56,6 @@ def _collect_modes_from_linalg(
         if not isa(bounds_attr_lin, DenseArrayBase[IntegerType]):
             continue
         bounds = _dense_ints(bounds_attr_lin)
-        assert len(bounds) == len(parallel_dims), (
-            f"phs_array_bounds {bounds} count {len(bounds)} != #parallel iterator dims "
-            f"{len(parallel_dims)} on linalg.generic for @{pe_name}"
-        )
         modes.append((in_maps, out_maps, bounds))
     return modes
 
