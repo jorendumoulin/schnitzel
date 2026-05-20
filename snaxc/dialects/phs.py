@@ -42,9 +42,8 @@ from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.hints import isa
 
 
-def _dense_int_values(attr: DenseArrayBase) -> tuple[int, ...]:
-    """Read int values from a DenseArrayBase, asserting integer element type."""
-    assert isa(attr, DenseArrayBase[IntegerType])
+def _dense_int_values(attr: DenseArrayBase[IntegerType]) -> tuple[int, ...]:
+    """Read int values from a DenseArrayBase of integer element type."""
     return tuple(int(v) for v in attr.get_values())
 
 
@@ -892,6 +891,7 @@ class PEArrayOp(IRDLOperation):
         return pe
 
     def get_bounds(self) -> tuple[int, ...]:
+        assert isa(self.bounds, DenseArrayBase[IntegerType])
         return _dense_int_values(self.bounds)
 
     def get_input_maps(self, mode: int) -> tuple[AffineMap, ...]:
@@ -901,6 +901,7 @@ class PEArrayOp(IRDLOperation):
         return tuple(m.data for m in self.output_modes.data[mode].data)
 
     def get_paired_outputs(self) -> tuple[int, ...]:
+        assert isa(self.paired_outputs, DenseArrayBase[IntegerType])
         return _dense_int_values(self.paired_outputs)
 
     def get_max_outputs(self) -> int:

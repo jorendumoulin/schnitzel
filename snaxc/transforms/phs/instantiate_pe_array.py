@@ -20,8 +20,7 @@ PAIRED_OUTPUTS_ATTR_NAME = "phs.paired_outputs"
 MAGIC_ATTR_NAME = "phs_acc"
 
 
-def _dense_ints(attr: DenseArrayBase) -> tuple[int, ...]:
-    assert isa(attr, DenseArrayBase[IntegerType])
+def _dense_ints(attr: DenseArrayBase[IntegerType]) -> tuple[int, ...]:
     return tuple(int(v) for v in attr.get_values())
 
 
@@ -45,7 +44,7 @@ def _collect_modes_from_linalg(
         out_maps = tuple(m.data for m in op.indexing_maps.data[num_ins:])
 
         bounds_attr_lin = op.attributes.get(BOUNDS_ATTR_NAME)
-        if not isinstance(bounds_attr_lin, builtin.DenseArrayBase):
+        if not isa(bounds_attr_lin, DenseArrayBase[IntegerType]):
             continue
         bounds = _dense_ints(bounds_attr_lin)
         modes.append((in_maps, out_maps, bounds))
@@ -67,7 +66,7 @@ class InstantiatePEArrays(RewritePattern):
             if BOUNDS_ATTR_NAME not in pe.attributes:
                 return
             bounds_attr = pe.attributes[BOUNDS_ATTR_NAME]
-            assert isinstance(bounds_attr, builtin.DenseArrayBase)
+            assert isa(bounds_attr, DenseArrayBase[IntegerType])
             pe_bounds = _dense_ints(bounds_attr)
             num_data = len(pe.data_operands())
             num_outputs = len(pe.get_terminator().operands)
@@ -86,7 +85,7 @@ class InstantiatePEArrays(RewritePattern):
         if paired_attr is None:
             paired_outputs = tuple(range(min(len(modes[0][1]), len(modes[0][0]))))
         else:
-            assert isinstance(paired_attr, builtin.DenseArrayBase)
+            assert isa(paired_attr, DenseArrayBase[IntegerType])
             paired_outputs = _dense_ints(paired_attr)
 
         num_data = len(pe.data_operands())
