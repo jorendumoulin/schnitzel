@@ -4,6 +4,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../")
 
+include(${ROOT}/cmake/ccache.cmake)
+
 if(NOT CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE
     "${ROOT}/cmake/cva6-toolchain.cmake"

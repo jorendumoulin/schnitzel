@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/ccache.cmake)
+
 project(sim CXX)
 
 set(CMAKE_CXX_STANDARD 17)
