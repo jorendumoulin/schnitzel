@@ -43,17 +43,25 @@ class LLVMMemrefDescriptor:
             LLVMMemrefDescriptor: The created descriptor.
         """
 
-        return cls(
-            LLVMStructType.from_type_list(
-                [
-                    LLVMPointerType(),
-                    LLVMPointerType(),
-                    integer_type,
-                    LLVMArrayType(rank, integer_type),
-                    LLVMArrayType(rank, integer_type),
-                ]
-            )
-        )
+        # MLIR's default calling convention for ranked memrefs (matched by
+        # `--finalize-memref-to-llvm`) drops the sizes/strides arrays when
+        # rank is 0 — only the allocated/aligned pointers and offset remain.
+        # Keeping those arrays here as `LLVMArrayType(0, ...)` would diverge
+        # from the mlir-opt convention and leave an unreconcilable
+        # `builtin.unrealized_conversion_cast` between the snax-side 5-field
+        # struct and the mlir-side 3-field struct.
+        fields: list = [
+            LLVMPointerType(),
+            LLVMPointerType(),
+            integer_type,
+        ]
+        if rank > 0:
+            fields.extend([
+                LLVMArrayType(rank, integer_type),
+                LLVMArrayType(rank, integer_type),
+            ])
+
+        return cls(LLVMStructType.from_type_list(fields))
 
     @classmethod
     def from_memref_type(cls, memref_type: MemRefType[Attribute], integer_type: IntegerType) -> "LLVMMemrefDescriptor":
@@ -84,25 +92,32 @@ class LLVMMemrefDescriptor:
         def exception(message: str) -> VerifyException:
             return VerifyException("Invalid Memref Descriptor: " + message)
 
-        type_iter = iter(self.descriptor.types.data)
+        types = self.descriptor.types.data
 
-        if not isinstance(next(type_iter), LLVMPointerType):
+        if len(types) not in (3, 5):
+            raise exception("Expected descriptor to have 3 (0-D) or 5 (ranked) fields")
+
+        if not isinstance(types[0], LLVMPointerType):
             raise exception("Expected first element to be LLVMPointerType")
 
-        if not isinstance(next(type_iter), LLVMPointerType):
+        if not isinstance(types[1], LLVMPointerType):
             raise exception("Expected second element to be LLVMPointerType")
 
-        if not isinstance(next(type_iter), IntegerType):
+        if not isinstance(types[2], IntegerType):
             raise exception("Expected third element to be IntegerType")
 
-        shape = next(type_iter)
+        if len(types) == 3:
+            # 0-D memref descriptor: pointer + aligned_pointer + offset only.
+            return
+
+        shape = types[3]
         if not isinstance(shape, LLVMArrayType):
             raise exception("Expected fourth element to be LLVMArrayType")
 
         if not isinstance(shape.type, IntegerType):
             raise exception("Expected fourth element to be LLVMArrayType of IntegerType")
 
-        strides = next(type_iter)
+        strides = types[4]
         if not isinstance(strides, LLVMArrayType):
             raise exception("Expected fifth element to be LLVMArrayType")
 

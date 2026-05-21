@@ -227,6 +227,11 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return PhsEncodePass
 
+    def get_promote_linalg_scalars():
+        from snaxc.transforms.promote_linalg_scalars import PromoteLinalgScalarsPass
+
+        return PromoteLinalgScalarsPass
+
     def get_phs_prune_unused_carries():
         from snaxc.transforms.phs.prune_unused_carries import PrunePEUnusedCarriesPass
 
@@ -415,6 +420,7 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "pipeline-duplicate-buffers": get_pipeline_duplicate_buffers,
         "postprocess": get_postprocess_mlir,
         "preprocess": get_preprocess_mlir,
+        "promote-linalg-scalars": get_promote_linalg_scalars,
         "realize-memref-casts": get_realize_memref_casts,
         "reuse-memref-allocs": get_reuse_memref_allocs,
         "snax-allocate": get_snax_allocate,

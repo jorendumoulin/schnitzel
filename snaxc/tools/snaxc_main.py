@@ -37,6 +37,7 @@ from snaxc.transforms.frontend.preprocess_mlir import PreprocessPass
 from snaxc.transforms.insert_sync_barrier import InsertSyncBarrier
 from snaxc.transforms.memref_to_snax import MemrefToSNAX
 from snaxc.transforms.phs.dispatch_linalg_phs import DispatchLinalgPHS
+from snaxc.transforms.promote_linalg_scalars import PromoteLinalgScalarsPass
 from snaxc.transforms.pipeline.construct_pipeline import ConstructPipelinePass
 from snaxc.transforms.pipeline.pipeline_canonicalize_for import PipelineCanonicalizeFor
 from snaxc.transforms.pipeline.pipeline_duplicate_buffers import PipelineDuplicateBuffersPass
@@ -199,6 +200,10 @@ class SNAXCMain(CommandLineTool):
         # Standard lowering pipeline:
         if phs:
             pass_pipeline.append(DispatchLinalgPHS())
+        # Promote scalar (non-shaped) linalg.generic ins to 0-D tensors so
+        # bufferization gives every operand a memref and downstream passes
+        # don't need a scalar branch.
+        pass_pipeline.append(PromoteLinalgScalarsPass())
         pass_pipeline.append(ConvertLinalgToDart())
         if not self.args.no_frontend:
             pass_pipeline.append(SnaxBufferize())
