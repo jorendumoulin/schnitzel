@@ -4618,20 +4618,11 @@ packages:
 - pypi: ./
   name: schnitzel
   version: 0.1.0
-  sha256: 46f92245546f27daba562a9a1957acc32e5f338662a380e8ed2eaef385a2ec4b
+  sha256: 1b8611b65963dbdcfe0746a8e79ceec612d016105fe9fed7880257f426731119
   requires_dist:
   - numpy
   - dacite>=1.9.2,<2
   requires_python: ==3.12.*
-- pypi: ./
-  name: schnitzel
-  version: 0.1.0
-  sha256: 46f92245546f27daba562a9a1957acc32e5f338662a380e8ed2eaef385a2ec4b
-  requires_dist:
-  - numpy
-  - dacite>=1.9.2,<2
-  requires_python: ==3.12.*
-  editable: true
 - pypi: https://files.pythonhosted.org/packages/f3/1b/998312db6d361ded1dd56b457ada371a8d8d77ca2195a7d18fd8a1736f21/scikit_learn-1.7.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
   name: scikit-learn
   version: 1.7.1
