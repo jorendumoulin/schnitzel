@@ -102,11 +102,29 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
       tcdmPortIdx += 1
     }
 
-    // Wire CSR config: take registers [csrOffset..csrOffset+numRegs), reverse
-    // for correct bit mapping (register 0 -> baseAddr at MSB), then reinterpret
-    // as AffineAguConfig bundle. This matches the pattern in AluAccelerator.
+    // Wire CSR config by explicit field assignment. The Python `param_values`
+    // (see snaxc/hw/accelerators/phs.py) lays out the CSRs as:
+    //   reg 0          : baseAddr
+    //   reg 1..T       : temporalStrides(0..T-1)
+    //   reg T+1..2T    : temporalBounds(0..T-1)
+    //   reg 2T+1..2T+S : spatialStrides(0..S-1)
+    // The previous `VecInit(regs.reverse).asTypeOf(...)` shortcut got
+    // baseAddr right (highest field, MSB) but flipped the index order
+    // within each inner Vec: a 2D config landed `ts_0` into
+    // `temporalStrides(T-1)` instead of `temporalStrides(0)`, and likewise
+    // for ub/ss. Harmless for 1D (single-element Vec) but breaks 2D and
+    // beyond. Wire each field explicitly to match the Python layout.
     val regs = (0 until numRegs).map(j => csrItf.io.vals(csrOffset + j))
-    s.io.config := VecInit(regs.reverse).asTypeOf(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes))
+    val cfg = Wire(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes))
+    cfg.baseAddr := regs(0)
+    for (k <- 0 until sc.nTemporalDims) {
+      cfg.temporalStrides(k) := regs(1 + k)
+      cfg.temporalBounds(k) := regs(1 + sc.nTemporalDims + k)
+    }
+    for (k <- 0 until sc.spatialDimSizes.length) {
+      cfg.spatialStrides(k) := regs(1 + 2 * sc.nTemporalDims + k)
+    }
+    s.io.config := cfg
     // spatialDimMask is wired below for write streamers (from the blackbox).
     // Default to all-enabled here; read streamers keep this value.
     s.io.spatialDimMask := VecInit(Seq.fill(sc.spatialDimSizes.length)(true.B))
@@ -114,11 +132,20 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
 
     // Wire start and direction
     s.io.start := csrItf.io.start
+    // A readWrite streamer whose carry-input is unused by the PE has no real
+    // read side to schedule: the BlackBox never consumes its readData. Drive
+    // it as a pure write streamer instead — the existing `write` paths in
+    // Streamer.scala issue one TCDM write per AGU iteration (every cycle for
+    // non-reduction patterns where isLast is trivially true), which matches
+    // the per-cycle output rate of the PE. The dedicated readWrite paths are
+    // reduction-specific (read on isFirst, write on isLast, bypass between)
+    // and would only fire once across the whole iteration space here.
     s.io.dir := (sc.streamType match {
-      case "read"      => StreamerDir.read
-      case "write"     => StreamerDir.write
-      case "readWrite" => StreamerDir.readWrite
-      case other       => throw new IllegalArgumentException(s"Unknown streamType: $other")
+      case "read"                       => StreamerDir.read
+      case "write"                      => StreamerDir.write
+      case "readWrite" if !sc.carryUsed => StreamerDir.write
+      case "readWrite"                  => StreamerDir.readWrite
+      case other                        => throw new IllegalArgumentException(s"Unknown streamType: $other")
     })
 
     // Tie off unused data port. readWrite uses both sides, so nothing is tied.
@@ -198,11 +225,23 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
     streamers(sIdx).io.spatialDimMask := dimMask
   }
 
-  // BlackBox is purely combinational — read streamers are ready when writes are ready
+  // BlackBox is purely combinational — read streamers fire in lockstep with
+  // writers. Gating each reader's ready on `combinedReadDataValid` (in
+  // addition to writers' writeData.ready) prevents one reader from draining
+  // its rspQueue alone while a sibling reader is still waiting on TCDM. Such
+  // unilateral drains would desync the rspQueues: the fast reader would
+  // empty first, force `combinedReadDataValid` permanently low, and stall
+  // the writer at whichever iteration the slow reader hadn't caught up to.
+  // Now reader_K.fire == writer.fire for every K.
+  val combinedWriteReady = writeStreamers.map(_.io.writeData.ready).reduce(_ && _)
   for (rIdx <- readStreamers.indices) {
-    readStreamers(rIdx).io.readData.ready := writeStreamers.map(_.io.writeData.ready).reduce(_ && _)
+    readStreamers(rIdx).io.readData.ready := combinedReadDataValid && combinedWriteReady
   }
 
-  // Done when all write streamers complete
-  csrItf.io.done := writeStreamers.map(_.io.done).reduce(_ && _)
+  // Done when every streamer completes. Writers normally finish last (they
+  // wait on combinedReadDataValid), but pure-read streamers can still have
+  // in-flight TCDM responses draining their rspQueues after the writer's AGU
+  // goes idle. Aggregating across all streamers ensures the host barrier
+  // doesn't release while any AGU or response queue is still active.
+  csrItf.io.done := streamers.map(_.io.done).reduce(_ && _)
 }

@@ -1,0 +1,201 @@
+"""
+End-to-end PHS build flow for the streamer_phs_alu kernel on schnitzel.
+
+  phsc (MLIR → SV + SoC verilog + sw.llvm.mlir)
+    → mlir-translate (sw.ll)
+    → clang (sw.o)
+    → link with runtime → test.elf
+    → verilator sim → simulate
+
+Usage: pixi run -e phs snakemake -j$(nproc)
+"""
+
+import os
+
+ROOT = os.path.abspath("../..")
+BUILD = "build"
+GENERATED = os.path.abspath(f"{BUILD}/generated")
+SIM_BUILD = f"{BUILD}/sim"
+DEVICE_BUILD = f"{BUILD}/device"
+
+# Cross-compilation settings (must match ibex-toolchain.cmake)
+CXX = "clang++"
+CC = "clang"
+CFLAGS = (
+    "-O2 --target=riscv32-unkown-elf -march=rv32imc -mabi=ilp32 -fno-builtin-printf"
+)
+LDFLAGS = f"{CFLAGS} -fuse-ld=lld -nostartfiles -nostdlib"
+RUNTIME_INCLUDE = f"{ROOT}/sw/device/runtime"
+MLIR_INCLUDE = f"{ROOT}/sw/common/mlir"
+LINKER_SCRIPT = f"{RUNTIME_INCLUDE}/link.ld"
+
+
+rule all:
+    input:
+        f"{BUILD}/test.log",
+
+
+rule alu_test:
+    """Run the hand-written ALU accelerator test (for debugging CSR values)"""
+    input:
+        f"{BUILD}/alu_test.log",
+
+
+# --- Step 1: PHS compilation + schnitzel hardware generation ---
+# phsc compiles MLIR → BlackBox SV + SoC verilog + lowered software MLIR
+
+
+rule phsc:
+    input:
+        mlir="addition.mlir",
+        schedule="transform_schedule.mlir",
+        software="test_software.mlir",
+    output:
+        sw=f"{BUILD}/sw.llvm.mlir",
+        top=f"{GENERATED}/Top.sv",
+        filelist=f"{GENERATED}/filelist.f",
+    shell:
+        """
+        phsc {input.mlir} {input.schedule} \
+            --software-file {input.software} \
+            -o {output.sw} \
+            --output-hardware {GENERATED}/phs_blackboxes.sv \
+            --output-schnitzel-dir {GENERATED}
+        """
+
+
+# --- Step 2: Compile PHS software kernel ---
+
+
+rule translate_mlir:
+    input:
+        f"{BUILD}/sw.llvm.mlir",
+    output:
+        f"{BUILD}/sw.ll",
+    shell:
+        "mlir-translate --mlir-to-llvmir -o {output} {input}"
+
+
+rule compile_mlir_kernel:
+    input:
+        f"{BUILD}/sw.ll",
+    output:
+        f"{BUILD}/sw.o",
+    shell:
+        "{CC} {CFLAGS} -x ir -c {input} -o {output} -Wno-override-module"
+
+
+# --- Step 3: Build device runtime (cmake, once) ---
+
+
+rule configure_device:
+    output:
+        ninja=f"{DEVICE_BUILD}/build.ninja",
+    shell:
+        "cmake -B {DEVICE_BUILD} -S {ROOT}/sw/device -G Ninja"
+
+
+rule build_device_runtime:
+    input:
+        ninja=f"{DEVICE_BUILD}/build.ninja",
+    output:
+        runtime=f"{DEVICE_BUILD}/runtime/libdevice_runtime.a",
+    shell:
+        "cmake --build {DEVICE_BUILD} --target device_runtime"
+
+
+# --- Step 4: Compile and link test harness ---
+
+
+rule compile_main:
+    input:
+        "main.cpp",
+    output:
+        f"{BUILD}/main.o",
+    shell:
+        "{CXX} {CFLAGS} -I{RUNTIME_INCLUDE} -I{MLIR_INCLUDE} -c {input} -o {output}"
+
+
+rule link:
+    input:
+        sw=f"{BUILD}/sw.o",
+        main=f"{BUILD}/main.o",
+        runtime=f"{DEVICE_BUILD}/runtime/libdevice_runtime.a",
+    output:
+        f"{BUILD}/test.elf",
+    shell:
+        "{CC} {LDFLAGS} -T{LINKER_SCRIPT} {input.sw} {input.main} {input.runtime} -o {output}"
+
+
+# --- Hand-written ALU test (for debugging) ---
+
+
+rule build_alu_test:
+    input:
+        ninja=f"{DEVICE_BUILD}/build.ninja",
+    output:
+        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
+    shell:
+        "cmake --build {DEVICE_BUILD} --target alu_accelerator_test.elf"
+
+
+rule simulate_alu_test:
+    input:
+        sim=f"{SIM_BUILD}/sim",
+        elf=f"{DEVICE_BUILD}/apps/alu_accelerator_test.elf",
+    output:
+        log=f"{BUILD}/alu_test.log",
+    shell:
+        """
+        {input.sim} {input.elf} 2>&1 | tee {output.log}
+        grep -q "TEST PASSED" {output.log}
+        """
+
+
+# --- Step 5: Build simulator (Verilator) ---
+
+
+rule configure_sim:
+    input:
+        filelist=f"{GENERATED}/filelist.f",
+    output:
+        ninja=f"{SIM_BUILD}/build.ninja",
+    shell:
+        "cmake -B {SIM_BUILD} -S {ROOT}/sim -G Ninja -DGENERATED_DIR={GENERATED}"
+
+
+rule build_sim:
+    input:
+        ninja=f"{SIM_BUILD}/build.ninja",
+        top=f"{GENERATED}/Top.sv",
+    output:
+        sim=f"{SIM_BUILD}/sim",
+        sim_lib=f"{SIM_BUILD}/my_module.cpython-312-x86_64-linux-gnu.so",
+    threads: workflow.cores
+    shell:
+        "cmake --build {SIM_BUILD} -j{threads}"
+
+
+# --- Step 6: Simulate ---
+
+
+rule simulate:
+    input:
+        sim=f"{SIM_BUILD}/sim",
+        sim_lib=f"{SIM_BUILD}/my_module.cpython-312-x86_64-linux-gnu.so",
+        elf=f"{BUILD}/test.elf",
+        spec="test_software.mlir",
+        inputs="inputs.json",
+    output:
+        log=f"{BUILD}/test.log",
+    shell:
+        """
+        snax-runner \
+            --elf {input.elf} \
+            --spec {input.spec} \
+            --inputs {input.inputs} \
+            --build-dir {BUILD}/golden \
+            --sim-lib {input.sim_lib} \
+            --vlt-args "+ibex_tracer_enable=0" 2>&1 | tee {output.log}
+        grep -q "TEST PASSED" {output.log}
+        """

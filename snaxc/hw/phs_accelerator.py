@@ -110,15 +110,40 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
         """Generate all setup values: streamer configs + switch values."""
         result: list[tuple[Sequence[Operation], SSAValue]] = []
 
-        for operand, pattern, _streamer in zip(
+        for operand, pattern, streamer in zip(
             (*op.inputs, *op.outputs), op.stride_patterns.data, self.phs.streamers.streamers
         ):
             result.append(([], operand))
-            for ts in pattern.temporal_strides:
-                c = arith.ConstantOp.from_int_and_width(ts.data, 32)
+
+            # The streamer reserves `streamer.temporal_dims` slots for ts/ub in
+            # its CSR layout (see Phs.param_values), but convert_dart_to_snax_stream
+            # may emit fewer dims (canonicalize collapses contiguous dims; the
+            # bound>spat_size split branch can fold a 2D access into 1D). Pad
+            # the short side with identity dims (ub=1, ts=0) so the positional
+            # zip against param_values() keys stays aligned. ub=0 would mean
+            # "disabled" per canonicalize semantics, which is wrong here.
+            # TODO: fix convert_dart_to_snax_stream to emit T temporal dims
+            # natively, then make this assert exact equality.
+            ts_values = [ts.data for ts in pattern.temporal_strides]
+            ub_values = [ub.data for ub in pattern.upper_bounds]
+            assert len(ts_values) <= streamer.temporal_dims, (
+                f"streamer '{streamer.name_base}' reserves {streamer.temporal_dims} "
+                f"temporal dims but pattern has {len(ts_values)}"
+            )
+            pad = streamer.temporal_dims - len(ts_values)
+            ts_values.extend([0] * pad)
+            ub_values.extend([1] * pad)
+
+            assert len(pattern.spatial_strides) == streamer.spatial_dim, (
+                f"streamer '{streamer.name_base}' has {streamer.spatial_dim} spatial dims "
+                f"but pattern has {len(pattern.spatial_strides)}"
+            )
+
+            for ts in ts_values:
+                c = arith.ConstantOp.from_int_and_width(ts, 32)
                 result.append(([c], c.result))
-            for ub in pattern.upper_bounds:
-                c = arith.ConstantOp.from_int_and_width(ub.data, 32)
+            for ub in ub_values:
+                c = arith.ConstantOp.from_int_and_width(ub, 32)
                 result.append(([c], c.result))
             for ss in pattern.spatial_strides:
                 c = arith.ConstantOp.from_int_and_width(ss.data, 32)
