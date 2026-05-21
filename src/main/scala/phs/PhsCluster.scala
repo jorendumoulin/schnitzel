@@ -11,6 +11,8 @@ import memory.MemDemux
 import csr.HWBarrier
 import dma.Dma
 import csr.{CsrDemux, CsrCombiner, CsrIO}
+import config.{AcceleratorConfig, ClusterConfig, MemoryConfig}
+import upickle.default.writeJs
 
 /** Self-contained PHS cluster with 2 RISC-V cores, shared TCDM, DMA, and PHS accelerators.
   *
@@ -154,16 +156,27 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
   axiMux.io.out <> io.axi
 
   // ---- Config export ----
-  def getConfig: PhsClusterConfig = PhsClusterConfig(
-    PhsMemoryConfig("L1", 0x1000_0000L, 0x1_0000L),
+  def getConfig: ClusterConfig = ClusterConfig(
+    MemoryConfig("L1", 0x1000_0000L, 0x1_0000L),
     List(
-      PhsCoreConfig(1, core1Accels.map { case (base, cfg) =>
-        PhsAccelPhsEntry(
-          "phs", cfg.streamers, cfg.numSwitches, cfg.switchBitwidths,
-          cfg.maskBitwidths, cfg.moduleName, cfg.svPath, base
-        )
-      }.toList),
-      PhsCoreConfig(2, List(PhsAccelDmaEntry("dma")))
+      config.CoreConfig(
+        1,
+        core1Accels.map { case (base, cfg) =>
+          AcceleratorConfig(
+            "phs",
+            Map(
+              "streamers" -> ujson.Arr.from(cfg.streamers.map(writeJs(_))),
+              "numSwitches" -> ujson.Num(cfg.numSwitches),
+              "switchBitwidths" -> ujson.Arr.from(cfg.switchBitwidths.map(ujson.Num(_))),
+              "maskBitwidths" -> ujson.Arr.from(cfg.maskBitwidths.map(ujson.Num(_))),
+              "moduleName" -> ujson.Str(cfg.moduleName),
+              "svPath" -> ujson.Str(cfg.svPath),
+              "csrBase" -> ujson.Num(base)
+            )
+          )
+        }.toList
+      ),
+      config.CoreConfig(2, List(dma.getConfig))
     )
   )
 }
