@@ -55,11 +55,21 @@ class LayoutResolution(RewritePattern):
             # Mapping from data to memory:
             assert isinstance(memref_type := op.operands[operand].type, MemRefType)
 
-            # Mapping from data to memory:
-            data_mem_map: AffineMap = memref_type.get_affine_map_in_bytes()
-
             # Mapping from access to data:
             access_data_map: AffineMap = schedule[operand].pattern.to_affine_map()
+
+            if memref_type.get_num_dims() == 0:
+                # 0-rank (broadcast) operand: no spatial axis, so the
+                # access→memory map is constant 0 across the schedule's
+                # iteration space. Skip `get_affine_map_in_bytes` (which
+                # rejects empty shapes) and emit an empty (0×num_dims)
+                # pattern matrix directly.
+                empty = np.zeros((0, access_data_map.num_dims), dtype=int)
+                access_patterns.append(AffineTransform(empty, np.array([], dtype=int)).to_affine_map())
+                continue
+
+            # Mapping from data to memory:
+            data_mem_map: AffineMap = memref_type.get_affine_map_in_bytes()
 
             # Mapping from access to memory:
             access_mem_map: AffineMap = data_mem_map.compose(access_data_map)
