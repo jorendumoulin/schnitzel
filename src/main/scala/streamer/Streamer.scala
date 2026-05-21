@@ -3,7 +3,7 @@ package streamer
 import chisel3._
 import chisel3.util.Queue
 import core.DecoupledBusIO
-import chisel3.util.{Decoupled, RRArbiter, log2Ceil, log2Up}
+import chisel3.util.{Decoupled, RRArbiter, log2Ceil}
 import dataclass.data
 import streamer.AguOutput
 import core.BusReq
@@ -67,21 +67,22 @@ class Streamer(
   io.readData.bits := readVec.asTypeOf(streamerDataType)
   val writeVec = io.writeData.bits.asTypeOf(Vec(numPorts, UInt(dataWidth.W)))
 
-  // In readWrite mode, the AGU doesn't advance on isFirst until writeData fires,
-  // but the readReqQueue must issue the TCDM read exactly once before that.
-  // This register prevents duplicate enqueues while the AGU is stalled.
-  // Generalized below to gate pure-read mode too, so a stalled AGU never
-  // re-enqueues the same address (which would also miscount credits).
+  // Prevent duplicate readReqQueue enqueues while the AGU stalls on a single
+  // address. Reset on AGU advance; set once every enabled lane has enqueued.
+  // Needed in readWrite mode (AGU waits for writeData) AND pure-read mode
+  // (AGU stalls when any lane's readReqQueue fills under asymmetric bank
+  // contention — lanes with free space would otherwise re-enqueue the held
+  // address every cycle).
   val firstReadIssued = RegInit(false.B)
 
-  // Per-lane credit tracking: counts free rspQueue slots accounting for
-  // in-flight reqs. Decremented when a req is admitted to readReqQueue (a
-  // future rsp committed to land in rspQueue), incremented when rspQueue
-  // drains. Gating both readReqQueue.enq.valid and AGU.addrs.ready on
-  // credits prevents rspQueue overflow regardless of bank-arbitration timing.
-  // Necessary because the interconnect's `outs.rsp.ready` is hardwired true
-  // and does not propagate back-pressure when the streamer's rspQueue is full.
-  val credits = Seq.fill(numPorts)(RegInit(queueDepth.U(log2Up(queueDepth + 1).W)))
+  // Forward-declared backpressure signal: high when this lane's rspQueue can
+  // safely absorb the rsp produced by a newly-issued TCDM read. Assigned
+  // below, after rspQueue is created. Gates the read-side arbiter input so
+  // a read req only leaves the streamer when its future rsp has a home.
+  // This is the actual end-to-end backpressure path from rspQueue to the
+  // request side; the rsp-side `rspQueue.io.enq.ready` cannot reach the
+  // bank (SRAM has no rsp-side hold capability).
+  val rspQueueHasSpace = Wire(Vec(numPorts, Bool()))
 
   // Queue to request reads from TCDM
   // For the reads, no data is necessary, so we just make a queue of addresses instead
@@ -89,7 +90,7 @@ class Streamer(
     val readReqQueue = Module(new Queue(UInt(addrWidth.W), queueDepth))
     readReqQueue.io.enq.bits := agu.io.addrs.bits.addrs(i)
     readReqQueue.io.enq.valid := agu.io.addrs.valid && agu.io.addrs.bits.isFirst &&
-      laneEnabled(i) && !firstReadIssued && credits(i) =/= 0.U && (
+      laneEnabled(i) && !firstReadIssued && (
         (io.dir === StreamerDir.read) ||
           (io.dir === StreamerDir.readWrite)
       )
@@ -116,9 +117,13 @@ class Streamer(
     val reqArbiter = Module(new RRArbiter(new BusReq(addrWidth, dataWidth), 2))
     // Attach each arbiters output to the req part of a TCDM port
     io.tcdmReqs(i).req <> reqArbiter.io.out
-    // port 0 on arbiter is for reads, only connect address, rest is hardcoded anyways
-    readReqQueues(i).io.deq.ready := reqArbiter.io.in(0).ready
-    reqArbiter.io.in(0).valid := readReqQueues(i).io.deq.valid
+    // port 0 on arbiter is for reads, only connect address, rest is hardcoded anyways.
+    // Gate on rspQueueHasSpace(i): only issue the read req to TCDM when the
+    // lane's rspQueue can hold the resulting rsp (accounting for the rsp
+    // already in flight from a previous cycle). This is what backpressures
+    // the AGU end-to-end: arbiter stalls → readReqQueue fills → AGU stalls.
+    readReqQueues(i).io.deq.ready := reqArbiter.io.in(0).ready && rspQueueHasSpace(i)
+    reqArbiter.io.in(0).valid := readReqQueues(i).io.deq.valid && rspQueueHasSpace(i)
     reqArbiter.io.in(0).bits.addr := readReqQueues(i).io.deq.bits
     reqArbiter.io.in(0).bits.wdata := DontCare
     reqArbiter.io.in(0).bits.wen := false.B;
@@ -141,16 +146,8 @@ class Streamer(
   // accumulation in reductions).
   val needsRead = isRead || (inReadWrite && agu.io.addrs.bits.isFirst)
   val needsWrite = isWrite || (inReadWrite && agu.io.addrs.bits.isLast)
-
-  // Hold off the AGU until every enabled lane has a credit. Without this, the
-  // AGU could issue an addr whose rsp would arrive on a full rspQueue and be
-  // silently dropped at the input boundary.
-  val allLaneCreditsAvailable = credits.zip(laneEnabled).map {
-    case (c, en) => !en || c =/= 0.U
-  }.reduce(_ && _)
-
   agu.io.addrs.ready :=
-    (!needsRead || (allReadReqQueuesReady && allLaneCreditsAvailable)) &&
+    (!needsRead || allReadReqQueuesReady) &&
       (!needsWrite || allWriteReqQueuesReady) &&
       (isRead || io.writeData.valid)
 
@@ -171,12 +168,9 @@ class Streamer(
     bypassState := BypassState.bypass
   }
 
-  // Prevent duplicate readReqQueue enqueues while AGU stalls. Reset on AGU
-  // advance (next address available); set when every enabled lane has
-  // enqueued for the current address. Generalized to all modes (was
-  // previously gated on inReadWrite, which left pure-read mode unprotected
-  // and allowed the same address to be re-enqueued each cycle during a
-  // partial-stall — wasted bandwidth and broken credit accounting).
+  // FSM for firstReadIssued (see declaration above). Reset on AGU advance
+  // (new address available); set once every enabled lane has enqueued for
+  // the current address.
   when(agu.io.addrs.fire) {
     firstReadIssued := false.B
   }.elsewhen(readReqQueues.zip(laneEnabled).map { case (q, en) => q.io.enq.fire || !en }.reduce(_ && _)) {
@@ -214,18 +208,19 @@ class Streamer(
     }
   }
 
-  // Credit update: decrement when a req is admitted (a future rsp committed to
-  // land in this lane's rspQueue), increment when a rsp is drained. When both
-  // happen the same cycle the credit is unchanged. Initial value = queueDepth
-  // matches an empty rspQueue with no in-flight reqs.
+  // Per-port "rsp in flight" tracker. TCDM bank latency is exactly 1 cycle,
+  // so at most one rsp per port can be travelling back at any moment: the
+  // one whose req fired last cycle. RegNext of arbiter.in(0).fire captures it.
+  val rspInFlight = (0 until numPorts).map(i => RegNext(reqArbiters(i).io.in(0).fire, false.B))
+
+  // rspQueueHasSpace: it is safe to issue a new read req this cycle iff
+  // rspQueue.count (current occupancy, does not reflect this cycle's enq/deq)
+  // plus the already-in-flight rsp would leave at least one free slot for
+  // the rsp that the new req will produce next cycle. Slightly conservative
+  // (ignores same-cycle deq), but no combinational loop and the lost cycle
+  // only matters at full saturation.
   for (i <- 0 until numPorts) {
-    val reqAdmitted = readReqQueues(i).io.enq.fire
-    val rspDrained = rspQueues(i).io.deq.fire
-    when(reqAdmitted && !rspDrained) {
-      credits(i) := credits(i) - 1.U
-    }.elsewhen(!reqAdmitted && rspDrained) {
-      credits(i) := credits(i) + 1.U
-    }
+    rspQueueHasSpace(i) := (rspQueues(i).io.count + rspInFlight(i).asUInt) < queueDepth.U
   }
 
   // Disabled lanes never issue requests, so their rspQueues stay empty.
