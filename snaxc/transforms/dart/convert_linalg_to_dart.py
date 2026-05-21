@@ -59,6 +59,18 @@ class StreamifyGenericOpPattern(RewritePattern):
         for output in (op.operands[index] for index, _ in streamable_output_indices):
             outputs.append(output)
 
+        # Only convert linalg.generics that were claimed by an accelerator
+        # dispatch pass (which marks them with a library_call). Unclaimed
+        # generics — e.g. PHS-eligible ops whose decode mapping failed — fall
+        # through to be lowered to RISC-V code by subsequent passes.
+        if op.library_call is None:
+            return
+        # Derive the accelerator name from library_call, stripping the
+        # conventional `_stream` suffix used by DispatchLinalgPHS.
+        acc_name = op.library_call.data
+        if acc_name.endswith("_stream"):
+            acc_name = acc_name[: -len("_stream")]
+
         # create the streaming region to wrap around the stream.generic
         streaming_region_op = dart.OperationOp(
             inputs=tuple(op.operands[index] for index, _ in streamable_input_indices),
@@ -66,7 +78,7 @@ class StreamifyGenericOpPattern(RewritePattern):
             patterns=patterns,
             body=Region(Block(arg_types=input_stream_types + result_stream_types)),
             result_types=op.result_types,
-            accelerator=StringAttr("tensorcore"),
+            accelerator=StringAttr(acc_name),
         )
 
         new_body = streaming_region_op.body.block

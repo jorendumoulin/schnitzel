@@ -112,10 +112,11 @@ class Phs(Accelerator):
             csr_base=csr_base,
         )
 
-    @staticmethod
-    def from_config(config: dict[str, Any]) -> "Phs":
-        """Create a Phs accelerator from a JSON config dict (as produced by PhsDriver)."""
-        streamers: list[dict[str, Any]] = config.get("streamers", [])
+    @classmethod
+    def from_params(cls, params: dict[str, Any]) -> "Phs":
+        """Create a Phs accelerator from the ``params`` dict of an ``AcceleratorConfig`` entry
+        emitted by the schnitzel hardware generator (see PhsCluster.getConfig)."""
+        streamers: list[dict[str, Any]] = params.get("streamers", [])
         # Reconstruct the (pure_reads, readWrites, writes) layout `from_template`
         # expects. readWrite streamers contribute one output AND one carry-input;
         # paired_outputs records which output each readWrite binds.
@@ -142,17 +143,17 @@ class Phs(Accelerator):
         paired_outputs = tuple(range(len(rw_sizes)))
         # moduleName from Scala is "{name}_array"; strip the suffix to get the
         # accelerator name that matches the PEOp sym_name.
-        module_name = str(config.get("moduleName", "phs"))
+        module_name = str(params.get("moduleName", "phs"))
         name = module_name.removesuffix("_array")
         return Phs.from_template(
             name=name,
             input_sizes=input_sizes,
             output_sizes=output_sizes,
-            num_switches=int(config.get("numSwitches", 0)),
-            switch_bitwidths=list(config.get("switchBitwidths", [])),
+            num_switches=int(params.get("numSwitches", 0)),
+            switch_bitwidths=list(params.get("switchBitwidths", [])),
             paired_outputs=paired_outputs,
             carry_used=rw_carry_used,
-            csr_base=int(config.get("csrBase", 0x900)),
+            csr_base=int(params.get("csrBase", 0x900)),
         )
 
     def param_values(self) -> dict[str, int]:
