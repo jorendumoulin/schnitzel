@@ -127,14 +127,12 @@ class Streamer(
   val writeDataQueuesFire =
     writeDataQueues.zipWithIndex.map { case (q, i) => q.io.enq.fire || ~laneEnabled(i) }.reduce(_ && _);
 
-  // Other writes go into the bypass buffer
+  // Bypass buffer: depth-1 cache that holds a value across multiple consumer
+  // reads. Used for both readWrite carry recirculation (writeData fed back as
+  // next iteration's read) and stride-0 broadcast reads (one TCDM read whose
+  // value must be served on every subsequent cycle until the AGU completes).
+  // The enq path is driven below once `rspQueues` exists.
   val bypassBuffer = Module(new Queue(Vec(affineConfig.numPorts, UInt(dataWidth.W)), 1, pipe = true))
-  bypassBuffer.io.enq.bits := writeVec
-  bypassBuffer.io.enq.valid :=
-    // We are not writing to the last element
-    ~isLastQueue.io.deq.bits && isLastQueue.io.deq.valid &&
-      // Write data is available
-      io.writeData.valid
 
   // Ready for new data:
   when(isLastQueue.io.deq.valid) {
@@ -211,16 +209,46 @@ class Streamer(
     }
     .reduce(_ && _);
 
+  // Drive bypassBuffer.enq now that rspQueues exists. For read direction the
+  // bypass captures the rsp values so they survive past their single drain
+  // (stride-0 broadcast). For write/readWrite the existing write-feedback
+  // path is preserved.
+  bypassBuffer.io.enq.bits := Mux(
+    io.dir === StreamerDir.read,
+    VecInit(rspQueues.map(_.io.deq.bits)),
+    writeVec
+  )
+  bypassBuffer.io.enq.valid := Mux(
+    io.dir === StreamerDir.read,
+    allRspQueuesValid,
+    ~isLastQueue.io.deq.bits && isLastQueue.io.deq.valid && io.writeData.valid
+  )
+
   // Step 5: send response to the outside
   val readVec = Wire(Vec(affineConfig.numPorts, UInt(dataWidth.W)))
   io.readData.bits := readVec.asTypeOf(streamerDataType)
 
   bypassBuffer.io.deq.ready := false.B
-  when(bypassBuffer.io.deq.valid) {
+  when(io.dir === StreamerDir.read && allRspQueuesValid) {
+    // Pure read with fresh rsp data — drain rsp directly. Drain the bypass
+    // too so its depth-1 slot is free for the parallel enq that snapshots
+    // this cycle's value (pipe=true makes that a combinational pass-through).
+    readVec.zip(rspQueues).map { case (read, resp) =>
+      read := resp.io.deq.bits
+      resp.io.deq.ready := io.readData.ready
+    }
+    bypassBuffer.io.deq.ready := true.B
+    io.readData.valid := true.B
+  }.elsewhen(bypassBuffer.io.deq.valid) {
+    // Cached value: readWrite carry recirculation OR stride-0 broadcast hold.
+    // For read direction the cache is held (no drain) so the same value can
+    // be served for as long as the AGU iterates.
     readVec := bypassBuffer.io.deq.bits
-    bypassBuffer.io.deq.ready := io.readData.ready
+    bypassBuffer.io.deq.ready :=
+      Mux(io.dir === StreamerDir.read, false.B, io.readData.ready)
     io.readData.valid := true.B
   }.elsewhen(allRspQueuesValid) {
+    // Write/readWrite fallback when bypass is empty.
     readVec.zip(rspQueues).map { case (read, resp) =>
       read := resp.io.deq.bits
       resp.io.deq.ready := io.readData.ready
