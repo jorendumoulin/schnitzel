@@ -92,8 +92,8 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
   var tcdmPortIdx = 0
 
   val streamers = config.streamers.map { sc =>
-    val s =
-      Module(new Streamer(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes, addrWidth), queueDepth, dataWidth))
+    val cfg = Wire(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes))
+    val s = Module(new Streamer(cfg, queueDepth, dataWidth))
     val numPorts = sc.numTcdmPorts
     val numRegs = sc.numCsrRegs
 
@@ -116,7 +116,7 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
     // for ub/ss. Harmless for 1D (single-element Vec) but breaks 2D and
     // beyond. Wire each field explicitly to match the Python layout.
     val regs = (0 until numRegs).map(j => csrItf.io.vals(csrOffset + j))
-    val cfg = Wire(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes))
+    // val cfg = Wire(new AffineAguConfig(sc.nTemporalDims, sc.spatialDimSizes))
     cfg.baseAddr := regs(0)
     for (k <- 0 until sc.nTemporalDims) {
       cfg.temporalStrides(k) := regs(1 + k)
