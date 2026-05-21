@@ -9,6 +9,8 @@ generate-verilog top='default': flatten-ibex flatten-cva6
 
 configure-quick:
     cmake -B build/sim -S sim -G Ninja -DSIM_OPT_FAST="-O0"
+    cmake -B build/host -S sw/host -G Ninja
+    cmake -B build/device -S sw/device -G Ninja -DCMAKE_INSTALL_PREFIX=$PWD/install
 
 configure:
     cmake -B build/sim -S sim -G Ninja; \
