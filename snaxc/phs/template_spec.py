@@ -94,7 +94,7 @@ class TemplateSpec:
 
     def _same_dims(self) -> bool:
         first_num_dims = self.input_maps[0].num_dims
-        comparison = [map.num_dims == first_num_dims for map in (self.input_maps + self.output_maps)[:1]]
+        comparison = [map.num_dims == first_num_dims for map in self.input_maps + self.output_maps]
         return all(comparison)
 
     def _get_sizes(self, maps: tuple[AffineMap, ...]) -> list[tuple[int, ...]]:
