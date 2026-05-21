@@ -16,6 +16,7 @@ from xdsl.rewriter import InsertPoint
 from snaxc.dialects import accfg
 from snaxc.dialects.snax_stream import StreamingRegionOp
 from snaxc.hw import AccContext
+from snaxc.hw.phs_accelerator import PhsAccelerator
 from snaxc.inference.helpers import (
     calc_if_state_delta,
     find_all_acc_names_in_region,
@@ -63,6 +64,11 @@ class ConvertSnaxStreamToAcceleratorPattern(RewritePattern):
     @op_type_rewrite_pattern
     def match_and_rewrite(self, op: StreamingRegionOp, rewriter: PatternRewriter):
         acc = self.ctx.get_acc(op.accelerator.data)
+        # Only PHS uses the polymorphic per-accelerator lowering. Dma and
+        # TensorCore are handled uniformly by ConvertStreamToAccfgPass later
+        # in the pipeline.
+        if not isinstance(acc, PhsAccelerator):
+            return
         rewriter.replace_op(op, acc.convert_to_acc_ops(op))
 
 
@@ -263,8 +269,10 @@ class ConvertLinalgToAccPass(ModulePass):
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         assert isinstance(ctx, AccContext)
-        # PatternRewriteWalker(ConvertLinalgToAcceleratorPattern(op, ctx)).rewrite_module(op)
-        # PatternRewriteWalker(ConvertSnaxStreamToAcceleratorPattern(op, ctx)).rewrite_module(op)
+        # PHS lowers its snax_stream.StreamingRegionOps through PhsAccelerator's
+        # polymorphic convert_to_acc_ops. Dma and TensorCore are handled later
+        # by the uniform ConvertStreamToAccfgPass.
+        PatternRewriteWalker(ConvertSnaxStreamToAcceleratorPattern(op, ctx)).rewrite_module(op)
         # run these strictly sequentially, otherwise stuff breaks
         PatternRewriteWalker(ConnectStatesThroughControlFlowPattern()).rewrite_module(op)
 

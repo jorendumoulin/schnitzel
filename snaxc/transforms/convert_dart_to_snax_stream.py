@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import cast
 
@@ -20,6 +19,7 @@ from snaxc.dialects import dart, snax_stream
 from snaxc.dialects.accfg import SetupOp
 from snaxc.hw import AccContext
 from snaxc.hw.accelerators.tensorcore import TensorCore
+from snaxc.hw.phs_accelerator import PhsAccelerator
 from snaxc.hw.streamers.streamers import Streamer
 from snaxc.ir.dart.affine_transform import AffineTransform
 from snaxc.ir.tsl.stride import Stride
@@ -40,7 +40,7 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
     def match_and_rewrite(self, op: dart.AccessPatternOp, rewriter: PatternRewriter):
         assert op.accelerator
         accelerator = self.ctx.system.find_accelerator(op.accelerator)
-        assert isinstance(accelerator, TensorCore)
+        assert isinstance(accelerator, TensorCore | PhsAccelerator)
         template = accelerator.get_template(op)
         streamers = accelerator.streamers
 
@@ -108,12 +108,21 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
             for (pattern, streamer) in zip(snax_stride_patterns, accelerator.streamers)
         ]
 
-        # only keep setup ops from dart body:
-        bops: Sequence[SetupOp] = []
-        for bop in op.body.block.ops:
-            if isinstance(bop, SetupOp):
-                bop.detach()
-                bops.append(bop)
+        if isinstance(accelerator, PhsAccelerator):
+            # PHS lowering downstream (PhsAccelerator.convert_to_acc_ops) needs
+            # the original dart.generic inside the streaming region to decode
+            # PE switch values, so move the dart body wholesale (including its
+            # block args carrying the stream types).
+            new_body = rewriter.move_region_contents_to_new_regions(op.body)
+        else:
+            # Tensorcore/Dma path: drop everything except the SetupOps that
+            # were embedded in the dart body.
+            bops: list[SetupOp] = []
+            for bop in op.body.block.ops:
+                if isinstance(bop, SetupOp):
+                    bop.detach()
+                    bops.append(bop)
+            new_body = Region(Block(bops))
 
         # now create snax_streaming region op
         new_op = snax_stream.StreamingRegionOp(
@@ -122,7 +131,7 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
             stride_patterns=snax_stride_patterns,
             dynamic_operands=[],
             accelerator=op.accelerator.data,
-            body=Region(Block(bops)),
+            body=new_body,
         )
 
         rewriter.replace_op(op, new_op, new_op.results)

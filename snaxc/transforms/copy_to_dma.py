@@ -116,13 +116,21 @@ class CopyToDmaPattern(RewritePattern):
 
         # Determine streamer patterns:
         dynamic_operands: Sequence[Operation | SSAValue]
+        has_static_layout = isinstance(op.source.type.layout, TiledStridedLayoutAttr) or isinstance(
+            op.destination.type.layout, TiledStridedLayoutAttr
+        )
         if DYNAMIC_INDEX in op.source.type.get_shape():
             if op.source.type.layout != NoneAttr() or op.destination.type.layout != NoneAttr():
                 raise NotImplementedError("Transformations not supported for dynamic transfers")
             tcdm_pattern, axi_pattern, dynamic_operands = self.dynamic_1d_patterns(op, rewriter, dma, element_type)
-        else:
+        elif has_static_layout:
             tcdm_pattern, axi_pattern = self.static_transform_pattern(op, rewriter, dma, element_type, reverse_ops)
             dynamic_operands = []
+        else:
+            # Static shape, no tiled layout — fall back to a flat 1D transfer
+            # (same pattern the dynamic path produces, but the bound becomes a
+            # constant derived from the static shape).
+            tcdm_pattern, axi_pattern, dynamic_operands = self.dynamic_1d_patterns(op, rewriter, dma, element_type)
 
         # set other dma params directly with accfg:
         dir_val = ConstantOp.from_int_and_width(1 if reverse_ops else 0, i32)

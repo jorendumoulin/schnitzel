@@ -9,10 +9,6 @@ from snaxc.hw.system import Accelerator, System
 
 def _parse_accelerator(accelerator: dict[str, Any]) -> Accelerator:
     acc_type = accelerator["type"]
-    if acc_type == "phs":
-        from snaxc.hw.accelerators.phs import Phs
-
-        return Phs.from_config(accelerator)
     return get_all_accelerators()[acc_type]().from_params(accelerator["params"])
 
 

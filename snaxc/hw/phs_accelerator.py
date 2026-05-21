@@ -9,8 +9,9 @@ from xdsl.pattern_rewriter import PatternRewriter
 from snaxc.dialects import accfg, dart, phs, snax_stream
 from snaxc.hw.accelerators.phs import Phs
 from snaxc.hw.streamer_accelerator import StreamerAccelerator
+from snaxc.hw.streamers.streamers import Streamer
 from snaxc.hw.system import Accelerator
-from snaxc.ir.dart.access_pattern import Template
+from snaxc.ir.dart.access_pattern import Schedule, Template
 from snaxc.phs.decode import decode_abstract_graph
 from snaxc.phs.encode import convert_generic_body_to_phs
 from snaxc.phs.hw_conversion import get_switch_bitwidth
@@ -171,3 +172,12 @@ class PhsAccelerator(Accelerator, StreamerAccelerator):
 
     def get_template(self, op: dart.StreamingRegionOpBase) -> Template:
         return self.template_spec.get_dart_template()
+
+    @property
+    def streamers(self) -> Sequence[Streamer]:
+        """Sequence of Streamer objects, mirroring the TensorCore property."""
+        return self.phs.streamers.streamers
+
+    def transform_schedule(self, sched: Schedule) -> Schedule:
+        """PHS does not rewrite the schedule before layout resolution."""
+        return sched
