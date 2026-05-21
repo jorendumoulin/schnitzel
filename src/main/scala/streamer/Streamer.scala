@@ -29,12 +29,24 @@ class Streamer(
     val writeData = Flipped(Decoupled(streamerDataType))
     val done = Output(Bool())
   })
-
   dontTouch(io.config)
 
   val agu = Module(new AffineAgu(affineConfig));
   agu.io.start := io.start
   agu.io.config := io.config
+
+  // Based on the spatial dim mask, compute which 'lanes' of the streamer are enabled.
+  // This is achieved by doing it for every dimension separately, and then using kronecker product.
+  val maskPerDim = affineConfig.spatialDimSizes.zip(io.spatialDimMask).map { case (s, m) =>
+    // creates lists [1, 0, 0, 0, ...] or [1, 1, 1, 1] depending on mask
+    true.B +: Vector.fill(s - 1)(m)
+  }
+  val laneEnabled: Vec[Bool] = VecInit(
+    maskPerDim.reduce { (a, b) =>
+      for (x <- a; y <- b) yield x && y
+    }
+  )
+  dontTouch(laneEnabled)
 
   // Step 1: Turn result from AGU into read + write requests
   val readReq = agu.io.addrs.bits.isFirst && (io.dir === StreamerDir.read || io.dir === StreamerDir.readWrite);
@@ -51,7 +63,8 @@ class Streamer(
     val queue = Module(new Queue(UInt(affineConfig.addrWidth.W), queueDepth))
     queue.io.enq.bits := agu.io.addrs.bits.addrs(i)
     // can enqueue read request if it is valid, if both read and write, also wait for write queues
-    queue.io.enq.valid := agu.io.addrs.valid && readReq && readQueuesReady && (!writeReq || writeQueuesReady);
+    queue.io.enq.valid :=
+      agu.io.addrs.valid && readReq && readQueuesReady && (!writeReq || writeQueuesReady) && laneEnabled(i);
     queue
   }
   readQueuesReady := readReqQueues.map { q => q.io.enq.ready }.reduce(_ && _);
@@ -61,7 +74,8 @@ class Streamer(
     val queue = Module(new Queue(UInt(affineConfig.addrWidth.W), queueDepth))
     queue.io.enq.bits := agu.io.addrs.bits.addrs(i)
     // can enqueue write request if it is valid, if both read and write, also wait for read queues
-    queue.io.enq.valid := agu.io.addrs.valid && writeReq && writeQueuesReady && (!readReq || readQueuesReady);
+    queue.io.enq.valid :=
+      agu.io.addrs.valid && writeReq && writeQueuesReady && (!readReq || readQueuesReady) && laneEnabled(i);
     queue
   }
   writeQueuesReady := writeReqQueues.map { q => q.io.enq.ready }.reduce(_ && _);
@@ -97,13 +111,16 @@ class Streamer(
         // A write address is available
         writeReqQueues(i).io.deq.valid &&
         // Write data is available
-        io.writeData.valid
+        io.writeData.valid &&
+        // Lane is enabled
+        laneEnabled(i)
 
     writeReqQueues(i).io.deq.ready := queue.io.enq.fire
     queue
   }
   val writeDataQueuesReady = writeDataQueues.map { q => q.io.enq.ready }.reduce(_ && _);
-  val writeDataQueuesFire = writeDataQueues.map { q => q.io.enq.fire }.reduce(_ && _);
+  val writeDataQueuesFire =
+    writeDataQueues.zipWithIndex.map { case (q, i) => q.io.enq.fire || ~laneEnabled(i) }.reduce(_ && _);
 
   // Other writes go into the bypass buffer
   val bypassBuffer = Module(new Queue(Vec(affineConfig.numPorts, UInt(dataWidth.W)), 1, pipe = true))
@@ -183,7 +200,11 @@ class Streamer(
     roomForRsp(i) := rspQueue.io.count < (rspQueue.entries.U - 1.U);
     rspQueue
   }
-  val allRspQueuesValid = rspQueues.map { q => q.io.deq.valid }.reduce(_ && _);
+  val allRspQueuesValid = rspQueues.zipWithIndex
+    .map { case (q, i) =>
+      q.io.deq.valid || ~laneEnabled(i) // ignore disabled lanes
+    }
+    .reduce(_ && _);
 
   // Step 5: send response to the outside
   val readVec = Wire(Vec(affineConfig.numPorts, UInt(dataWidth.W)))

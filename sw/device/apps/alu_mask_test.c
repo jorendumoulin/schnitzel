@@ -100,10 +100,10 @@ int main() {
 
     // C streamer
     write_csr(0x908, (unsigned long)tcdm_c_data);
-    write_csr(0x909, 16);
-    write_csr(0x90A, 0);
-    write_csr(0x90B, 4);
-    write_csr(0x90C, 0);
+    write_csr(0x909, 0);
+    write_csr(0x90A, 16);
+    write_csr(0x90B, 0);
+    write_csr(0x90C, 4);
     write_csr(0x90D, 4);
 
     write_csr(0x90E, 0);   // ALU select: addition
