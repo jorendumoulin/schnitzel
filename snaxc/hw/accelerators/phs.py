@@ -87,21 +87,29 @@ class Phs(Accelerator):
             carry_used = [True] * carry_no
         assert len(carry_used) == carry_no, f"carry_used has length {len(carry_used)} but carry_no={carry_no}"
 
+        # The Chisel-side AffineAgu reduces over its `temporalCounters` Vec, which
+        # Chisel rejects when empty. Until the streamer-disable PR lands, force
+        # `temporal_dims >= 1` so a 0-D broadcast operand still produces a
+        # well-formed AGU (the padding logic in phs_accelerator._generate_stream_setup_vals
+        # zero-fills the extra ts/ub slots, so it's a single base-address read).
+        def _temporal_dims(dims: tuple[int, ...]) -> int:
+            return max(1, len(dims))
+
         paired_set = set(paired_outputs)
         streamers: list[Streamer] = []
         for i in range(num_pure_inputs):
             dims = input_sizes[i]
-            streamers.append(Streamer(access_width, len(dims), dims, f"in_{i}", "read"))
+            streamers.append(Streamer(access_width, _temporal_dims(dims), dims, f"in_{i}", "read"))
         for k, out_idx in enumerate(paired_outputs):
             dims = output_sizes[out_idx]
             streamers.append(
-                Streamer(access_width, len(dims), dims, f"rw_{out_idx}", "readWrite", carry_used=carry_used[k])
+                Streamer(access_width, _temporal_dims(dims), dims, f"rw_{out_idx}", "readWrite", carry_used=carry_used[k])
             )
         for out_idx in range(num_outputs):
             if out_idx in paired_set:
                 continue
             dims = output_sizes[out_idx]
-            streamers.append(Streamer(access_width, len(dims), dims, f"out_{out_idx}", "write"))
+            streamers.append(Streamer(access_width, _temporal_dims(dims), dims, f"out_{out_idx}", "write"))
 
         return Phs(
             name=name,
