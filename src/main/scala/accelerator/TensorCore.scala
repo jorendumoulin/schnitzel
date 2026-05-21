@@ -36,6 +36,8 @@ class TensorCore(addrWidth: Int, dataWidth: Int, M: Int = 4, N: Int = 4, K: Int 
     val csr = Flipped(new CsrIO)
   })
 
+  def ports = io.aData ++ io.bData ++ io.cData
+
   csrItf.io.csr <> io.csr
 
   val aStreamer = Module(new Streamer(csrVals.aStreamerConfig, 6, dataWidth));

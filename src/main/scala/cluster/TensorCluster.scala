@@ -52,12 +52,11 @@ class TensorCluster extends Module {
   val icache = InstructionCache(Seq(core_0.imem, core_1.imem))
 
   // TCDM
-  val accPorts = tensorCore.io.aData ++ tensorCore.io.bData ++ tensorCore.io.cData
-  val tcdm_ports = BankedMemory(numBanks = 64, depth = 1024, dataWidth = tcdmDataWidth)
+  val tcdm = BankedMemory(numBanks = 64, depth = 1024, dataWidth = tcdmDataWidth)
 
   Interconnect(
-    inputs = Seq(core_0.tcdm, core_1.tcdm) ++ dma.io.data ++ accPorts,
-    outputs = tcdm_ports
+    inputs = Seq(core_0.tcdm, core_1.tcdm) ++ dma.io.data ++ tensorCore.ports,
+    outputs = tcdm
   )
 
   // AXI Crossbar
