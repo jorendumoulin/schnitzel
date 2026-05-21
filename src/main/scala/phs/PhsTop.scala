@@ -7,6 +7,7 @@ import axi.{AXIConfig, AXIDemux}
 import core.CVA6
 import axi.AxiToMem
 import top.GlobalBarrier
+import config.{SystemConfig, MemoryConfig}
 
 /** Self-contained PHS top-level module.
   *
@@ -44,8 +45,8 @@ class PhsTop(
   barrier.io.csr <> cluster.io.csr
   barrier.io.axi <> managerDemux.io.outs(0)
 
-  def getConfig: PhsSystemConfig = PhsSystemConfig(
-    PhsMemoryConfig("L3", 0x2_0000_0000L, 0x2_0000_0000L),
+  def getConfig: SystemConfig = SystemConfig(
+    MemoryConfig("L3", 0x2_0000_0000L, 0x2_0000_0000L),
     List(cluster.getConfig)
   )
 }
