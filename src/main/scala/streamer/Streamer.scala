@@ -41,11 +41,16 @@ class Streamer(
     // creates lists [1, 0, 0, 0, ...] or [1, 1, 1, 1] depending on mask
     true.B +: Vector.fill(s - 1)(m)
   }
-  val laneEnabled: Vec[Bool] = VecInit(
-    maskPerDim.reduce { (a, b) =>
-      for (x <- a; y <- b) yield x && y
-    }
-  )
+  // A 0-D (broadcast) streamer has no spatial dims and therefore no mask bits;
+  // `numPorts` collapses to 1 (empty product), so a single always-enabled lane
+  // is the correct default — the kronecker reduce below would fail on an empty
+  // sequence.
+  val laneEnabled: Vec[Bool] =
+    if (maskPerDim.isEmpty) VecInit(true.B)
+    else
+      VecInit(maskPerDim.reduce { (a, b) =>
+        for (x <- a; y <- b) yield x && y
+      })
   dontTouch(laneEnabled)
 
   // Step 1: Turn result from AGU into read + write requests
