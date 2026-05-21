@@ -103,7 +103,9 @@ class Phs(Accelerator):
         for k, out_idx in enumerate(paired_outputs):
             dims = output_sizes[out_idx]
             streamers.append(
-                Streamer(access_width, _temporal_dims(dims), dims, f"rw_{out_idx}", "readWrite", carry_used=carry_used[k])
+                Streamer(
+                    access_width, _temporal_dims(dims), dims, f"rw_{out_idx}", "readWrite", carry_used=carry_used[k]
+                )
             )
         for out_idx in range(num_outputs):
             if out_idx in paired_set:

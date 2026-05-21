@@ -37,11 +37,11 @@ from snaxc.transforms.frontend.preprocess_mlir import PreprocessPass
 from snaxc.transforms.insert_sync_barrier import InsertSyncBarrier
 from snaxc.transforms.memref_to_snax import MemrefToSNAX
 from snaxc.transforms.phs.dispatch_linalg_phs import DispatchLinalgPHS
-from snaxc.transforms.promote_linalg_scalars import PromoteLinalgScalarsPass
 from snaxc.transforms.pipeline.construct_pipeline import ConstructPipelinePass
 from snaxc.transforms.pipeline.pipeline_canonicalize_for import PipelineCanonicalizeFor
 from snaxc.transforms.pipeline.pipeline_duplicate_buffers import PipelineDuplicateBuffersPass
 from snaxc.transforms.pipeline.unroll_pipeline import UnrollPipelinePass
+from snaxc.transforms.promote_linalg_scalars import PromoteLinalgScalarsPass
 from snaxc.transforms.realize_memref_casts import RealizeMemrefCastsPass
 from snaxc.transforms.reuse_memref_allocs import ReuseMemrefAllocs
 from snaxc.transforms.set_memory_layout import SetMemoryLayout

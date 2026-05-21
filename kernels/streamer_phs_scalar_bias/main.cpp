@@ -5,8 +5,9 @@
 
 #define DATA_LEN 16
 
-extern "C" void _mlir_ciface_streamer_scalar_bias(MemRefDescriptor<int32_t, 1> *A,
-                                                  MemRefDescriptor<int32_t, 1> *O);
+extern "C" void
+_mlir_ciface_streamer_scalar_bias(MemRefDescriptor<int32_t, 1> *A,
+                                  MemRefDescriptor<int32_t, 1> *O);
 
 alignas(64) int32_t A[DATA_LEN];
 alignas(64) int32_t O[DATA_LEN];

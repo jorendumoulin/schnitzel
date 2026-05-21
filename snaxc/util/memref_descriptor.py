@@ -50,16 +50,18 @@ class LLVMMemrefDescriptor:
         # from the mlir-opt convention and leave an unreconcilable
         # `builtin.unrealized_conversion_cast` between the snax-side 5-field
         # struct and the mlir-side 3-field struct.
-        fields: list = [
+        fields: list[Attribute] = [
             LLVMPointerType(),
             LLVMPointerType(),
             integer_type,
         ]
         if rank > 0:
-            fields.extend([
-                LLVMArrayType(rank, integer_type),
-                LLVMArrayType(rank, integer_type),
-            ])
+            fields.extend(
+                [
+                    LLVMArrayType(rank, integer_type),
+                    LLVMArrayType(rank, integer_type),
+                ]
+            )
 
         return cls(LLVMStructType.from_type_list(fields))
 

@@ -77,9 +77,7 @@ class PromoteScalarOperandsPattern(RewritePattern):
         for i, inp in enumerate(op.inputs):
             if isinstance(inp.type, builtin.ShapedType):
                 continue
-            built, value = (
-                _materialize_zero_rank_memref(inp) if memref_style else _materialize_zero_rank_tensor(inp)
-            )
+            built, value = _materialize_zero_rank_memref(inp) if memref_style else _materialize_zero_rank_tensor(inp)
             new_ops.extend(built)
             replacements.append((i, value))
         if not replacements:

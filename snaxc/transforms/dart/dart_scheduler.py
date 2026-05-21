@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import cast
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
@@ -9,6 +8,7 @@ from xdsl.dialects.builtin import (
     FixedBitwidthType,
     MemRefType,
 )
+from xdsl.ir import Attribute
 from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import (
     PatternRewriter,
@@ -16,6 +16,7 @@ from xdsl.pattern_rewriter import (
     RewritePattern,
     op_type_rewrite_pattern,
 )
+from xdsl.utils.hints import isa
 
 from snaxc.dialects import dart
 from snaxc.hw import AccContext
@@ -61,14 +62,15 @@ class AutoflowScheduler(RewritePattern):
         schedule = Schedule(SchedulePattern(schedule_bounds, pattern.data) for pattern in op.patterns.data)
 
         schedule = schedule.canonicalize()
-        element_sizes = [
-            (
-                cast(MemRefType[FixedBitwidthType], oper.type).element_type.size
-                if isinstance(oper.type, builtin.MemRefType)
-                else cast(FixedBitwidthType, oper.type).size
-            )
-            for oper in op.operands
-        ]
+        element_sizes: list[int] = []
+        for oper in op.operands:
+            oper_type: Attribute = oper.type
+            if isa(oper_type, MemRefType[Attribute]):
+                element_type: Attribute = oper_type.element_type
+            else:
+                element_type = oper_type
+            assert isa(element_type, FixedBitwidthType)
+            element_sizes.append(element_type.size)
         schedule = scheduler(
             template,
             schedule,
