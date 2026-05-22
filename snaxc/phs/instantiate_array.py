@@ -73,11 +73,6 @@ WiringResolution = FromArrayBlockArg | FromPEOutput
 # =====================================================================
 
 
-def _is_scalar_map(m: AffineMap, bounds: tuple[int, ...]) -> bool:
-    """True if this map produces a 0-dimensional (scalar) output."""
-    return len(m.eval(bounds, ())) == 0
-
-
 @dataclass(frozen=True)
 class ArrayLayout:
     """Describes the block arg structure of a PEArrayOp."""
@@ -88,7 +83,8 @@ class ArrayLayout:
     parallel_arg_idx: dict[int, int]
     chained_arg_idx: dict[int, int]
     # Mapping: chained input index -> reduced output index it pairs with.
-    # Used for SPATIAL-chain wiring only (FromArrayBlockArg w/ indices=() / FromPEOutput).
+    # Used for SPATIAL-chain wiring only (FromArrayBlockArg for the first PE
+    # in each output group, FromPEOutput for subsequent PEs).
     input_to_output_chain: dict[int, int]
     # Mapping: PE input index -> PE output index that share a logical streamer.
     # Used for streamer/mask accounting (read+write coalesce into readWrite).
@@ -112,13 +108,21 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     yield_op = pe.get_terminator()
     pe_result_types = list(yield_op.operand_types)
 
-    chained_inputs = tuple(i for i, m in enumerate(spec.input_maps) if _is_scalar_map(m, bounds))
     reduced_outputs = tuple(j for j, m in enumerate(spec.output_maps) if m.eval(bounds, ()) != bounds)
     parallel_outputs = tuple(j for j in range(len(pe_result_types)) if j not in reduced_outputs)
 
-    # Spatial chain pairs: for spatial-chain input wiring (scalar carry init feeding a
-    # chain of PE outputs). Drives the 0-D FromArrayBlockArg / FromPEOutput materialisation.
-    input_to_output_chain: dict[int, int] = dict(zip(chained_inputs, reduced_outputs, strict=False))
+    # Spatial chain pairs. A paired carry whose paired output is reduced (the
+    # output map drops at least one bounds dim) becomes a spatial chain along
+    # the dropped dim(s). Each PE in the same output-group reads its carry
+    # from the previous PE in iteration order; the first PE in the group
+    # reads the carry init from the block arg. Subsumes the fully-reduced
+    # case (output map → ()) where the init port is the 1-element wrap of a
+    # scalar; for partial reduction (output map keeps some bounds dims) the
+    # init is a multi-element hw.array indexed by the group's output position.
+    input_to_output_chain: dict[int, int] = {
+        in_idx: out_idx for in_idx, out_idx in spec.readwrite_pairs.items() if out_idx in reduced_outputs
+    }
+    chained_inputs = tuple(sorted(input_to_output_chain))
     # Streamer-level pairs: union with positional readWrite pairs from the spec
     # (encode-pass convention). Drives streamer/mask accounting only — temporal
     # readWrite inputs are still wired as parallel array reads, not chains.
@@ -131,15 +135,14 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     for i, data_opnd in enumerate(data_operands):
         assert isa(data_opnd.type, builtin.AnySignlessIntegerType)
         if i in input_to_output_chain:
-            # Chain-init: a 0-D array (1-element hw.array) holding the
-            # carry initial value. Wrap with the same helper as parallel
-            # inputs so the block-arg type and CIRCT port shape are
-            # consistent across both paths.
+            # Carry-init port: shape follows the carry input's own access map
+            # (= paired output's map). Fully-reduced chain → 0-D wrap as
+            # hw.array<1xT>; partial reduction → hw.array of the paired
+            # output's shape, indexed by the group's output position.
             chained_arg_idx[i] = len(in_types)
-            in_types.append(create_shaped_hw_array_type(data_opnd.type, ()))
         else:
             parallel_arg_idx[i] = len(in_types)
-            in_types.append(create_shaped_hw_array_type(data_opnd.type, input_sizes[i]))
+        in_types.append(create_shaped_hw_array_type(data_opnd.type, input_sizes[i]))
 
     for _ in switches:
         in_types.append(builtin.IndexType())
@@ -232,12 +235,16 @@ def resolve_input_wiring(
     """
     if input_index in layout.input_to_output_chain:
         paired_out = layout.input_to_output_chain[input_index]
-        prev = _previous_in_chain(iteration, spec.output_maps[paired_out], all_iters)
+        output_map = spec.output_maps[paired_out]
+        prev = _previous_in_chain(iteration, output_map, all_iters)
         if prev is None:
             # First PE in the chain group → initial value from the carry-init
-            # block arg. A carry-init is a 0-D operand (1-element hw.array);
-            # extract element 0 — same path as a broadcast input.
-            return FromArrayBlockArg(arg_index=layout.chained_arg_idx[input_index], indices=(0,))
+            # block arg. Partial reduction → index by this group's output
+            # position; full reduction (group_pos == ()) → index the 1-element
+            # wrap at 0, same path as a broadcast input.
+            group_pos = output_map.eval(iteration, ())
+            indices = group_pos if group_pos else (0,)
+            return FromArrayBlockArg(arg_index=layout.chained_arg_idx[input_index], indices=indices)
         return FromPEOutput(iteration=prev, output_index=paired_out)
     else:
         # Parallel input: read from the array block arg using the input map.

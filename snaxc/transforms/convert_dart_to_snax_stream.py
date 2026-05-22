@@ -118,11 +118,16 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
                 temporal_bounds = [x.bound for x in strides[: len(strides) - spatial_dim]]
                 assert isa(temporal_bounds, list[int])
 
-                # stride is outermost-> innnermost, stride pattern is innermost -> outermost
+                # stride is outermost-> innnermost, stride pattern is innermost -> outermost.
+                # Pad missing temporal dims with ub=1, ts=0 (single execution with no
+                # address advance). Padding ub=0 here would mark the streamer as
+                # "disabled" per the canonicalize rule and skip the operand entirely,
+                # which is wrong when the schedule is fully unrolled into the spatial
+                # template (temporal_bounds == []).
                 return snax_stream.StridePattern(
-                    upper_bounds=temporal_bounds[::-1] + [0] * (streamer.temporal_dim - len(temporal_bounds)),
+                    upper_bounds=temporal_bounds[::-1] + [1] * (streamer.temporal_dim - len(temporal_bounds)),
                     temporal_strides=temporal_strides[::-1] + [0] * (streamer.temporal_dim - len(temporal_strides)),
-                    spatial_strides=spatial_strides[::-1],
+                    spatial_strides=spatial_strides,
                 )
 
             snax_stride_patterns.append(create_stride_pattern(streamers[operand], stride_list))
