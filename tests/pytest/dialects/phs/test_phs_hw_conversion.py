@@ -20,7 +20,7 @@ from snaxc.phs.hw_conversion import (
 
 def test_create_shaped_hw_array_type():
     assert str(create_shaped_hw_array_type(i32, (1, 2, 3))) == "!hw.array<1x!hw.array<2x!hw.array<3xi32>>>"
-    assert str(create_shaped_hw_array_type(i32, ())) == "i32"  # 0D edge case
+    assert str(create_shaped_hw_array_type(i32, ())) == "!hw.array<1xi32>"  # 0D edge case → lane-1 array
     assert str(create_shaped_hw_array_type(i32, (3, 3, 3))) == "!hw.array<3x!hw.array<3x!hw.array<3xi32>>>"
     assert str(create_shaped_hw_array_type(i32, (4,))) == "!hw.array<4xi32>"
 
