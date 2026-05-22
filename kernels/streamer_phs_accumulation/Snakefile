@@ -35,7 +35,7 @@ rule phsc:
     output:
         sw=f"{BUILD}/sw.llvm.mlir",
         top=f"{BUILD}/generated/Top.sv",
-        filelist=f"{BUILD}/generated/filelist.f",
+        bender_yml=f"{BUILD}/generated/Bender.yml",
     params:
         generated=lambda wc: os.path.abspath(f"{BUILD}/generated"),
     shell:
@@ -104,13 +104,13 @@ rule link:
 
 rule configure_sim:
     input:
-        filelist=f"{BUILD}/generated/filelist.f",
+        bender_yml=f"{BUILD}/generated/Bender.yml",
     output:
         ninja=f"{SIM_BUILD}/build.ninja",
     params:
         generated=lambda wc: os.path.abspath(f"{BUILD}/generated"),
     shell:
-        "cmake -B {SIM_BUILD} -S {ROOT}/sim -G Ninja -DGENERATED_DIR={params.generated}"
+        "cmake -B {SIM_BUILD} -S {ROOT}/sim -G Ninja -DSCHNITZEL_RTL_DIR={params.generated}"
 
 
 rule build_sim:
