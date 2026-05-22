@@ -1,0 +1,34 @@
+# Root Bender manifest for the schnitzel project.
+#
+# This is the single source of truth for the full file list. Downstream
+# tooling (sim/CMakeLists.txt, future synth flows) invokes one of:
+#
+#   bender script verilator -t simulation -t ibex_tracing -D RVFI
+#   bender script genus     -t synthesis  -t ibex_regfile_latch -D SYNTHESIS
+#   bender script flist     -t synthesis
+#
+# and consumes the emitted filelist directly — no per-tool custom logic.
+#
+# Targets:
+#   simulation        — pulls in the sim/rtl/ wrappers (TopWrapper, MemDpi).
+#                       Set automatically by `bender script verilator`.
+#   ibex_tracing      — opt-in for sim flows that want the RVFI tracer; see
+#                       submodules/ibex/Bender.yml for the contract.
+#   synthesis         — drops sim wrappers; set automatically by tool emitters
+#                       like `bender script genus`.
+
+package:
+  name: schnitzel
+  authors:
+    - "Joren Dumoulin"
+dependencies:
+  ibex: {path: submodules/ibex}
+  schnitzel_rtl: {path: $SCHNITZEL_RTL_DIR}
+sources:
+  # ----------------------------------------------------------------------
+  # Simulation-only top wrapper + DPI memory shim.
+  # ----------------------------------------------------------------------
+  - target: simulation
+    files:
+      - sim/rtl/TopWrapper.sv
+      - sim/rtl/MemDpi.sv

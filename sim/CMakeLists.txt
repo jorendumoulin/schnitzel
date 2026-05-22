@@ -30,28 +30,34 @@ add_library(sim SHARED
 target_include_directories(sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(sim PRIVATE argparse::argparse elfio::elfio)
 
-if(NOT DEFINED GENERATED_DIR)
-  set(GENERATED_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../generated)
-endif()
-set(RTL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rtl)
+# All RTL sources, include dirs, and defines come from the root Bender
+# manifest. No project-specific file enumeration lives here — adding new
+# RTL or new submodules is done in Bender.yml, not in cmake.
+#
+# The path to the chisel-generated RTL directory is communicated to bender
+# via the `SCHNITZEL_RTL_DIR` env var so that this build tree can be one of
+# many parallel system builds (each pairing a generated/ dir with a build/
+# dir). Override with `-DSCHNITZEL_RTL_DIR=...` when configuring cmake.
+set(SCHNITZEL_RTL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../generated" CACHE PATH
+    "Directory containing the chisel-generated RTL and its auto-emitted Bender.yml.")
 
-file(READ ${GENERATED_DIR}/filelist.f FILELIST_CONTENT)
-string(REPLACE "\n" ";" FILELIST ${FILELIST_CONTENT})
-
-set(RTL_SOURCES
-    ${RTL_DIR}/TopWrapper.sv
-    ${RTL_DIR}/MemDpi.sv
+# Have bender render a small cmake snippet (BENDER_SOURCES / BENDER_DEFINES /
+# BENDER_INCDIRS) via its Tera template engine. include()-ing that snippet
+# avoids any hand-rolled string parsing in cmake.
+set(BENDER_CMAKE ${CMAKE_CURRENT_BINARY_DIR}/bender.cmake)
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E env "SCHNITZEL_RTL_DIR=${SCHNITZEL_RTL_DIR}"
+            bender script template
+                -t simulation -t ibex_tracing -D RVFI
+                --template=${CMAKE_CURRENT_SOURCE_DIR}/bender.cmake.tera
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+    OUTPUT_FILE ${BENDER_CMAKE}
+    COMMAND_ERROR_IS_FATAL ANY
 )
-
-foreach(f ${FILELIST})
-  string(STRIP "${f}" f_stripped)
-  if(NOT f_stripped STREQUAL "")
-    list(APPEND RTL_SOURCES ${GENERATED_DIR}/${f_stripped})
-  endif()
-endforeach()
+include(${BENDER_CMAKE})
 
 verilate(sim
-    SOURCES ${RTL_SOURCES}
+    SOURCES ${BENDER_SOURCES}
     TOP_MODULE TopWrapper
     PREFIX VTopWrapper
     TRACE
@@ -63,8 +69,8 @@ verilate(sim
         -Wno-BLKANDNBLK -Wno-SELRANGE -Wno-SYMRSVDWORD
         -Wno-CMPCONST -Wno-UNSIGNED -Wno-WIDTH -Wno-ASCRANGE
         -Wno-IMPLICITSTATIC
-        -I${GENERATED_DIR}/
-        -I${RTL_DIR}/
+        ${BENDER_DEFINES}
+        ${BENDER_INCDIRS}
         --assert
 )
 

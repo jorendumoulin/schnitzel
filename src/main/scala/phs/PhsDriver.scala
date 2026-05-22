@@ -2,9 +2,9 @@ package phs
 
 import chisel3._
 import circt.stage.ChiselStage
-import upickle.default.{write, read}
-import java.io.{File, PrintWriter}
+import upickle.default.read
 import scopt.OParser
+import sim.EmitArtifacts
 
 case class PhsDriverConfig(
     phsConfig: String = "",
@@ -60,14 +60,8 @@ object PhsDriver {
       )
     )
 
-    val configJson = write(topModule.getConfig, indent = 2)
-    val pw = new PrintWriter(new File(s"${config.outputDir}/config.json"))
-    try {
-      pw.write(configJson)
-      println(s"Successfully generated metadata at ${config.outputDir}/config.json")
-    } finally {
-      pw.close()
-    }
+    EmitArtifacts.writeConfigJson(config.outputDir, topModule.getConfig)
+    EmitArtifacts.writeBenderYml(config.outputDir)
 
     println(s"Verilog generated in ${config.outputDir}/Top.sv")
   }

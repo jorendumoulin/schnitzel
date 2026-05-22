@@ -1,0 +1,21 @@
+# {{HEADER_AUTOGEN}}
+# This file contains a template for bender to generate a cmake-compatible
+# filelist to be used with the `verilate` cmake command.
+
+set(BENDER_SOURCES
+{%- for f in all_files %}
+    "{{ f }}"
+{%- endfor %}
+)
+
+set(BENDER_DEFINES
+{%- for d in all_defines %}
+    "+define+{{ d.0 }}{% if d.1 %}={{ d.1 }}{% endif %}"
+{%- endfor %}
+)
+
+set(BENDER_INCDIRS
+{%- for inc in all_incdirs %}
+    "+incdir+{{ inc }}"
+{%- endfor %}
+)
