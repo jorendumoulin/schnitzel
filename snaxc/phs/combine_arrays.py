@@ -24,7 +24,6 @@ from snaxc.phs.hw_conversion import trace_hw_array_get_chain
 from snaxc.phs.instantiate_array import (
     FromArrayBlockArg,
     FromPEOutput,
-    FromScalarBlockArg,
     WiringResolution,
     compute_layout,
     resolve_input_wiring,
@@ -42,16 +41,19 @@ def _classify_existing_operand(
     figure out what WiringResolution it corresponds to.
 
     Handles the three cases:
-    - Direct block arg → FromScalarBlockArg
+    - Direct block arg → FromArrayBlockArg with empty indices (0-D array:
+      either a broadcast input or a reduction-carry initialiser)
     - Chain of hw.array_get on a block arg → FromArrayBlockArg
     - Result of a PEInstanceOp → FromPEOutput (mapping the instance back to its iteration)
     """
     # Build instance -> iteration lookup
     instance_to_iter = {inst: it for inst, it in zip(instances, iterations, strict=True)}
 
-    # Case 1: direct block arg
+    # Case 1: direct block arg — should not normally appear under the
+    # 0-D-array convention (materialise always emits an array_get), but
+    # treat it as a 1-element wrapper accessed at index 0 for symmetry.
     if isinstance(operand, BlockArgument):
-        return FromScalarBlockArg(arg_index=operand.index)
+        return FromArrayBlockArg(arg_index=operand.index, indices=(0,))
 
     owner = operand.owner
 
@@ -154,8 +156,6 @@ def _materialize_before(
     Like `materialize`, but inserts new ops just before `before_op` instead
     of appending to the block.
     """
-    if isinstance(res, FromScalarBlockArg):
-        return block.args[res.arg_index]
     if isinstance(res, FromArrayBlockArg):
         # Build hw.array_get chain manually so we can position the ops.
         current = block.args[res.arg_index]

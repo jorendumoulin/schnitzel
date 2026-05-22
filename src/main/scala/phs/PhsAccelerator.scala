@@ -127,8 +127,12 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
     }
     s.io.config := cfg
     // spatialDimMask is wired below for write streamers (from the blackbox).
-    // Default to all-enabled here; read streamers keep this value.
-    s.io.spatialDimMask := VecInit(Seq.fill(sc.spatialDimSizes.length)(true.B))
+    // Default to all-enabled here; read streamers keep this value. A 0-D
+    // (broadcast) streamer has no spatial dims, so the mask Vec is empty —
+    // skip the VecInit (Chisel rejects empty hardware values).
+    if (sc.spatialDimSizes.nonEmpty) {
+      s.io.spatialDimMask := VecInit(Seq.fill(sc.spatialDimSizes.length)(true.B))
+    }
     csrOffset += numRegs
 
     // Wire start and direction
@@ -226,10 +230,14 @@ class PhsAccelerator(addrWidth: Int, dataWidth: Int, config: PhsAcceleratorConfi
   // spatial dim collapses to size 1, suppressing TCDM requests for lanes that
   // only differ along that dim. One mask per physical streamer.
   for ((sc, sIdx) <- config.streamers.zipWithIndex) {
-    val maskBits = bb.io.elements(s"mask_${sIdx}").asUInt
     val numDims = sc.spatialDimSizes.length
-    val dimMask = VecInit((0 until numDims).map(k => maskBits(k)))
-    streamers(sIdx).io.spatialDimMask := dimMask
+    if (numDims > 0) {
+      val maskBits = bb.io.elements(s"mask_${sIdx}").asUInt
+      val dimMask = VecInit((0 until numDims).map(k => maskBits(k)))
+      streamers(sIdx).io.spatialDimMask := dimMask
+    }
+    // A 0-D (broadcast) streamer has no spatial dims; its mask Vec is empty
+    // and Streamer.scala defaults the single lane to enabled.
   }
 
   // BlackBox is purely combinational — read streamers fire in lockstep with

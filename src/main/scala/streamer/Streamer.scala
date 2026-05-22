@@ -41,11 +41,14 @@ class Streamer(
     // creates lists [1, 0, 0, 0, ...] or [1, 1, 1, 1] depending on mask
     true.B +: Vector.fill(s - 1)(m)
   }
-  val laneEnabled: Vec[Bool] = VecInit(
-    maskPerDim.reduce { (a, b) =>
-      for (x <- a; y <- b) yield x && y
-    }
-  )
+  val laneEnabled: Vec[Bool] =
+    // 0-D case
+    if (maskPerDim.isEmpty) VecInit(true.B)
+    // > 0-D
+    else
+      VecInit(maskPerDim.reduce { (a, b) =>
+        for (x <- a; y <- b) yield x && y
+      })
   dontTouch(laneEnabled)
 
   // Step 1: Turn result from AGU into read + write requests
@@ -85,6 +88,8 @@ class Streamer(
   isLastQueue.io.enq.bits := agu.io.addrs.bits.isLast
   // FIXME: address gen does not wait for isLastQueue, hopefully it is deep enough :')
   isLastQueue.io.enq.valid := agu.io.addrs.fire
+  // set default ready false
+  isLastQueue.io.deq.ready := false.B
 
   // assign ready signal of agu
   agu.io.addrs.ready := (readQueuesReady || ~readReq) && (writeQueuesReady || ~writeReq)
@@ -148,7 +153,9 @@ class Streamer(
     }
   }.otherwise { io.writeData.ready := false.B }
 
-  isLastQueue.io.deq.ready := bypassBuffer.io.enq.fire || writeDataQueuesFire
+  when(io.dir === StreamerDir.readWrite) {
+    isLastQueue.io.deq.ready := bypassBuffer.io.enq.fire || writeDataQueuesFire
+  }
 
   // Step 3: arbitrate read and write requests to the TCDM
 
@@ -212,13 +219,22 @@ class Streamer(
 
   bypassBuffer.io.deq.ready := false.B
   when(bypassBuffer.io.deq.valid) {
+    // When data is available in bypass buffer, read data from there.
     readVec := bypassBuffer.io.deq.bits
     bypassBuffer.io.deq.ready := io.readData.ready
     io.readData.valid := true.B
   }.elsewhen(allRspQueuesValid) {
     readVec.zip(rspQueues).map { case (read, resp) =>
+      // Otherwise, read data from the rsp queues:
       read := resp.io.deq.bits
-      resp.io.deq.ready := io.readData.ready
+      // In read-only mode, only pop the element from the fifo on last use.
+      when(io.dir === StreamerDir.read) {
+        resp.io.deq.ready := io.readData.ready && isLastQueue.io.deq.bits && isLastQueue.io.deq.valid
+        isLastQueue.io.deq.ready := io.readData.ready
+      }.otherwise {
+        // Otherwise always pop
+        resp.io.deq.ready := io.readData.ready
+      }
     }
     io.readData.valid := true.B
   }.otherwise {

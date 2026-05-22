@@ -145,11 +145,12 @@ class OperationOp(StreamingRegionOpBase):
 
     def get_static_shapes(self) -> Iterable[int]:
         """
-        Return the static shapes of all operands of this op.
+        Return the static shapes of all operands of this op. Scalar operands
+        (0-rank broadcast streams) contribute no shape dimensions.
         """
         for operand in self.operands:
-            assert isinstance(operand.type, ShapedType)
-            yield from operand.type.get_shape()
+            if isinstance(operand.type, ShapedType):
+                yield from operand.type.get_shape()
 
     def get_static_pattern_bounds(self) -> Iterable[int]:
         """

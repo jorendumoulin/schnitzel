@@ -44,17 +44,17 @@ from snaxc.phs.template_spec import TemplateSpec
 
 @dataclass(frozen=True)
 class FromArrayBlockArg:
-    """Read from an array-typed block arg at the given indices."""
+    """Read from an array-typed block arg at the given indices.
+
+    A 0-D array (``indices == ()``) is represented in IR as a bare
+    element-typed block arg; ``materialize`` returns that block arg
+    directly without emitting any ``hw.array_get``. Both broadcast
+    inputs and reduction-carry initialisers — same shape, opposite
+    direction — flow through this path.
+    """
 
     arg_index: int
     indices: tuple[int, ...]
-
-
-@dataclass(frozen=True)
-class FromScalarBlockArg:
-    """Read directly from a scalar block arg (initial value of a chain)."""
-
-    arg_index: int
 
 
 @dataclass(frozen=True)
@@ -65,7 +65,7 @@ class FromPEOutput:
     output_index: int
 
 
-WiringResolution = FromArrayBlockArg | FromScalarBlockArg | FromPEOutput
+WiringResolution = FromArrayBlockArg | FromPEOutput
 
 
 # =====================================================================
@@ -88,7 +88,7 @@ class ArrayLayout:
     parallel_arg_idx: dict[int, int]
     chained_arg_idx: dict[int, int]
     # Mapping: chained input index -> reduced output index it pairs with.
-    # Used for SPATIAL-chain wiring only (FromScalarBlockArg / FromPEOutput).
+    # Used for SPATIAL-chain wiring only (FromArrayBlockArg w/ indices=() / FromPEOutput).
     input_to_output_chain: dict[int, int]
     # Mapping: PE input index -> PE output index that share a logical streamer.
     # Used for streamer/mask accounting (read+write coalesce into readWrite).
@@ -117,7 +117,7 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     parallel_outputs = tuple(j for j in range(len(pe_result_types)) if j not in reduced_outputs)
 
     # Spatial chain pairs: for spatial-chain input wiring (scalar carry init feeding a
-    # chain of PE outputs). Drives FromScalarBlockArg / FromPEOutput materialization.
+    # chain of PE outputs). Drives the 0-D FromArrayBlockArg / FromPEOutput materialisation.
     input_to_output_chain: dict[int, int] = dict(zip(chained_inputs, reduced_outputs, strict=False))
     # Streamer-level pairs: union with positional readWrite pairs from the spec
     # (encode-pass convention). Drives streamer/mask accounting only — temporal
@@ -131,8 +131,12 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     for i, data_opnd in enumerate(data_operands):
         assert isa(data_opnd.type, builtin.AnySignlessIntegerType)
         if i in input_to_output_chain:
+            # Chain-init: a 0-D array (1-element hw.array) holding the
+            # carry initial value. Wrap with the same helper as parallel
+            # inputs so the block-arg type and CIRCT port shape are
+            # consistent across both paths.
             chained_arg_idx[i] = len(in_types)
-            in_types.append(data_opnd.type)
+            in_types.append(create_shaped_hw_array_type(data_opnd.type, ()))
         else:
             parallel_arg_idx[i] = len(in_types)
             in_types.append(create_shaped_hw_array_type(data_opnd.type, input_sizes[i]))
@@ -140,15 +144,15 @@ def compute_layout(pe: phs.PEOp, spec: TemplateSpec) -> ArrayLayout:
     for _ in switches:
         in_types.append(builtin.IndexType())
 
-    # Data outputs come first.
+    # Data outputs come first. A 0-D (fully-reduced) output is a 1-element
+    # `hw.array<1xT>` — same convention as 0-D inputs so CIRCT emits the
+    # ``out_j_0`` port and the Chisel ``out_${wIdx}_${eIdx}`` wiring lines
+    # up uniformly.
     out_types: list[Attribute] = []
     for j, out_size in enumerate(output_sizes):
-        if len(out_size) == 0:
-            out_types.append(pe_result_types[j])
-        else:
-            el_type = yield_op.operands[j].type
-            assert isa(el_type, builtin.AnySignlessIntegerType)
-            out_types.append(create_shaped_hw_array_type(el_type, out_size))
+        el_type = yield_op.operands[j].type if len(out_size) > 0 else pe_result_types[j]
+        assert isa(el_type, builtin.AnySignlessIntegerType)
+        out_types.append(create_shaped_hw_array_type(el_type, out_size))
 
     # One per-spatial-dim enable mask per *logical streamer*. A streamer is:
     #   - a pure read:      one PE input that is NOT chained to an output
@@ -230,12 +234,18 @@ def resolve_input_wiring(
         paired_out = layout.input_to_output_chain[input_index]
         prev = _previous_in_chain(iteration, spec.output_maps[paired_out], all_iters)
         if prev is None:
-            # First PE in the chain group → initial value from scalar block arg.
-            return FromScalarBlockArg(arg_index=layout.chained_arg_idx[input_index])
+            # First PE in the chain group → initial value from the carry-init
+            # block arg. A carry-init is a 0-D operand (1-element hw.array);
+            # extract element 0 — same path as a broadcast input.
+            return FromArrayBlockArg(arg_index=layout.chained_arg_idx[input_index], indices=(0,))
         return FromPEOutput(iteration=prev, output_index=paired_out)
     else:
         # Parallel input: read from the array block arg using the input map.
+        # An empty index tuple means the map is 0-rank — the operand is the
+        # 1-element broadcast wrapper, so index element 0.
         idx = spec.input_maps[input_index].eval(iteration, ())
+        if not idx:
+            idx = (0,)
         return FromArrayBlockArg(arg_index=layout.parallel_arg_idx[input_index], indices=idx)
 
 
@@ -280,8 +290,6 @@ def materialize(
     instances: dict[tuple[int, ...], phs.PEInstanceOp],
 ) -> SSAValue:
     """Turn a WiringResolution into an SSAValue, building hw.array_get ops if needed."""
-    if isinstance(res, FromScalarBlockArg):
-        return block.args[res.arg_index]
     if isinstance(res, FromArrayBlockArg):
         array_val = SSAValue.get(block.args[res.arg_index], type=hw.ArrayType)
         get_ops, val = get_from_shaped_hw_array(array_val, res.indices)
@@ -343,13 +351,11 @@ def build_pe_array_body(
         sources = resolve_output_assembly(spec, layout, j, all_iters)
         materialized = [materialize(s, block, instances) for s in sources]
         out_size = output_sizes[j]
-        if len(out_size) == 0:
-            # Scalar
-            yield_operands.append(materialized[0])
-        else:
-            ops, array_val = create_shaped_hw_array(materialized, out_size)
-            block.add_ops(ops)
-            yield_operands.append(array_val)
+        # A 0-D output is wrapped as ``hw.array<1xT>`` (single element); the
+        # helper handles shape ``()`` uniformly with higher-rank shapes.
+        ops, array_val = create_shaped_hw_array(materialized, out_size)
+        block.add_ops(ops)
+        yield_operands.append(array_val)
 
     # Append per-spatial-dim enable masks, one per logical streamer. Ordering
     # matches compute_layout: PE inputs first (read or readWrite), then

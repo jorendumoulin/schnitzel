@@ -196,6 +196,10 @@ class TiledStridedLayoutAttr(MemRefLayoutAttr, Data[TiledStridedLayout]):
         else:
             el_bytes = 1
 
+        # 0-D memref (scalar broadcast): no strides at all, no step ops to emit.
+        if tsl.dimension() == 0:
+            return result, result_mapping
+
         # to handle the dynamic case, we must first find the largest
         # statically defined step, and then use that to calculate the
         # dynamic steps

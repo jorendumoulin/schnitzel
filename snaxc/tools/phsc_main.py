@@ -37,6 +37,7 @@ from snaxc.transforms.phs.instantiate_pe_array import InstantiatePEArrayPass
 from snaxc.transforms.phs.prune_unused_carries import PrunePEUnusedCarriesPass
 from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
 from snaxc.transforms.phs.schedule_preset.separate_linalg import PhsScheduleSeparateLinalgPass
+from snaxc.transforms.promote_linalg_scalars import PromoteLinalgScalarsPass
 
 
 def _harvest_accelerators(hardware_module: ModuleOp, pe_clones: dict[str, phs.PEOp]) -> list[PhsAccelerator]:
@@ -326,6 +327,7 @@ class PHSCMain(SNAXCMain):
                 input_pass_pipeline.append(PhsScheduleSeparateLinalgPass())
             else:
                 raise SystemExit(f"Unknown scheduling preset: {self.args.scheduling_preset}")
+        input_pass_pipeline.append(PromoteLinalgScalarsPass())
         # Rewrite `arith.divf %x, %const` as `arith.mulf %x, 1/const`. Runs
         # before PHS encoding so the rewrite operates on plain linalg/arith
         # IR. Assumes reciprocal accuracy is acceptable for NN inference.

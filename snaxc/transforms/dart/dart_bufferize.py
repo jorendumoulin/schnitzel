@@ -57,9 +57,11 @@ class BufferizeStreamingRegion(RewritePattern):
                 return
             tensor_to_memrefs[operand] = to_tensor_op.memref
 
+        # Tensors get rewired to their underlying memref. Non-tensor operands
+        # (scalars routed through 0-rank streamers) pass through unchanged.
         new_op = dart.OperationOp(
-            inputs=[tensor_to_memrefs[input] for input in op.inputs],
-            outputs=[tensor_to_memrefs[output] for output in op.outputs],
+            inputs=[tensor_to_memrefs.get(input, input) for input in op.inputs],
+            outputs=[tensor_to_memrefs.get(output, output) for output in op.outputs],
             patterns=op.patterns,
             body=rewriter.move_region_contents_to_new_regions(op.body),
             accelerator=op.accelerator,

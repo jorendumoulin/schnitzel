@@ -49,6 +49,30 @@ class ConvertStreamToSnaxStreamPattern(RewritePattern):
         for operand in range(len(op.operands)):
             pattern = AffineTransform.from_affine_map(op.patterns.data[operand].data)
 
+            # Scalar (0-rank) broadcast operand: indexing map has no result
+            # dims. Read the single address every temporal cycle with stride
+            # 0 on every axis so the broadcast streamer stays in lockstep
+            # with the non-broadcast read streamers. The temporal cycle
+            # count = the schedule iteration dims that are NOT absorbed by
+            # the spatial template (same count the non-broadcast operands
+            # use below). Without this padding, the streamer drains its
+            # rspQueue after one read and writers stall on
+            # `combinedReadDataValid`.
+            if pattern.A.shape[0] == 0:
+                spatial_strides = [0] * len(streamers[operand].spatial_dims)
+                n_temporal = pattern.num_dims - template.num_dims
+                total_cycles = 1
+                for i in range(n_temporal):
+                    total_cycles *= op.bounds.data[i].value.data
+                snax_stride_patterns.append(
+                    snax_stream.StridePattern(
+                        upper_bounds=[total_cycles],
+                        temporal_strides=[0],
+                        spatial_strides=spatial_strides,
+                    )
+                )
+                continue
+
             # filter out irrelevant spatial access patterns:
             relevant: list[bool] = [True] * (pattern.num_dims - template.num_dims)
             # relevant spatial strides have a component in the template matrix

@@ -21,18 +21,23 @@ def get_shaped_hw_array_shape(array_type: hw.ArrayType) -> tuple[list[int], Attr
 
 def create_shaped_hw_array_type(
     el_type: builtin.AnySignlessIntegerType | hw.ArrayType, shape: tuple[int, ...]
-) -> builtin.AnySignlessIntegerType | hw.ArrayType:
+) -> hw.ArrayType:
     """
     Generates a recursively nested !hw.array type based on a given shape, e.g.:
 
     i32, (1,2,3) -> !hw.array<1x!hw.array<2x!hw.array<3xi32>>>
     i32, (2) -> !hw.array<2xi32>
-    i32, () -> i32
+    i32, () -> !hw.array<1xi32>
+
+    A 0-D operand (broadcast input or reduction-carry initialiser) is the
+    limit case of a 1-D streamer with stride 0 — its hardware port carries
+    a single lane. Wrapping it as ``hw.array<1xT>`` makes the CIRCT port
+    naming (``data_i_0``) consistent with non-broadcast ports and lets the
+    same ``get_from_shaped_hw_array`` indexing machinery serve both.
     """
 
-    # Edge case for "0D" arrays
     if len(shape) == 0:
-        return el_type
+        return hw.ArrayType(el_type, 1)
 
     if len(shape) == 1:
         return hw.ArrayType(el_type, shape[0])
@@ -148,6 +153,12 @@ def create_shaped_hw_array(
     def create_shaped_hw_array_inner(
         values: list[SSAValue[Attribute]], shape: tuple[int, ...]
     ) -> tuple[list[Operation], SSAValue]:
+        if len(shape) == 0:
+            # 0-D: wrap the single value in a 1-element hw.array — mirror of
+            # ``create_shaped_hw_array_type(_, ()) -> hw.array<1xT>``.
+            assert len(values) == 1
+            op = hw.ArrayCreateOp(values[0])
+            return [op], op.result
         if len(shape) == 1:
             # SystemVerilog needs reversed operand ordering for array indexing
             op = hw.ArrayCreateOp(*reversed(values))
@@ -201,15 +212,23 @@ def get_switch_bitwidth(arg: BlockArgument) -> int:
 def get_pe_port_decl(pe: phs.PEOp, template_spec: TemplateSpec | None = None) -> builtin.ArrayAttr[hw.ModulePort]:
     """
     Get a port declaration for a given PEOp.
-    If an optional template_spec is given, the inputs and outputs of the port declaration are shaped
-    to accommodate the bounds of the spec.
+
+    If ``template_spec`` is given, the inputs and outputs are shaped to the
+    template's spatial unroll (used for the PE-array module). Without a
+    template the ports are scalar element-typed — that's the per-PE module
+    itself, which processes one scalar at a time. The 0-D-as-``hw.array<1xT>``
+    convention applies only at the array/streamer boundary, not on the PE.
     """
+    array_ports = template_spec is not None
     if template_spec is None:
         input_sizes = [() for _ in range(len(pe.data_operands()))]
         output_sizes = [() for _ in range(len(pe.get_terminator().operands))]
     else:
         input_sizes = template_spec.get_input_sizes()
         output_sizes = template_spec.get_output_sizes()
+
+    def port_type(el: builtin.AnySignlessIntegerType, shape: tuple[int, ...]):
+        return create_shaped_hw_array_type(el, shape) if array_ports else el
 
     ports: list[hw.ModulePort] = []
 
@@ -218,7 +237,7 @@ def get_pe_port_decl(pe: phs.PEOp, template_spec: TemplateSpec | None = None) ->
         ports.append(
             hw.ModulePort(
                 builtin.StringAttr(f"data_{i}"),
-                cast(TypeAttribute, create_shaped_hw_array_type(data_opnd.type, input_size)),
+                cast(TypeAttribute, port_type(data_opnd.type, input_size)),
                 hw.DirectionAttr(data=hw.Direction.INPUT),
             )
         )
@@ -235,7 +254,7 @@ def get_pe_port_decl(pe: phs.PEOp, template_spec: TemplateSpec | None = None) ->
         ports.append(
             hw.ModulePort(
                 builtin.StringAttr(f"out_{i}"),
-                cast(TypeAttribute, create_shaped_hw_array_type(output.type, output_size)),
+                cast(TypeAttribute, port_type(output.type, output_size)),
                 hw.DirectionAttr(data=hw.Direction.OUTPUT),
             )
         )
