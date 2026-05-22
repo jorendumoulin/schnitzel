@@ -158,7 +158,13 @@ class PHSCMain(SNAXCMain):
                 # designs only one module is auto-findable. Split the consolidated
                 # output into per-module files named after each module so all PHS
                 # blackboxes are picked up by the simulator build.
-                self._split_sv_per_module(stdout_final, os.path.dirname(os.path.abspath(self.args.output_hardware)))
+                #
+                # Skip this when also generating the schnitzel SoC: that flow uses
+                # Bender to enumerate sources explicitly, so the consolidated file
+                # alone is sufficient and the split files would cause MODDUP
+                # warnings against the consolidated copy.
+                if not self.args.output_schnitzel_dir:
+                    self._split_sv_per_module(stdout_final, os.path.dirname(os.path.abspath(self.args.output_hardware)))
 
         else:
             with open(self.args.output_hardware, "w") as outfile:
