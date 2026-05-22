@@ -34,7 +34,6 @@ jobs:
       - name: Generate flattened BlackBox wrappers
         working-directory: schnitzel
         run: |
-          pixi run -e phs make -C src/main/resources/ibex
           pixi run -e phs make -C src/main/resources/cva6
       - name: Build and run kernels
         run: pixi run -e phs snakemake -k -p -j $(nproc) all

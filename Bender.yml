@@ -22,8 +22,8 @@ package:
   authors:
     - "Joren Dumoulin"
 dependencies:
-  ibex: { path: submodules/ibex }
-  schnitzel_rtl: { path: $SCHNITZEL_RTL_DIR }
+  ibex: {path: submodules/ibex}
+  schnitzel_rtl: {path: $SCHNITZEL_RTL_DIR}
 sources:
   # ----------------------------------------------------------------------
   # Simulation-only top wrapper + DPI memory shim.
