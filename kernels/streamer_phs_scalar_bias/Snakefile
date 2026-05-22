@@ -47,7 +47,7 @@ rule phsc:
     output:
         sw=f"{BUILD}/sw.llvm.mlir",
         top=f"{GENERATED}/Top.sv",
-        filelist=f"{GENERATED}/filelist.f",
+        bender_yml=f"{GENERATED}/Bender.yml",
     shell:
         """
         phsc {input.mlir} {input.schedule} \
@@ -126,11 +126,11 @@ rule link:
 
 rule configure_sim:
     input:
-        filelist=f"{GENERATED}/filelist.f",
+        bender_yml=f"{GENERATED}/Bender.yml",
     output:
         ninja=f"{SIM_BUILD}/build.ninja",
     shell:
-        "cmake -B {SIM_BUILD} -S {ROOT}/sim -G Ninja -DGENERATED_DIR={GENERATED}"
+        "cmake -B {SIM_BUILD} -S {ROOT}/sim -G Ninja -DSCHNITZEL_RTL_DIR={GENERATED}"
 
 
 rule build_sim:
