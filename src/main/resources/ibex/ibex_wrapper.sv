@@ -1,6 +1,20 @@
 // Simple wrapper exposing useful ports and configuring Ibex parameters to the 'small' configuration.
+//
+// The top-level Ibex module is selected at compile time:
+//   * `+define+SYNTHESIS` → instantiate `ibex_top` directly. No tracer; the
+//     right choice for synthesis or any flow where the tracer is unwanted.
+//   * otherwise           → instantiate `ibex_top_tracing` (the RVFI-tracer-
+//     wrapped core). The tracer additionally requires `+define+RVFI` so
+//     the inner `ibex_top` exposes its RVFI port set.
+//
+// Default behaviour (no defines) gives the tracer, matching Ibex's own
+// `ifndef SYNTHESIS` convention for behavioural-only code. The two modules
+// expose an identical port list for the non-RVFI signals, so the parameter
+// and port mappings are shared via an `ifdef` over just the module name.
+// Note that the module name `ibex_wrapper_flattened` is kept here for
+// historical compatibility with the Chisel BlackBox class.
 
-module ibex_wrapper_flattened (
+module ibex_wrapper (
     // Clock and Reset
     input clk_i,
     input rst_ni,
@@ -39,7 +53,12 @@ module ibex_wrapper_flattened (
 
   // Based on ibex_simple_system.sv
 
-  ibex_top_tracing #(
+`ifdef SYNTHESIS
+  ibex_top
+`else
+  ibex_top_tracing
+`endif
+  #(
       .RV32E(0),
       .RV32M(ibex_pkg::RV32MFast),
       .RV32B(ibex_pkg::RV32BNone),

@@ -1,10 +1,9 @@
 package core
 
 import chisel3._
-import chisel3.util.HasBlackBoxPath
-import java.nio.file.{Files, Paths}
+import chisel3.util.HasBlackBoxResource
 
-class ibex_wrapper_flattened extends BlackBox with HasBlackBoxPath {
+class ibex_wrapper extends BlackBox with HasBlackBoxResource {
 
   val io = IO(new Bundle {
 
@@ -44,7 +43,6 @@ class ibex_wrapper_flattened extends BlackBox with HasBlackBoxPath {
     val csr_ext_rdata_i = Input(UInt(32.W))
   })
 
-  // Add ibex resources:
-  addPath("src/main/resources/ibex/ibex_wrapper_flattened.sv")
+  addResource("/ibex/ibex_wrapper.sv")
 
 }

@@ -25,7 +25,7 @@ class Core(hartId: Int) extends Module {
     val csr = new CsrIO()
   })
 
-  val ibex = Module(new ibex_wrapper_flattened())
+  val ibex = Module(new ibex_wrapper())
   ibex.io.clk_i := clock
   ibex.io.rst_ni := ~reset.asBool
 
