@@ -1,5 +1,5 @@
 # {{HEADER_AUTOGEN}}
-# This file contains a template for bender to generate a cmake-compatible 
+# This file contains a template for bender to generate a cmake-compatible
 # filelist to be used with the `verilate` cmake command.
 
 set(BENDER_SOURCES

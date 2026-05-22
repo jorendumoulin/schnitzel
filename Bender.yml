@@ -21,31 +21,14 @@ package:
   name: schnitzel
   authors:
     - "Joren Dumoulin"
-
 dependencies:
-  # Vendored Ibex core — own Bender.yml lives in the submodule.
   ibex: { path: submodules/ibex }
-  # Chisel-emitted RTL package. The path is parameterised via the
-  # `SCHNITZEL_RTL_DIR` env var so that multiple systems (different tops,
-  # different configs) can be built side-by-side, each with its own
-  # generated/build directory. cmake sets this automatically; callers
-  # invoking `bender` directly from the shell must export it themselves.
   schnitzel_rtl: { path: $SCHNITZEL_RTL_DIR }
-
 sources:
   # ----------------------------------------------------------------------
-  # Simulation-only top wrapper + DPI memory shim. Drives the Chisel Top
-  # via DPI for the C++ host-side test harness. Excluded from synthesis.
-  # Gated on the positive `simulation` target rather than `not(synthesis)`:
-  # `bender script verilator` auto-activates both `simulation` AND
-  # `synthesis`, so the negative form would drop the files. The `simulation`
-  # target is set by `script verilator` / `script vsim` but not `script genus`.
+  # Simulation-only top wrapper + DPI memory shim.
   # ----------------------------------------------------------------------
   - target: simulation
     files:
       - sim/rtl/TopWrapper.sv
       - sim/rtl/MemDpi.sv
-
-  # The Ibex BlackBox wrapper is bundled into the chisel emit as a resource
-  # by core.Ibex.scala's `addResource("/ibex/ibex_wrapper.sv")`, so it
-  # arrives via the schnitzel_rtl path dependency above. No entry needed here.
