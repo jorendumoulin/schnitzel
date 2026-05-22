@@ -4,7 +4,7 @@
 
 set(BENDER_SOURCES
 {%- for f in all_files %}
-    "{{ f.file }}"
+    "{{ f }}"
 {%- endfor %}
 )
 
