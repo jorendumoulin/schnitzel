@@ -178,8 +178,27 @@ class StreamingRegionOp(IRDLOperation):
         )
 
     def verify_(self):
+        # All active streamers must execute the same number of cycles. A streamer is
+        # considered disabled when any of its temporal upper bounds is zero (the
+        # canonical "off" encoding, see StridePattern.canonicalize). A mismatch here
+        # indicates a scheduling bug: the hardware would otherwise stall waiting on
+        # the longest streamer to complete.
+        active_cycles: list[tuple[int, int]] = []
+        for idx, sp in enumerate(self.stride_patterns):
+            bounds = [b.data for b in sp.upper_bounds.data]
+            if any(b == 0 for b in bounds):
+                continue
+            cycles = 1
+            for b in bounds:
+                cycles *= b
+            active_cycles.append((idx, cycles))
+        unique = {c for _, c in active_cycles}
+        if len(unique) > 1:
+            raise VerifyException(
+                "All active streamers must run for the same number of cycles, got "
+                + ", ".join(f"streamer {i}: {c}" for i, c in active_cycles)
+            )
         # TODO: rewrite with new patterns
-        pass
         # acc_op = find_accelerator_op(self, self.accelerator.data)
         # if not acc_op:
         #     raise VerifyException("AcceleratorOp not found!")
