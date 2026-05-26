@@ -1,14 +1,11 @@
 package core
 
 import chisel3._
-import chisel3.util.{HasBlackBoxPath, Decoupled}
+import chisel3.util.HasBlackBoxResource
 import axi.AXIBundle
 import axi.AXIConfig
 
-import chisel3._
-import circt.stage.ChiselStage
-
-class cva6_wrapper_flattened extends BlackBox with HasBlackBoxPath {
+class cva6_wrapper extends BlackBox with HasBlackBoxResource {
 
   val io = IO(new Bundle {
 
@@ -20,14 +17,13 @@ class cva6_wrapper_flattened extends BlackBox with HasBlackBoxPath {
 
   })
 
-  // Add cva6 resources:
-  addPath("src/main/resources/cva6/cva6_wrapper_flattened.sv")
+  addResource("/cva6/cva6_wrapper.sv")
 
 }
 
 class CVA6 extends Module {
   val io = IO(new Bundle { val axi = new AXIBundle(new AXIConfig) })
-  val cva6 = Module(new cva6_wrapper_flattened)
+  val cva6 = Module(new cva6_wrapper)
   cva6.io.axi <> io.axi
 
   cva6.io.clk_i := clock
