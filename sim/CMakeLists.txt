@@ -44,11 +44,32 @@ set(SCHNITZEL_RTL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../generated" CACHE PATH
 # Have bender render a small cmake snippet (BENDER_SOURCES / BENDER_DEFINES /
 # BENDER_INCDIRS) via its Tera template engine. include()-ing that snippet
 # avoids any hand-rolled string parsing in cmake.
+#
+# `-t synthesis -t verilator` mirrors what `bender script verilator` auto-
+# activates internally. Without these, `not(synthesis)`-gated files (e.g.
+# tech_cells_generic's deprecated pad_functional.sv, which uses 1995-style
+# pmos primitives Verilator can't handle) get pulled in.
 set(BENDER_CMAKE ${CMAKE_CURRENT_BINARY_DIR}/bender.cmake)
+
+# Bender pins the resolved value of `$SCHNITZEL_RTL_DIR` into Bender.lock at
+# update time and reads it from there on subsequent `bender script` calls,
+# ignoring the current env var. Multiple kernel builds in this repo each
+# need their own generated/ dir, so refresh the lock here against this
+# build's SCHNITZEL_RTL_DIR before rendering the filelist. Local parallel
+# kernel builds in the same checkout race on Bender.lock — CI runs one
+# kernel per checkout so it's unaffected.
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E env "SCHNITZEL_RTL_DIR=${SCHNITZEL_RTL_DIR}"
+            bender update
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+    COMMAND_ERROR_IS_FATAL ANY
+)
+
 execute_process(
     COMMAND ${CMAKE_COMMAND} -E env "SCHNITZEL_RTL_DIR=${SCHNITZEL_RTL_DIR}"
             bender script template
-                -t simulation -t ibex_tracing -D RVFI
+                -t synthesis -t verilator
+                -t sim_top -t ibex_tracing -t cv64a6_imafdc_sv39 -D RVFI
                 --template=${CMAKE_CURRENT_SOURCE_DIR}/bender.cmake.tera
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     OUTPUT_FILE ${BENDER_CMAKE}
@@ -69,6 +90,19 @@ verilate(sim
         -Wno-BLKANDNBLK -Wno-SELRANGE -Wno-SYMRSVDWORD
         -Wno-CMPCONST -Wno-UNSIGNED -Wno-WIDTH -Wno-ASCRANGE
         -Wno-IMPLICITSTATIC
+        # Bender follows cva6's manifest faithfully and pulls in every
+        # file of every transitive dep (axi, common_cells, ...) even when
+        # our design hierarchy never instantiates them. That introduces
+        # benign noise the old hand-curated flatten flow avoided:
+        #   PINMISSING  — uninstantiated axi/cva6 modules have pins our
+        #                 wrappers don't drive.
+        #   REDEFMACRO  — ibex and common_cells both define `ASSERT/`ASSUME
+        #                 macros with slightly different signatures.
+        # And `--bbox-unsup` stubs out language constructs Verilator does
+        # not implement (notably `default disable iff` outside `ifndef
+        # VERILATOR` in axi_id_remap.sv).
+        -Wno-PINMISSING -Wno-REDEFMACRO
+        --bbox-unsup
         ${BENDER_DEFINES}
         ${BENDER_INCDIRS}
         --assert

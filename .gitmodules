@@ -6,7 +6,7 @@
 	url = https://github.com/eyalroz/printf.git
 [submodule "submodules/cva6"]
 	path = submodules/cva6
-	url = https://github.com/openhwgroup/cva6.git
+	url = https://github.com/jorendumoulin/cva6.git
 [submodule "submodules/executorch"]
 	path = submodules/executorch
 	url = https://github.com/pytorch/executorch.git

@@ -1,15 +1,12 @@
 default:
   @just --list
 
-flatten-cva6:
-    make -C ./src/main/resources/cva6
-
 flatten-design top-module output:
     verilator -sv -E --top-module {{top-module}} generated/*.sv > {{output}}
     sed -i '/^`/s/^/\/\//' {{output}}
 
 # Generate Verilog RTL for a given Top module configuration.
-generate-verilog top='default' output='generated': flatten-cva6
+generate-verilog top='default' output='generated':
     ./mill schnitzel.runMain sim.EmitVerilog --top={{top}} --output-dir={{output}}
 
 configure-quick:
