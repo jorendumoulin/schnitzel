@@ -22,10 +22,8 @@ package:
   name: schnitzel
   authors:
     - "Joren Dumoulin"
-
 dependencies:
-  schnitzel_rtl: { path: $SCHNITZEL_RTL_DIR }
-
+  schnitzel_rtl: {path: $SCHNITZEL_RTL_DIR}
 sources:
   - include_dirs:
       - submodules/cva6/core/include
@@ -39,7 +37,6 @@ sources:
     defines:
       RVFI: ~
     files:
-
       # --- cva6 packages (must precede modules) ---
       - submodules/cva6/core/include/config_pkg.sv
       - src/main/resources/cva6/cv64a6_imafdc_sv39_config_pkg.sv
@@ -260,12 +257,10 @@ sources:
       - submodules/ibex/rtl/ibex_tracer_pkg.sv
       - submodules/ibex/rtl/ibex_tracer.sv
       - submodules/ibex/rtl/ibex_top_tracing.sv
-
       # Note: chisel-generated RTL is supplied by the `schnitzel_rtl` path
       # dependency declared above, not enumerated here. Its file list lives
       # at $SCHNITZEL_RTL_DIR/Bender.yml and is re-emitted on every chisel
       # build.
-
   - target: sim_top
     files:
       - sim/rtl/TopWrapper.sv
