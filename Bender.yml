@@ -1,43 +1,357 @@
 # Root Bender manifest for the schnitzel project.
 #
-# This is the single source of truth for the full file list. Downstream
-# tooling (sim/CMakeLists.txt, future synth flows) invokes one of:
+# Flat enumeration of every cva6/ibex source file by path relative to the
+# repo root — bender does not git-fetch and does not consume any downstream
+# cva6/ibex Bender.yml's. All external sources live under submodules/cva6/
+# (vendored or nested via cva6's own submodule tree) or submodules/ibex/.
+# The schnitzel-owned cva6 PMA override (rtl/cva6/...) replaces cva6's
+# stock cv64a6_imafdc_sv39_config_pkg.sv; only the override is listed.
 #
-#   bender script verilator -t sim_top -t ibex_tracing -t cv64a6_imafdc_sv39 -D RVFI
-#   bender script genus     -t synthesis -t ibex_regfile_latch -t cv64a6_imafdc_sv39 -D SYNTHESIS
-#   bender script flist     -t synthesis -t cv64a6_imafdc_sv39
-#
-# and consumes the emitted filelist directly — no per-tool custom logic.
+# The single remaining dependency is `schnitzel_rtl`, a chisel-emitted
+# Bender.yml that lives inside the generated/ tree. Its file list changes
+# every chisel emit (module names drift, new modules appear), and its
+# location varies per build (each kernel has its own generated/ dir), so
+# it stays out of this static manifest and gets pulled in by path. The
+# $SCHNITZEL_RTL_DIR env var tells bender where to find it.
 #
 # Targets:
-#   sim_top           — pulls in the sim/rtl/ wrappers (TopWrapper, MemDpi).
-#                       Positive opt-in. Do NOT use the standard `simulation`
-#                       target here: pulp-platform/axi's `simulation` target
-#                       pulls in UVM-style test classes (`axi_test.sv`) that
-#                       Verilator can't parse, so a generic `-t simulation`
-#                       flag would activate them too.
-#   ibex_tracing      — opt-in for sim flows that want the RVFI tracer; see
-#                       submodules/ibex/Bender.yml for the contract.
-#   synthesis         — drops sim wrappers; set automatically by tool emitters
-#                       like `bender script genus`.
+#   sim_top — pulls in the sim/rtl/ wrappers (TopWrapper, MemDpi). Drop
+#             with a synth-time activation that omits this target.
 
 package:
   name: schnitzel
   authors:
     - "Joren Dumoulin"
+
 dependencies:
-  ibex: {path: submodules/ibex}
-  # Reuse cva6's upstream Bender.yml verbatim. The schnitzel-modified
-  # cv64a6_imafdc_sv39_config_pkg.sv is shipped via Chisel addResource into
-  # the schnitzel_rtl package (not via a target on the cva6 dep), so do NOT
-  # activate `-t cv64a6_imafdc_sv39` — otherwise cva6's own copy of the
-  # config_pkg would also be pulled in and conflict.
-  cva6: {path: submodules/cva6}
-  schnitzel_rtl: {path: $SCHNITZEL_RTL_DIR}
+  schnitzel_rtl: { path: $SCHNITZEL_RTL_DIR }
+
 sources:
-  # ----------------------------------------------------------------------
-  # Simulation-only top wrapper + DPI memory shim.
-  # ----------------------------------------------------------------------
+  - include_dirs:
+      - submodules/cva6/core/include
+      - submodules/cva6/vendor/pulp-platform/axi/include
+      - submodules/cva6/vendor/pulp-platform/common_cells/include
+      - submodules/cva6/common/local/util
+      - submodules/ibex/dv/uvm/core_ibex/common/prim
+      - submodules/ibex/formal/data_ind_timing
+      - submodules/ibex/vendor/lowrisc_ip/dv/sv/dv_utils
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl
+    defines:
+      RVFI: ~
+    files:
+
+      # --- common_verification (cva6 transitive) ---
+      - submodules/cva6/corev_apu/tb/common_verification/src/clk_rst_gen.sv
+      - submodules/cva6/corev_apu/tb/common_verification/src/sim_timeout.sv
+      # --- tech_cells_generic (cva6 vendored) ---
+      - submodules/cva6/vendor/pulp-platform/tech_cells_generic/src/rtl/tc_sram.sv
+      - submodules/cva6/vendor/pulp-platform/tech_cells_generic/src/rtl/tc_clk.sv
+      - submodules/cva6/vendor/pulp-platform/tech_cells_generic/src/deprecated/pulp_clock_gating_async.sv
+      - submodules/cva6/vendor/pulp-platform/tech_cells_generic/src/deprecated/cluster_clk_cells.sv
+      - submodules/cva6/vendor/pulp-platform/tech_cells_generic/src/deprecated/pulp_clk_cells.sv
+      # --- common_cells (cva6 vendored) ---
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/binary_to_gray.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/cb_filter_pkg.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/cc_onehot.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/cf_math_pkg.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/delta_counter.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/ecc_pkg.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/edge_propagator_tx.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/exp_backoff.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/fifo_v3.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/gray_to_binary.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/isochronous_4phase_handshake.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/isochronous_spill_register.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/lfsr.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/lfsr_16bit.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/lfsr_8bit.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/mv_filter.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/onehot_to_bin.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/plru_tree.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/popcount.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/rr_arb_tree.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/rstgen_bypass.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/serial_deglitch.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/shift_reg.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/spill_register_flushable.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_demux.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_filter.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_fork.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_intf.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_mux.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/sub_per_hash.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/sync.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/sync_wedge.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/unread.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/cdc_2phase.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/addr_decode.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/cb_filter.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/cdc_fifo_2phase.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/counter.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/ecc_decode.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/ecc_encode.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/edge_detect.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/lzc.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/max_counter.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/rstgen.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/spill_register.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_delay.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_fifo.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_fork_dynamic.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_join.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/cdc_fifo_gray.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/fall_through_register.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/id_queue.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_to_mem.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_arbiter_flushable.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_register.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_xbar.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_arbiter.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/stream_omega_net.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/clock_divider_counter.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/find_first_one.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/generic_LFSR_8bit.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/generic_fifo.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/prioarbiter.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/pulp_sync.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/pulp_sync_wedge.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/rrarbiter.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/clock_divider.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/fifo_v2.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/deprecated/fifo_v1.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/edge_propagator.sv
+      - submodules/cva6/vendor/pulp-platform/common_cells/src/edge_propagator_rx.sv
+      # --- fpu_div_sqrt_mvp (cvfpu nested submodule) ---
+      - submodules/cva6/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/defs_div_sqrt_mvp.sv
+      - submodules/cva6/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/iteration_div_sqrt_mvp.sv
+      - submodules/cva6/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/control_mvp.sv
+      - submodules/cva6/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/norm_div_sqrt_mvp.sv
+      - submodules/cva6/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/preprocess_mvp.sv
+      - submodules/cva6/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/nrbd_nrsc_mvp.sv
+      - submodules/cva6/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/div_sqrt_top_mvp.sv
+      - submodules/cva6/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/div_sqrt_mvp_wrapper.sv
+      # --- axi (cva6 vendored) ---
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_pkg.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_intf.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_atop_filter.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_burst_splitter.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_cdc_dst.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_cdc_src.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_cut.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_delayer.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_demux.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_dw_downsizer.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_dw_upsizer.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_id_remap.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_id_prepend.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_isolate.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_join.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_lite_demux.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_lite_join.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_lite_mailbox.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_lite_mux.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_lite_regs.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_lite_to_apb.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_lite_to_axi.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_modify_address.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_mux.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_serializer.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_cdc.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_err_slv.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_dw_converter.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_id_serialize.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_multicut.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_to_axi_lite.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_iw_converter.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_lite_xbar.sv
+      - submodules/cva6/vendor/pulp-platform/axi/src/axi_xbar.sv
+      # --- fpnew/cvfpu (cva6 submodule) ---
+      - submodules/cva6/core/cvfpu/src/fpnew_pkg.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_cast_multi.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_classifier.sv
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/clk/rtl/gated_clk_cell.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_ctrl.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_ff1.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_pack_single.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_prepare.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_round_single.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_special.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_srt_single.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_top.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_dp.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_frbus.v
+      - submodules/cva6/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_src_type.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_ctrl.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_double.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_ff1.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_pack.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_prepare.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_round.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_scalar_dp.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt_radix16_bound_table.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt_radix16_with_sqrt.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt.v
+      - submodules/cva6/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_top.v
+      - submodules/cva6/core/cvfpu/src/fpnew_divsqrt_th_32.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_divsqrt_th_64_multi.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_divsqrt_multi.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_fma.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_fma_multi.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_noncomp.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_opgroup_block.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_opgroup_fmt_slice.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_opgroup_multifmt_slice.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_rounding.sv
+      - submodules/cva6/core/cvfpu/src/fpnew_top.sv
+      # --- cva6 core ---
+      - submodules/cva6/core/include/config_pkg.sv
+      # --- schnitzel-owned cva6 config_pkg override ---
+      - rtl/cva6/cv64a6_imafdc_sv39_config_pkg.sv
+      # --- cva6 core ---
+      - submodules/cva6/core/include/riscv_pkg.sv
+      - submodules/cva6/core/include/ariane_pkg.sv
+      - submodules/cva6/core/include/build_config_pkg.sv
+      - submodules/cva6/core/cva6_accel_first_pass_decoder_stub.sv
+      - submodules/cva6/core/cva6_mmu/cva6_tlb.sv
+      - submodules/cva6/core/cva6_mmu/cva6_shared_tlb.sv
+      - submodules/cva6/core/cva6_mmu/cva6_mmu.sv
+      - submodules/cva6/core/cva6_mmu/cva6_ptw.sv
+      - submodules/cva6/core/include/dummy_l15_pkg.sv
+      - submodules/cva6/core/include/wt_cache_pkg.sv
+      - submodules/cva6/core/include/std_cache_pkg.sv
+      - submodules/cva6/core/include/aes_pkg.sv
+      - submodules/cva6/core/cvxif_example/include/cvxif_instr_pkg.sv
+      - submodules/cva6/core/cvxif_fu.sv
+      - submodules/cva6/core/cvxif_issue_register_commit_if_driver.sv
+      - submodules/cva6/core/cvxif_compressed_if_driver.sv
+      - submodules/cva6/core/cvxif_example/cvxif_example_coprocessor.sv
+      - submodules/cva6/core/cvxif_example/instr_decoder.sv
+      - submodules/cva6/core/cva6_rvfi_probes.sv
+      - submodules/cva6/core/cva6_fifo_v3.sv
+      - submodules/cva6/core/cva6.sv
+      - submodules/cva6/core/aes.sv
+      - submodules/cva6/core/alu.sv
+      - submodules/cva6/core/alu_wrapper.sv
+      - submodules/cva6/core/fpu_wrap.sv
+      - submodules/cva6/core/branch_unit.sv
+      - submodules/cva6/core/compressed_decoder.sv
+      - submodules/cva6/core/controller.sv
+      - submodules/cva6/core/csr_buffer.sv
+      - submodules/cva6/core/csr_regfile.sv
+      - submodules/cva6/core/decoder.sv
+      - submodules/cva6/core/ex_stage.sv
+      - submodules/cva6/core/acc_dispatcher.sv
+      - submodules/cva6/core/instr_realign.sv
+      - submodules/cva6/core/id_stage.sv
+      - submodules/cva6/core/issue_read_operands.sv
+      - submodules/cva6/core/issue_stage.sv
+      - submodules/cva6/core/load_unit.sv
+      - submodules/cva6/core/load_store_unit.sv
+      - submodules/cva6/core/lsu_bypass.sv
+      - submodules/cva6/core/mult.sv
+      - submodules/cva6/core/multiplier.sv
+      - submodules/cva6/core/serdiv.sv
+      - submodules/cva6/core/perf_counters.sv
+      - submodules/cva6/core/ariane_regfile_ff.sv
+      - submodules/cva6/core/ariane_regfile_fpga.sv
+      - submodules/cva6/core/scoreboard.sv
+      - submodules/cva6/core/raw_checker.sv
+      - submodules/cva6/core/store_buffer.sv
+      - submodules/cva6/core/amo_buffer.sv
+      - submodules/cva6/core/store_unit.sv
+      - submodules/cva6/core/commit_stage.sv
+      - submodules/cva6/core/axi_shim.sv
+      - submodules/cva6/core/frontend/btb.sv
+      - submodules/cva6/core/frontend/bht.sv
+      - submodules/cva6/core/frontend/bht2lvl.sv
+      - submodules/cva6/core/frontend/ras.sv
+      - submodules/cva6/core/frontend/instr_scan.sv
+      - submodules/cva6/core/frontend/instr_queue.sv
+      - submodules/cva6/core/frontend/frontend.sv
+      - submodules/cva6/core/cache_subsystem/wt_dcache_ctrl.sv
+      - submodules/cva6/core/cache_subsystem/wt_dcache_mem.sv
+      - submodules/cva6/core/cache_subsystem/wt_dcache_missunit.sv
+      - submodules/cva6/core/cache_subsystem/wt_dcache_wbuffer.sv
+      - submodules/cva6/core/cache_subsystem/wt_dcache.sv
+      - submodules/cva6/core/cache_subsystem/wt_cache_subsystem.sv
+      - submodules/cva6/core/cache_subsystem/wt_axi_adapter.sv
+      - submodules/cva6/core/cache_subsystem/cva6_icache.sv
+      - submodules/cva6/core/cache_subsystem/tag_cmp.sv
+      - submodules/cva6/core/cache_subsystem/cva6_icache_axi_wrapper.sv
+      - submodules/cva6/core/cache_subsystem/axi_adapter.sv
+      - submodules/cva6/core/cache_subsystem/miss_handler.sv
+      - submodules/cva6/core/cache_subsystem/cache_ctrl.sv
+      - submodules/cva6/core/cache_subsystem/std_nbdcache.sv
+      - submodules/cva6/core/cache_subsystem/std_cache_subsystem.sv
+      - submodules/cva6/core/pmp/src/pmp.sv
+      - submodules/cva6/core/pmp/src/pmp_entry.sv
+      - submodules/cva6/core/pmp/src/pmp_data_if.sv
+      - submodules/cva6/common/local/util/sram.sv
+      - submodules/cva6/common/local/util/tc_sram_wrapper.sv
+      - submodules/cva6/common/local/util/sram_cache.sv
+      - submodules/cva6/common/local/util/tc_sram_wrapper_cache_techno.sv
+      # --- ibex ---
+      - submodules/ibex/dv/uvm/core_ibex/common/prim/prim_pkg.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_ram_1p_pkg.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_cipher_pkg.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_secded_pkg.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_mubi_pkg.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_count_pkg.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_util_pkg.sv
+      - submodules/ibex/rtl/ibex_pkg.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_assert.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_generic_buf.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_generic_clock_gating.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_generic_ram_1p.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_generic_flop.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim_generic/rtl/prim_generic_clock_mux2.sv
+      - submodules/ibex/dv/uvm/core_ibex/common/prim/prim_buf.sv
+      - submodules/ibex/dv/uvm/core_ibex/common/prim/prim_clock_gating.sv
+      - submodules/ibex/dv/uvm/core_ibex/common/prim/prim_ram_1p.sv
+      - submodules/ibex/dv/uvm/core_ibex/common/prim/prim_flop.sv
+      - submodules/ibex/dv/uvm/core_ibex/common/prim/prim_clock_mux2.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_secded_28_22_enc.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_secded_28_22_dec.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_secded_39_32_enc.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_secded_39_32_dec.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_secded_inv_39_32_enc.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_secded_inv_39_32_dec.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_lfsr.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_count.sv
+      - submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_ram_1p_scr.sv
+      - submodules/ibex/rtl/ibex_alu.sv
+      - submodules/ibex/rtl/ibex_branch_predict.sv
+      - submodules/ibex/rtl/ibex_compressed_decoder.sv
+      - submodules/ibex/rtl/ibex_controller.sv
+      - submodules/ibex/rtl/ibex_core.sv
+      - submodules/ibex/rtl/ibex_counter.sv
+      - submodules/ibex/rtl/ibex_cs_registers.sv
+      - submodules/ibex/rtl/ibex_csr.sv
+      - submodules/ibex/rtl/ibex_decoder.sv
+      - submodules/ibex/rtl/ibex_dummy_instr.sv
+      - submodules/ibex/rtl/ibex_ex_block.sv
+      - submodules/ibex/rtl/ibex_fetch_fifo.sv
+      - submodules/ibex/rtl/ibex_icache.sv
+      - submodules/ibex/rtl/ibex_id_stage.sv
+      - submodules/ibex/rtl/ibex_if_stage.sv
+      - submodules/ibex/rtl/ibex_load_store_unit.sv
+      - submodules/ibex/rtl/ibex_lockstep.sv
+      - submodules/ibex/rtl/ibex_multdiv_fast.sv
+      - submodules/ibex/rtl/ibex_multdiv_slow.sv
+      - submodules/ibex/rtl/ibex_pmp.sv
+      - submodules/ibex/rtl/ibex_prefetch_buffer.sv
+      - submodules/ibex/rtl/ibex_wb_stage.sv
+      - submodules/ibex/rtl/ibex_register_file_ff.sv
+      - submodules/ibex/rtl/ibex_top.sv
+      - submodules/ibex/rtl/ibex_tracer_pkg.sv
+      - submodules/ibex/rtl/ibex_tracer.sv
+      - submodules/ibex/rtl/ibex_top_tracing.sv
+
+      # Note: chisel-generated RTL is supplied by the `schnitzel_rtl` path
+      # dependency declared above, not enumerated here. Its file list lives
+      # at $SCHNITZEL_RTL_DIR/Bender.yml and is re-emitted on every chisel
+      # build.
+
   - target: sim_top
     files:
       - sim/rtl/TopWrapper.sv
