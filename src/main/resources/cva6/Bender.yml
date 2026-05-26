@@ -1,0 +1,186 @@
+# Bender sub-manifest for cva6.
+#
+# Lists every cva6-side file the schnitzel build needs. Paths into the cva6
+# submodule are written relative to this file ($CVA6_PATH/...).
+# The co-located cv64a6_imafdc_sv39_config_pkg.sv overrides cva6's stock copy
+# and is referenced by bare filename.
+#
+# Consumed by the root Bender.yml as a path dependency.
+
+package:
+  name: cva6
+  authors:
+    - "Joren Dumoulin"
+sources:
+  - include_dirs:
+      - $CVA6_PATH/core/include
+      - $CVA6_PATH/vendor/pulp-platform/axi/include
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/include
+      - $CVA6_PATH/common/local/util
+    defines:
+      RVFI: ~
+    files:
+      # --- cva6 packages (must precede modules) ---
+      - $CVA6_PATH/core/include/config_pkg.sv
+      - cv64a6_imafdc_sv39_config_pkg.sv
+      - $CVA6_PATH/core/include/riscv_pkg.sv
+      - $CVA6_PATH/core/include/ariane_pkg.sv
+      - $CVA6_PATH/vendor/pulp-platform/axi/src/axi_pkg.sv
+      - $CVA6_PATH/core/include/wt_cache_pkg.sv
+      - $CVA6_PATH/core/include/std_cache_pkg.sv
+      - $CVA6_PATH/core/include/instr_tracer_pkg.sv
+      - $CVA6_PATH/core/include/build_config_pkg.sv
+      - $CVA6_PATH/core/include/aes_pkg.sv
+      - $CVA6_PATH/core/include/triggers_pkg.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_pkg.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/cf_math_pkg.sv
+      # --- fpga-support ---
+      - $CVA6_PATH/vendor/pulp-platform/fpga-support/rtl/SyncDpRam.sv
+      - $CVA6_PATH/vendor/pulp-platform/fpga-support/rtl/AsyncDpRam.sv
+      - $CVA6_PATH/vendor/pulp-platform/fpga-support/rtl/AsyncThreePortRam.sv
+      - $CVA6_PATH/vendor/pulp-platform/fpga-support/rtl/SyncThreePortRam.sv
+      - $CVA6_PATH/vendor/pulp-platform/fpga-support/rtl/SyncDpRam_ind_r_w.sv
+      # --- cvfpu ---
+      - $CVA6_PATH/core/cvfpu/src/fpnew_cast_multi.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_classifier.sv
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/clk/rtl/gated_clk_cell.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_ctrl.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_ff1.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_pack_single.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_prepare.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_round_single.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_special.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_srt_single.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_top.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_dp.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_frbus.v
+      - $CVA6_PATH/core/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_src_type.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_ctrl.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_double.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_ff1.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_pack.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_prepare.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_round.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_scalar_dp.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt_radix16_bound_table.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt_radix16_with_sqrt.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt.v
+      - $CVA6_PATH/core/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_top.v
+      - $CVA6_PATH/core/cvfpu/src/fpnew_divsqrt_th_32.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_divsqrt_th_64_multi.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_divsqrt_multi.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_fma_multi.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_fma.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_noncomp.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_opgroup_block.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_opgroup_fmt_slice.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_opgroup_multifmt_slice.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_rounding.sv
+      - $CVA6_PATH/core/cvfpu/src/fpnew_top.sv
+      - $CVA6_PATH/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/defs_div_sqrt_mvp.sv
+      - $CVA6_PATH/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/control_mvp.sv
+      - $CVA6_PATH/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/div_sqrt_top_mvp.sv
+      - $CVA6_PATH/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/iteration_div_sqrt_mvp.sv
+      - $CVA6_PATH/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/norm_div_sqrt_mvp.sv
+      - $CVA6_PATH/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/nrbd_nrsc_mvp.sv
+      - $CVA6_PATH/core/cvfpu/src/fpu_div_sqrt_mvp/hdl/preprocess_mvp.sv
+      # --- cvxif ---
+      - $CVA6_PATH/core/cvxif_compressed_if_driver.sv
+      - $CVA6_PATH/core/cvxif_issue_register_commit_if_driver.sv
+      - $CVA6_PATH/core/cvxif_fu.sv
+      # --- common_cells ---
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/fifo_v3.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/lfsr.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/lfsr_8bit.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/stream_arbiter.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/stream_arbiter_flushable.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/stream_mux.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/stream_demux.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/lzc.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/rr_arb_tree.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/shift_reg.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/unread.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/popcount.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/exp_backoff.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/counter.sv
+      - $CVA6_PATH/vendor/pulp-platform/common_cells/src/delta_counter.sv
+      # --- cva6 core ---
+      - $CVA6_PATH/core/cva6.sv
+      - $CVA6_PATH/core/cva6_rvfi_probes.sv
+      - $CVA6_PATH/core/alu.sv
+      - $CVA6_PATH/core/alu_wrapper.sv
+      - $CVA6_PATH/core/aes.sv
+      - $CVA6_PATH/core/fpu_wrap.sv
+      - $CVA6_PATH/core/branch_unit.sv
+      - $CVA6_PATH/core/compressed_decoder.sv
+      - $CVA6_PATH/core/macro_decoder.sv
+      - $CVA6_PATH/core/controller.sv
+      - $CVA6_PATH/core/zcmt_decoder.sv
+      - $CVA6_PATH/core/csr_buffer.sv
+      - $CVA6_PATH/core/csr_regfile.sv
+      - $CVA6_PATH/core/trigger_module.sv
+      - $CVA6_PATH/core/decoder.sv
+      - $CVA6_PATH/core/ex_stage.sv
+      - $CVA6_PATH/core/instr_realign.sv
+      - $CVA6_PATH/core/id_stage.sv
+      - $CVA6_PATH/core/issue_read_operands.sv
+      - $CVA6_PATH/core/issue_stage.sv
+      - $CVA6_PATH/core/load_unit.sv
+      - $CVA6_PATH/core/load_store_unit.sv
+      - $CVA6_PATH/core/lsu_bypass.sv
+      - $CVA6_PATH/core/mult.sv
+      - $CVA6_PATH/core/multiplier.sv
+      - $CVA6_PATH/core/serdiv.sv
+      - $CVA6_PATH/core/perf_counters.sv
+      - $CVA6_PATH/core/ariane_regfile_ff.sv
+      - $CVA6_PATH/core/ariane_regfile_fpga.sv
+      - $CVA6_PATH/core/scoreboard.sv
+      - $CVA6_PATH/core/raw_checker.sv
+      - $CVA6_PATH/core/store_buffer.sv
+      - $CVA6_PATH/core/amo_buffer.sv
+      - $CVA6_PATH/core/store_unit.sv
+      - $CVA6_PATH/core/commit_stage.sv
+      - $CVA6_PATH/core/axi_shim.sv
+      - $CVA6_PATH/core/cva6_accel_first_pass_decoder_stub.sv
+      - $CVA6_PATH/core/acc_dispatcher.sv
+      - $CVA6_PATH/core/cva6_fifo_v3.sv
+      # --- cva6 frontend ---
+      - $CVA6_PATH/core/frontend/btb.sv
+      - $CVA6_PATH/core/frontend/bht.sv
+      - $CVA6_PATH/core/frontend/bht2lvl.sv
+      - $CVA6_PATH/core/frontend/ras.sv
+      - $CVA6_PATH/core/frontend/instr_scan.sv
+      - $CVA6_PATH/core/frontend/instr_queue.sv
+      - $CVA6_PATH/core/frontend/frontend.sv
+      # --- cva6 cache subsystem ---
+      - $CVA6_PATH/core/cache_subsystem/wt_dcache_ctrl.sv
+      - $CVA6_PATH/core/cache_subsystem/wt_dcache_mem.sv
+      - $CVA6_PATH/core/cache_subsystem/wt_dcache_missunit.sv
+      - $CVA6_PATH/core/cache_subsystem/wt_dcache_wbuffer.sv
+      - $CVA6_PATH/core/cache_subsystem/wt_dcache.sv
+      - $CVA6_PATH/core/cache_subsystem/cva6_icache.sv
+      - $CVA6_PATH/core/cache_subsystem/wt_cache_subsystem.sv
+      - $CVA6_PATH/core/cache_subsystem/wt_axi_adapter.sv
+      - $CVA6_PATH/core/cache_subsystem/tag_cmp.sv
+      - $CVA6_PATH/core/cache_subsystem/axi_adapter.sv
+      - $CVA6_PATH/core/cache_subsystem/miss_handler.sv
+      - $CVA6_PATH/core/cache_subsystem/cache_ctrl.sv
+      - $CVA6_PATH/core/cache_subsystem/cva6_icache_axi_wrapper.sv
+      - $CVA6_PATH/core/cache_subsystem/std_cache_subsystem.sv
+      - $CVA6_PATH/core/cache_subsystem/std_nbdcache.sv
+      # --- common util + tech_cells_generic ---
+      - $CVA6_PATH/common/local/util/instr_tracer.sv
+      - $CVA6_PATH/common/local/util/tc_sram_wrapper.sv
+      - $CVA6_PATH/common/local/util/tc_sram_wrapper_cache_techno.sv
+      - $CVA6_PATH/vendor/pulp-platform/tech_cells_generic/src/rtl/tc_sram.sv
+      - $CVA6_PATH/common/local/util/sram.sv
+      - $CVA6_PATH/common/local/util/sram_cache.sv
+      # --- pmp ---
+      - $CVA6_PATH/core/pmp/src/pmp.sv
+      - $CVA6_PATH/core/pmp/src/pmp_entry.sv
+      - $CVA6_PATH/core/pmp/src/pmp_data_if.sv
+      # --- cva6 mmu ---
+      - $CVA6_PATH/core/cva6_mmu/cva6_mmu.sv
+      - $CVA6_PATH/core/cva6_mmu/cva6_ptw.sv
+      - $CVA6_PATH/core/cva6_mmu/cva6_tlb.sv
+      - $CVA6_PATH/core/cva6_mmu/cva6_shared_tlb.sv

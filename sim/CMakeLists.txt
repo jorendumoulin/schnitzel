@@ -30,14 +30,25 @@ add_library(sim SHARED
 target_include_directories(sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(sim PRIVATE argparse::argparse elfio::elfio)
 
-# All RTL sources, include dirs, and defines come from the root Bender
-# manifest (a flat enumeration of cva6/ibex sources). The one remaining
-# dep is `schnitzel_rtl` — the chisel-emitted file list, whose location
-# varies per build (each kernel has its own generated/ dir) and whose
-# contents change every emit. Communicated to bender via the
-# `SCHNITZEL_RTL_DIR` env var; override with `-DSCHNITZEL_RTL_DIR=...`.
+# RTL sources come from the root Bender.yml, which pulls in three path
+# dependencies — src/main/resources/{cva6,ibex}/Bender.yml and the chisel-
+# emitted manifest at $SCHNITZEL_RTL_DIR. Each sub-manifest references its
+# submodule via an env var ($CVA6_PATH, $IBEX_PATH, $SCHNITZEL_RTL_DIR).
+# Bender substitutes them at script time but treats the substituted value
+# as relative to the sub-manifest dir, so the defaults below are written
+# relative to src/main/resources/{cva6,ibex}/ — i.e. four levels up to the
+# repo root, then back down into submodules/.
 set(SCHNITZEL_RTL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../generated" CACHE PATH
     "Directory containing the chisel-generated RTL and its auto-emitted Bender.yml.")
+set(CVA6_PATH "../../../../submodules/cva6" CACHE STRING
+    "Path to the cva6 submodule, resolved relative to src/main/resources/cva6/Bender.yml.")
+set(IBEX_PATH "../../../../submodules/ibex" CACHE STRING
+    "Path to the ibex submodule, resolved relative to src/main/resources/ibex/Bender.yml.")
+
+set(BENDER_ENV
+    "SCHNITZEL_RTL_DIR=${SCHNITZEL_RTL_DIR}"
+    "CVA6_PATH=${CVA6_PATH}"
+    "IBEX_PATH=${IBEX_PATH}")
 
 set(BENDER_CMAKE ${CMAKE_CURRENT_BINARY_DIR}/bender.cmake)
 
@@ -46,14 +57,13 @@ set(BENDER_CMAKE ${CMAKE_CURRENT_BINARY_DIR}/bender.cmake)
 # rendering the filelist. Parallel kernel builds in one checkout race on
 # Bender.lock — CI runs one kernel per checkout so it's unaffected.
 execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env "SCHNITZEL_RTL_DIR=${SCHNITZEL_RTL_DIR}"
-            bender update
+    COMMAND ${CMAKE_COMMAND} -E env ${BENDER_ENV} bender update
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     COMMAND_ERROR_IS_FATAL ANY
 )
 
 execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env "SCHNITZEL_RTL_DIR=${SCHNITZEL_RTL_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E env ${BENDER_ENV}
             bender script template
                 -t sim_top
                 --template=${CMAKE_CURRENT_SOURCE_DIR}/bender.cmake.tera
