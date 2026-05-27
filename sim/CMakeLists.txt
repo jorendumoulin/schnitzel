@@ -31,9 +31,9 @@ target_include_directories(sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(sim PRIVATE argparse::argparse elfio::elfio)
 
 # RTL sources come from the root Bender.yml
-set(SCHNITZEL_RTL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../generated")
-set(CVA6_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../submodules/cva6")
-set(IBEX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../submodules/ibex")
+set(SCHNITZEL_RTL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../generated" CACHE PATH)
+set(CVA6_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../submodules/cva6" CACHE PATH)
+set(IBEX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../submodules/ibex" CACHE PATH)
 
 cmake_path(ABSOLUTE_PATH SCHNITZEL_RTL_DIR NORMALIZE)
 cmake_path(ABSOLUTE_PATH CVA6_PATH NORMALIZE)
