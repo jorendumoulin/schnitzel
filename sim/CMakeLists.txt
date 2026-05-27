@@ -30,20 +30,14 @@ add_library(sim SHARED
 target_include_directories(sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(sim PRIVATE argparse::argparse elfio::elfio)
 
-# RTL sources come from the root Bender.yml, which pulls in three path
-# dependencies — src/main/resources/{cva6,ibex}/Bender.yml and the chisel-
-# emitted manifest at $SCHNITZEL_RTL_DIR. Each sub-manifest references its
-# submodule via an env var ($CVA6_PATH, $IBEX_PATH, $SCHNITZEL_RTL_DIR).
-# Bender substitutes them at script time but treats the substituted value
-# as relative to the sub-manifest dir, so the defaults below are written
-# relative to src/main/resources/{cva6,ibex}/ — i.e. four levels up to the
-# repo root, then back down into submodules/.
-set(SCHNITZEL_RTL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../generated" CACHE PATH
-    "Directory containing the chisel-generated RTL and its auto-emitted Bender.yml.")
-set(CVA6_PATH "../../../../submodules/cva6" CACHE STRING
-    "Path to the cva6 submodule, resolved relative to src/main/resources/cva6/Bender.yml.")
-set(IBEX_PATH "../../../../submodules/ibex" CACHE STRING
-    "Path to the ibex submodule, resolved relative to src/main/resources/ibex/Bender.yml.")
+# RTL sources come from the root Bender.yml
+set(SCHNITZEL_RTL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../generated")
+set(CVA6_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../submodules/cva6")
+set(IBEX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../submodules/ibex")
+
+cmake_path(ABSOLUTE_PATH SCHNITZEL_RTL_DIR NORMALIZE)
+cmake_path(ABSOLUTE_PATH CVA6_PATH NORMALIZE)
+cmake_path(ABSOLUTE_PATH IBEX_PATH NORMALIZE)
 
 set(BENDER_ENV
     "SCHNITZEL_RTL_DIR=${SCHNITZEL_RTL_DIR}"
@@ -61,11 +55,10 @@ execute_process(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     COMMAND_ERROR_IS_FATAL ANY
 )
-
 execute_process(
     COMMAND ${CMAKE_COMMAND} -E env ${BENDER_ENV}
             bender script template
-                -t sim_top
+                -t simulation
                 --template=${CMAKE_CURRENT_SOURCE_DIR}/bender.cmake.tera
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     OUTPUT_FILE ${BENDER_CMAKE}
@@ -85,20 +78,7 @@ verilate(sim
         -Wno-UNOPTFLAT -Wno-MULTIDRIVEN -Wno-LATCH
         -Wno-BLKANDNBLK -Wno-SELRANGE -Wno-SYMRSVDWORD
         -Wno-CMPCONST -Wno-UNSIGNED -Wno-WIDTH -Wno-ASCRANGE
-        -Wno-IMPLICITSTATIC
-        # Bender follows cva6's manifest faithfully and pulls in every
-        # file of every transitive dep (axi, common_cells, ...) even when
-        # our design hierarchy never instantiates them. That introduces
-        # benign noise the old hand-curated flatten flow avoided:
-        #   PINMISSING  — uninstantiated axi/cva6 modules have pins our
-        #                 wrappers don't drive.
-        #   REDEFMACRO  — ibex and common_cells both define `ASSERT/`ASSUME
-        #                 macros with slightly different signatures.
-        # And `--bbox-unsup` stubs out language constructs Verilator does
-        # not implement (notably `default disable iff` outside `ifndef
-        # VERILATOR` in axi_id_remap.sv).
-        -Wno-PINMISSING -Wno-REDEFMACRO
-        --bbox-unsup
+        -Wno-IMPLICITSTATIC -Wno-PINMISSING
         ${BENDER_DEFINES}
         ${BENDER_INCDIRS}
         --assert

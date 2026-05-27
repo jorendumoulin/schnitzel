@@ -1,21 +1,3 @@
-# Root Bender manifest for the schnitzel project.
-#
-# Everything is consumed via three path dependencies. Each one is a small,
-# focused sub-manifest the schnitzel build owns:
-#
-#   cva6           — schnitzel's curated cva6 file list; lives at
-#                    src/main/resources/cva6/Bender.yml, co-located with the
-#                    PMA override (cv64a6_imafdc_sv39_config_pkg.sv).
-#   ibex           — schnitzel's curated ibex file list; lives at
-#                    src/main/resources/ibex/Bender.yml.
-#   schnitzel_rtl  — chisel-emitted Bender.yml at $SCHNITZEL_RTL_DIR. Re-emitted
-#                    on every chisel build; module names drift, location can
-#                    vary per kernel, so its path comes from an env var.
-#
-# Targets:
-#   sim_top — pulls in the sim/rtl/ wrappers (TopWrapper, MemDpi). Drop with
-#             a synth-time activation that omits this target.
-
 package:
   name: schnitzel
   authors:
@@ -25,7 +7,7 @@ dependencies:
   ibex: {path: src/main/resources/ibex}
   schnitzel_rtl: {path: $SCHNITZEL_RTL_DIR}
 sources:
-  - target: sim_top
+  - target: simulation
     files:
       - sim/rtl/TopWrapper.sv
       - sim/rtl/MemDpi.sv

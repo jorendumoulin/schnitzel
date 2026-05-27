@@ -1,10 +1,3 @@
-# Bender sub-manifest for ibex.
-#
-# Lists every ibex-side file the schnitzel build needs. Paths into the ibex
-# submodule are written relative to this file ($IBEX_PATH/...).
-#
-# Consumed by the root Bender.yml as a path dependency.
-
 package:
   name: ibex
   authors:
@@ -68,6 +61,10 @@ sources:
       - $IBEX_PATH/rtl/ibex_wb_stage.sv
       - $IBEX_PATH/rtl/ibex_register_file_ff.sv
       - $IBEX_PATH/rtl/ibex_top.sv
-      - $IBEX_PATH/rtl/ibex_tracer_pkg.sv
-      - $IBEX_PATH/rtl/ibex_tracer.sv
-      - $IBEX_PATH/rtl/ibex_top_tracing.sv
+      - target: simulation
+        defines:
+          RVFI: ~
+        files:
+          - $IBEX_PATH/rtl/ibex_tracer_pkg.sv
+          - $IBEX_PATH/rtl/ibex_tracer.sv
+          - $IBEX_PATH/rtl/ibex_top_tracing.sv
