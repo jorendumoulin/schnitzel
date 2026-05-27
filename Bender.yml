@@ -1,44 +1,13 @@
-# Root Bender manifest for the schnitzel project.
-#
-# This is the single source of truth for the full file list. Downstream
-# tooling (sim/CMakeLists.txt, future synth flows) invokes one of:
-#
-#   bender script verilator -t sim_top -t ibex_tracing -t cv64a6_imafdc_sv39 -D RVFI
-#   bender script genus     -t synthesis -t ibex_regfile_latch -t cv64a6_imafdc_sv39 -D SYNTHESIS
-#   bender script flist     -t synthesis -t cv64a6_imafdc_sv39
-#
-# and consumes the emitted filelist directly — no per-tool custom logic.
-#
-# Targets:
-#   sim_top           — pulls in the sim/rtl/ wrappers (TopWrapper, MemDpi).
-#                       Positive opt-in. Do NOT use the standard `simulation`
-#                       target here: pulp-platform/axi's `simulation` target
-#                       pulls in UVM-style test classes (`axi_test.sv`) that
-#                       Verilator can't parse, so a generic `-t simulation`
-#                       flag would activate them too.
-#   ibex_tracing      — opt-in for sim flows that want the RVFI tracer; see
-#                       submodules/ibex/Bender.yml for the contract.
-#   synthesis         — drops sim wrappers; set automatically by tool emitters
-#                       like `bender script genus`.
-
 package:
   name: schnitzel
   authors:
     - "Joren Dumoulin"
 dependencies:
-  ibex: {path: submodules/ibex}
-  # Reuse cva6's upstream Bender.yml verbatim. The schnitzel-modified
-  # cv64a6_imafdc_sv39_config_pkg.sv is shipped via Chisel addResource into
-  # the schnitzel_rtl package (not via a target on the cva6 dep), so do NOT
-  # activate `-t cv64a6_imafdc_sv39` — otherwise cva6's own copy of the
-  # config_pkg would also be pulled in and conflict.
-  cva6: {path: submodules/cva6}
+  cva6: {path: src/main/resources/cva6}
+  ibex: {path: src/main/resources/ibex}
   schnitzel_rtl: {path: $SCHNITZEL_RTL_DIR}
 sources:
-  # ----------------------------------------------------------------------
-  # Simulation-only top wrapper + DPI memory shim.
-  # ----------------------------------------------------------------------
-  - target: sim_top
+  - target: simulation
     files:
       - sim/rtl/TopWrapper.sv
       - sim/rtl/MemDpi.sv
