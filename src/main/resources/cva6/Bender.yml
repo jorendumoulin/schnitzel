@@ -5,6 +5,7 @@ package:
 sources:
   - include_dirs:
       - $CVA6_PATH/core/include
+      - $CVA6_PATH/core/cvfpu/src/common_cells/include
       - $CVA6_PATH/vendor/pulp-platform/axi/include
       - $CVA6_PATH/vendor/pulp-platform/common_cells/include
       - $CVA6_PATH/common/local/util
