@@ -1,0 +1,20 @@
+
+abs_rtl_dir  := absolute_path("../generated/")
+abs_cva6_dir := absolute_path("../submodules/cva6")
+abs_ibex_dir := absolute_path("../submodules/ibex")
+
+genus-flist:
+    @echo "Generating Genus Filelist with absolute paths..."
+    SCHNITZEL_RTL_DIR="{{ abs_rtl_dir }}" \
+    CVA6_PATH="{{ abs_cva6_dir }}" \
+    IBEX_PATH="{{ abs_ibex_dir }}" \
+    bender script genus > flist.tcl
+
+copy_template := absolute_path("./copy.sh.tera")
+
+copy-flist:
+    @echo "Generating Copy Script"
+    SCHNITZEL_RTL_DIR="{{ abs_rtl_dir }}" \
+    CVA6_PATH="{{ abs_cva6_dir }}" \
+    IBEX_PATH="{{ abs_ibex_dir }}" \
+    bender script template --template {{copy_template}} > copy.sh
