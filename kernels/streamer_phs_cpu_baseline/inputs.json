@@ -1,0 +1,24 @@
+{
+  "fn": "streamer_add",
+  "inputs": {
+    "A": {
+      "dtype": "int32",
+      "shape": [16],
+      "seed": 1,
+      "range": [0, 1000]
+    },
+    "B": {
+      "dtype": "int32",
+      "shape": [16],
+      "seed": 2,
+      "range": [0, 1000]
+    }
+  },
+  "outputs": [
+    {
+      "name": "D",
+      "dtype": "int32",
+      "shape": [16]
+    }
+  ]
+}
