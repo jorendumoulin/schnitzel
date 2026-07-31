@@ -89,3 +89,6 @@ cover/
 # pixi environments
 .pixi
 *.egg-info
+
+# snakemake bookkeeping
+.snakemake

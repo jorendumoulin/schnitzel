@@ -16,9 +16,13 @@ import upickle.default.writeJs
 
 /** Self-contained PHS cluster with 2 RISC-V cores, shared TCDM, DMA, and PHS accelerators.
   *
-  * Core 0 always has DMA (on the CsrDemux catch-all at 0x900). Core 1 hosts one or more PHS accelerators,
+  * Core 0 always has DMA (on the CsrDemux catch-all at 0x900). Core 1 hosts zero or more PHS accelerators,
   * each packed tightly into the CSR address space starting at 0x900. Each accel reserves exactly
   * `numCsrRegs + 1` addresses (regs + start trigger); the next accel's base is the previous one's end.
+  *
+  * An empty `phsConfigs(1)` is legal and yields a plain 2-core cluster with no accelerators: core 1's CsrDemux keeps
+  * only its two barrier routes plus the tied-off catch-all, and the interconnect sees no accelerator ports. This is the
+  * accelerator-free baseline every workload can be compared against.
   *
   * @param phsConfigs
   *   Per-core list of PHS accelerator configs. phsConfigs(0) = core 0 (expected empty), phsConfigs(1) = core 1.
@@ -27,7 +31,6 @@ class PhsCluster(phsConfigs: Seq[Seq[PhsAcceleratorConfig]]) extends Module {
 
   require(phsConfigs.length == 2, "PhsCluster requires exactly 2 cores of configs")
   require(phsConfigs(0).isEmpty, "Core 0 PHS accelerators not yet supported (DMA occupies the catch-all)")
-  require(phsConfigs(1).nonEmpty, "Core 1 must host at least one PHS accelerator")
 
   // Per-accel CSR window sized to exactly what the accel needs. The CsrIO addr
   // is 12 bits, so the usable space ends at 0x1000. The CsrDemux strips the
