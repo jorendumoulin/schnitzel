@@ -7,6 +7,7 @@ from xdsl.ir import BlockArgument, Operation
 from xdsl.irdl import Operand
 
 from snaxc.dialects import phs
+from snaxc.phs.combine import get_abstract_possibilities
 
 
 class MappingNotFoundError(Exception):
@@ -82,6 +83,97 @@ def valid_mapping(graph: phs.PEOp, abstract_graph: phs.PEOp, mapping: dict[phs.M
 
     # If nothing failed, the mappings are equal
     return True
+
+
+class AmbiguousMappingError(Exception):
+    """Raised when a mux tree offers the same provenance on both of its branches.
+
+    `uncollide_inputs` only ever adds a branch for a provenance that is not
+    already reachable, so the leaves of a mux tree carry distinct provenances
+    and this cannot happen. It is caught rather than propagated so that a
+    future pass that breaks the invariant degrades to the search instead of
+    producing a wrong mapping.
+    """
+
+    pass
+
+
+def _concrete_provenance(operand: Operand) -> str | int:
+    """The provenance token the abstract side has to deliver for this operand."""
+    if isinstance(operand, BlockArgument):
+        return operand.index
+    if isinstance(operand.owner, phs.ChooseOp):
+        return operand.owner.name_prop.data
+    raise NotImplementedError("Only expect ChooseOps or BlockArgs as operands in concrete graph")
+
+
+def _constrain(operand: Operand, provenance: str | int, mapping: dict[phs.MuxOp, int]) -> bool:
+    """Force the muxes on the path from `operand` to `provenance`.
+
+    The leaves of a mux tree carry distinct provenances, so at most one branch
+    of each mux can deliver the one asked for and the path down to it is
+    unique. Walking it fixes every mux on the way and leaves the others free.
+
+    Returns False when the provenance is not reachable, or when a mux on the
+    path is already pinned the other way by an earlier operand, which are the
+    two ways a candidate fails to map.
+    """
+    while True:
+        if isinstance(operand, BlockArgument):
+            return operand.index == provenance
+        owner = operand.owner
+        if isinstance(owner, phs.ChooseOp):
+            return owner.name_prop.data == provenance
+        if not isinstance(owner, phs.MuxOp):
+            raise NotImplementedError()
+
+        in_lhs = provenance in get_abstract_possibilities(owner.lhs)
+        in_rhs = provenance in get_abstract_possibilities(owner.rhs)
+        if in_lhs and in_rhs:
+            raise AmbiguousMappingError()
+        if not in_lhs and not in_rhs:
+            return False
+        choice = 0 if in_lhs else 1
+        if mapping.setdefault(owner, choice) != choice:
+            return False
+        operand = owner.lhs if in_lhs else owner.rhs
+
+
+def propagate_mapping(
+    graph: phs.PEOp, abstract_graph: phs.PEOp, muxes: Sequence[phs.MuxOp]
+) -> None | dict[phs.MuxOp, int]:
+    """Derive the mux settings in a single walk instead of searching for them.
+
+    Every operand of the concrete graph names one provenance the abstract graph
+    has to deliver, and that provenance pins the muxes between the operand and
+    its source. Conflicting demands on a shared mux mean no assignment can
+    satisfy both, which is exactly what the search would have discovered by
+    exhausting the tree.
+
+    Muxes no operand constrains are left at 0. Returns None if the candidate
+    does not map.
+    """
+    mapping: dict[phs.MuxOp, int] = {}
+
+    for operation in graph.body.ops:
+        if isinstance(operation, phs.ChooseOp):
+            op = operation
+            abst_op = abstract_graph.get_choose_op(op.name_prop.data)
+            if abst_op is None:
+                raise MappingNotFoundError(f"Could not find equivalent ChooseOp for id {op.name_prop.data}")
+        elif isinstance(operation, phs.YieldOp):
+            op = operation
+            abst_op = abstract_graph.get_terminator()
+        else:
+            raise NotImplementedError("Only expect ChooseOps and YieldOps in concrete graph")
+
+        for opnd, abst_opnd in zip(op.data_operands, abst_op.data_operands, strict=True):
+            if not _constrain(abst_opnd, _concrete_provenance(opnd), mapping):
+                return None
+
+    for mux in muxes:
+        mapping.setdefault(mux, 0)
+    return mapping
 
 
 def search_mapping(
@@ -183,8 +275,23 @@ def decode_abstract_graph(abstract_graph: phs.PEOp, graph: phs.PEOp) -> Sequence
         else:
             raise RuntimeError("Only ChooseOp or MuxOp can be switched")
 
-    # Search for the mapping of the switches
-    mapping = search_mapping(graph, abstract_graph, mux_switches)
+    # Derive the mapping of the mux switches. Propagation is exact: it accepts
+    # and rejects the same candidates as the search it replaces, in one walk
+    # rather than in 2**len(mux_switches) trials. The search is kept as a
+    # fallback for the case the propagation cannot decide, which the
+    # construction of the mux trees rules out today.
+    try:
+        mapping = propagate_mapping(graph, abstract_graph, mux_switches)
+    except AmbiguousMappingError:
+        mapping = search_mapping(graph, abstract_graph, mux_switches)
+    else:
+        # A derived mapping that does not validate means the mux trees no
+        # longer carry distinct provenances per branch, so fall back rather
+        # than refuse a candidate that may still map. A candidate propagation
+        # rejects outright is refused without searching: under that invariant
+        # the search would exhaust the tree and reject it too.
+        if mapping is not None and not valid_mapping(graph, abstract_graph, mapping):
+            mapping = search_mapping(graph, abstract_graph, mux_switches)
     if mapping is None:
         raise MappingNotFoundError("Could not find valid mapping")
 
