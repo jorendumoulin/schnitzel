@@ -28,7 +28,7 @@ from snaxc.phs.decode import (
 
 def _merged_abstract() -> tuple[phs.PEOp, Sequence[phs.PEOp]]:
     """The fixture PEs of test_phs_decode, merged into one abstract PE."""
-    pe_a, pe_b, pe_c, pe_d, pe_e, _pe_f = create_test_input()
+    _pe_a, pe_b, pe_c, pe_d, pe_e, _pe_f = create_test_input()
     for candidate in (pe_c, pe_d, pe_e):
         append_to_abstract_graph(candidate, pe_b)
     return pe_b, (pe_c, pe_d, pe_e)
@@ -163,5 +163,6 @@ def test_mux_case_from_the_merging_figure() -> None:
     # merged PE would compute the same thing in both.
     add_mapping = propagate_mapping(pe_add, abstract, muxes)
     chain_mapping = propagate_mapping(pe_chain, abstract, muxes)
-    assert add_mapping is not None and chain_mapping is not None
+    assert add_mapping is not None
+    assert chain_mapping is not None
     assert add_mapping[muxes[0]] != chain_mapping[muxes[0]]
