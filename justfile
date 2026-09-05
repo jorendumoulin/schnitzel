@@ -9,6 +9,20 @@ flatten-design top-module output:
 generate-verilog top='default' output='generated':
     ./mill schnitzel.runMain sim.EmitVerilog --top={{top}} --output-dir={{output}}
 
+# Generate FPGA RTL and a Bender Vivado import script.
+generate-fpga-vivado rtl='generated-fpga' script='/tmp/schnitzel-vivado.tcl':
+    ./mill schnitzel.runMain sim.EmitVerilog --top=fpga --output-dir="{{rtl}}"
+    SCHNITZEL_RTL_DIR="$PWD/{{rtl}}" CVA6_PATH="$PWD/submodules/cva6" IBEX_PATH="$PWD/submodules/ibex" .pixi/envs/default/bin/bender update
+    SCHNITZEL_RTL_DIR="$PWD/{{rtl}}" CVA6_PATH="$PWD/submodules/cva6" IBEX_PATH="$PWD/submodules/ibex" .pixi/envs/default/bin/bender script vivado -t fpga -D SYNTHESIS -D FPGA_XILINX --no-simset > "{{script}}"
+    echo 'add_files -norecurse $ROOT/submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_assert_dummy_macros.svh' >> "{{script}}"
+    echo 'add_files -norecurse $ROOT/submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_assert_sec_cm.svh' >> "{{script}}"
+    echo 'add_files -norecurse $ROOT/submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_assert_yosys_macros.svh' >> "{{script}}"
+    echo 'add_files -norecurse $ROOT/submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_assert_standard_macros.svh' >> "{{script}}"
+    echo 'add_files -norecurse $ROOT/submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_macros.svh' >> "{{script}}"
+    echo 'add_files -norecurse $ROOT/submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_util_get_scramble_params.svh' >> "{{script}}"
+    echo 'add_files -norecurse $ROOT/submodules/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_util_memload.svh' >> "{{script}}"
+    echo 'add_files -norecurse $ROOT/submodules/ibex/vendor/lowrisc_ip/dv/sv/dv_utils/dv_fcov_macros.svh' >> "{{script}}"
+
 configure-quick:
     cmake -B build/sim -S sim -G Ninja -DSIM_OPT_FAST="-O0"
     cmake -B build/host -S sw/host -G Ninja

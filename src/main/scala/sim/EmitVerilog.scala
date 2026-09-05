@@ -2,7 +2,7 @@ package sim
 
 import chisel3._
 import circt.stage.ChiselStage
-import top.{Top, TensorTop}
+import top.{Top, TensorTop, FPGATop}
 import config.SystemConfig
 import upickle.default.{Writer, write}
 import java.io.{File, PrintWriter}
@@ -82,6 +82,7 @@ object EmitVerilog extends App {
     topName match {
       case "tensor"  => val m = new TensorTop; topConfig = m.getConfig; m
       case "default" => val m = new Top; topConfig = m.getConfig; m
+      case "fpga"    => val m = new FPGATop; topConfig = m.getConfig; m
       case other     => sys.error(s"Unknown --top value '$other'.")
     },
     args = Array("--target-dir", outputDir),
