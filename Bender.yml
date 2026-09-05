@@ -3,9 +3,9 @@ package:
   authors:
     - "Joren Dumoulin"
 dependencies:
-  cva6: {path: src/main/resources/cva6}
-  ibex: {path: src/main/resources/ibex}
-  schnitzel_rtl: {path: $SCHNITZEL_RTL_DIR}
+  cva6: { path: src/main/resources/cva6 }
+  ibex: { path: src/main/resources/ibex }
+  schnitzel_rtl: { path: /$SCHNITZEL_RTL_DIR }
 sources:
   - target: simulation
     files:

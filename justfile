@@ -1,3 +1,5 @@
+mod syn
+
 default:
   @just --list
 

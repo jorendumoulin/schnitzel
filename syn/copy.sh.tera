@@ -1,0 +1,11 @@
+{%- for incdir in all_incdirs %}
+{{ incdir | replace(from=root, to='') | trim_start_matches(pat='/') }}/
+{{ incdir | replace(from=root, to='') | trim_start_matches(pat='/') }}/**
+{%- endfor %}
+
+
+{%- for file_group in srcs -%}
+{%- for file in file_group.files %}
+{{ file.file | replace(from=root, to='') | trim_start_matches(pat='/') }}
+{%- endfor -%}
+{%- endfor %}

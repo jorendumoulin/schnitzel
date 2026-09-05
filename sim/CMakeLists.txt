@@ -78,7 +78,7 @@ verilate(sim
         -Wno-UNOPTFLAT -Wno-MULTIDRIVEN -Wno-LATCH
         -Wno-BLKANDNBLK -Wno-SELRANGE -Wno-SYMRSVDWORD
         -Wno-CMPCONST -Wno-UNSIGNED -Wno-WIDTH -Wno-ASCRANGE
-        -Wno-IMPLICITSTATIC -Wno-PINMISSING
+        -Wno-IMPLICITSTATIC
         ${BENDER_DEFINES}
         ${BENDER_INCDIRS}
         --assert
