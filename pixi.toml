@@ -1,10 +1,5 @@
 [workspace]
-channels = [
-  "conda-forge",
-  "bioconda",
-  "kuleuven-micas",
-  "JosseVanDelm",
-]
+channels = ["conda-forge", "bioconda", "kuleuven-micas", "JosseVanDelm"]
 name = "schnitzel"
 platforms = ["linux-64"]
 version = "0.1.0"
