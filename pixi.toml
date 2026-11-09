@@ -46,7 +46,7 @@ openjdk = ">=21,<22"
 riscv-gnu-toolchain = "==2026.01.23nightly"
 
 [feature.torch.pypi-dependencies]
-executorch = ">=1.1.0, <2"
+executorch = ">=1.5.1, <2"
 torch = { version = "==2.10.0", index = "https://download.pytorch.org/whl/cpu" }
 torchgen = ">=0.0.1, <0.0.2"
 
