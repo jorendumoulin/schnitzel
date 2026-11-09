@@ -1,0 +1,4 @@
+domain_path: /home/joren/phd/schnitzel/fpga/platform/zynqmp_fsbl/zynqmp_fsbl_bsp
+app_src_dir: /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_apps/zynqmp_fsbl
+template: zynqmp_fsbl
+lang: c

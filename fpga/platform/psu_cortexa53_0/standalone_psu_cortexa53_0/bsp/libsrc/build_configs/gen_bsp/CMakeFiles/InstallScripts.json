@@ -1,0 +1,26 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/xiltimer/src/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/xiltimer/src/core/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/xiltimer/src/core/default_timer/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/common/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/common/clocking/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/common/intr/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/common/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/common/gcc/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/ARMv8/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/ARMv8/64bit/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/ARMv8/64bit/gcc/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/ARMv8/64bit/platform/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/ARMv8/64bit/platform/ZynqMP/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/ARMv8/64bit/platform/ZynqMP/gcc/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/ARMv8/includes_ps/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/ARMv8/includes_ps/platform/cmake_install.cmake",
+		"/home/joren/phd/schnitzel/fpga/platform/psu_cortexa53_0/standalone_psu_cortexa53_0/bsp/libsrc/build_configs/gen_bsp/libsrc/standalone/src/arm/ARMv8/includes_ps/platform/ZynqMP/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
