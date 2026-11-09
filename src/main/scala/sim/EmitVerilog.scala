@@ -7,12 +7,10 @@ import config.SystemConfig
 import upickle.default.{Writer, write}
 import java.io.{File, PrintWriter}
 
-/** Side-effecting helpers shared between this CLI driver and phs.PhsDriver.
+/** Side-effecting helpers for this CLI driver.
   *
   * `writeConfigJson` and `writeBenderYml` together codify the "what we emit
-  * alongside the chisel SystemVerilog output" contract — keeping them in
-  * one place avoids drift between the two driver entry points and means a
-  * future driver only has to call them.
+  * alongside the chisel SystemVerilog output" contract.
   */
 object EmitArtifacts {
 

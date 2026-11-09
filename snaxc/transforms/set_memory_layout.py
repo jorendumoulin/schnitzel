@@ -68,8 +68,7 @@ class AddCyclicMemoryLayout(RewritePattern):
 
         assert op.accelerator is not None
         accelerator = self.ctx.system.find_accelerator(op.accelerator)
-        # PHS accelerators consume plain memrefs — layout assignment is
-        # TensorCore-specific. Skip silently for everything else.
+        # Layout assignment is TensorCore-specific. Skip silently for everything else.
         if not isinstance(accelerator, TensorCore):
             return
 

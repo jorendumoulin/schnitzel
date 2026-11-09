@@ -3,7 +3,6 @@ channels = [
   "conda-forge",
   "bioconda",
   "kuleuven-micas",
-  "KEKE046",
   "JosseVanDelm",
 ]
 name = "schnitzel"
@@ -56,14 +55,9 @@ executorch = ">=1.1.0, <2"
 torch = { version = "==2.10.0", index = "https://download.pytorch.org/whl/cpu" }
 torchgen = ">=0.0.1, <0.0.2"
 
-[feature.phs.dependencies]
-circt = { version = "==1.122.0", channel = "KEKE046" }
-snakemake = ">=9,<10"
-
 [environments]
 default = ["torch", "riscv-gnu-toolchain"]
 torch = ["torch", "riscv-gnu-toolchain"]
 rtl = ["compiler", "riscv-gnu-toolchain"]
 all = ["compiler", "torch", "riscv-gnu-toolchain"]
 minimal = []
-phs = ["compiler", "phs"]
