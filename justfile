@@ -47,3 +47,11 @@ submodule-ssh submodule:
     new=$(echo "$current" | sed -E 's|https://github\.com/([^/]+)/(.+)|git@github.com:\1/\2|')
     git remote set-url origin "$new"
     echo "submodules/{{submodule}}: $current -> $new"
+
+# Package the minimal Scala AXI4-Lite client as a Vivado IP.
+package-simple-axi out='build/SimpleAxiClient-ip':
+    bash -lc 'source /home/joren/vivado/settings64.sh && vivado -mode batch -source fpga/package_simple_axi.tcl -tclargs "{{out}}"'
+
+# Build the minimal KV260 AXI path through bitstream generation.
+build-simple-axi ip='build/SimpleAxiClient-ip' project='build/simple-axi':
+    bash -lc 'source /home/joren/vivado/settings64.sh && vivado -mode batch -source fpga/build_simple_axi.tcl -tclargs "{{ip}}" "{{project}}"'
