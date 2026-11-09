@@ -17,9 +17,7 @@ from xdsl.rewriter import InsertPoint
 from snaxc.dialects import dart
 
 
-# Every output is wrapped as a readWrite carry streamer. The PE body decides
-# (via outs block-arg use) whether the carry is actually consumed; a later
-# `phs-prune-unused-carries` pass demotes unused carries to write-only.
+# Every output is wrapped as a readWrite carry streamer.
 # No special-casing on the output producer kind is needed.
 @dataclass
 class StreamifyGenericOpPattern(RewritePattern):

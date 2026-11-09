@@ -95,66 +95,6 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return ConvertStreamToAccfgPass
 
-    def get_convert_pe_to_hw():
-        from snaxc.transforms.phs.convert_pe_to_hw import ConvertPEToHWPass
-
-        return ConvertPEToHWPass
-
-    def get_hw_scalarize_public_modules():
-        from snaxc.transforms.phs.hw_scalarize_public_modules import HwScalarizePublicModulesPass
-
-        return HwScalarizePublicModulesPass
-
-    def get_finalize_phs_to_hw():
-        from snaxc.transforms.phs.finalize_phs_to_hw import FinalizePhsToHWPass
-
-        return FinalizePhsToHWPass
-
-    def get_phs_keep_phs():
-        from snaxc.transforms.phs.export_phs import PhsKeepPhsPass
-
-        return PhsKeepPhsPass
-
-    def get_phs_remove_phs():
-        from snaxc.transforms.phs.export_phs import PhsRemovePhsPass
-
-        return PhsRemovePhsPass
-
-    def get_instantiate_pe_array():
-        from snaxc.transforms.phs.instantiate_pe_array import InstantiatePEArrayPass
-
-        return InstantiatePEArrayPass
-
-    def get_phs_convert_float_to_int():
-        from snaxc.transforms.phs.convert_float_to_int import PhsConvertFloatToInt
-
-        return PhsConvertFloatToInt
-
-    def get_convert_float_to_hardfloat():
-        from snaxc.transforms.hardfloat.convert_float_to_hardfloat import ConvertFloatToHardfloatPass
-
-        return ConvertFloatToHardfloatPass
-
-    def get_convert_hardfloat_to_hw():
-        from snaxc.transforms.hardfloat.convert_hardfloat_to_hw import ConvertHardfloatToHw
-
-        return ConvertHardfloatToHw
-
-    def get_hardfloat_reconcile_recodes():
-        from snaxc.transforms.hardfloat.reconcile_recodes import ReconcileRecodesPass
-
-        return ReconcileRecodesPass
-
-    def get_split_hardfloat_rounders():
-        from snaxc.transforms.hardfloat.split_round import SplitHardfloatRoundersPass
-
-        return SplitHardfloatRoundersPass
-
-    def get_merge_across_array_get():
-        from snaxc.transforms.hardfloat.merge_across_array_get import MergeAcrossArrayGetPass
-
-        return MergeAcrossArrayGetPass
-
     def get_convert_tosa_to_kernel():
         from snaxc.transforms.convert_tosa_to_kernel import ConvertTosaToKernelPass
 
@@ -187,11 +127,6 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return DartSchedulerPass
 
-    def get_dispatch_linalg_phs():
-        from snaxc.transforms.phs.dispatch_linalg_phs import DispatchLinalgPHS
-
-        return DispatchLinalgPHS
-
     def get_dispatch_regions():
         from snaxc.transforms.dispatch_regions import DispatchRegions
 
@@ -222,50 +157,10 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
 
         return MemrefToSNAX
 
-    def get_phs_encode():
-        from snaxc.transforms.phs.encode import PhsEncodePass
-
-        return PhsEncodePass
-
     def get_promote_linalg_scalars():
         from snaxc.transforms.promote_linalg_scalars import PromoteLinalgScalarsPass
 
         return PromoteLinalgScalarsPass
-
-    def get_phs_prune_unused_carries():
-        from snaxc.transforms.phs.prune_unused_carries import PrunePEUnusedCarriesPass
-
-        return PrunePEUnusedCarriesPass
-
-    def get_phs_export_phs():
-        from snaxc.transforms.phs.export_phs import PhsExportPhsPass
-
-        return PhsExportPhsPass
-
-    def get_phs_remove_one_option_switches():
-        from snaxc.transforms.phs.remove_one_option_switches import PhsRemoveOneOptionSwitchesPass
-
-        return PhsRemoveOneOptionSwitchesPass
-
-    def get_phs_divf_constant_to_mul():
-        from snaxc.transforms.phs.divf_constant_to_mul import PhsDivfConstantToMulPass
-
-        return PhsDivfConstantToMulPass
-
-    def get_phs_divf_to_reciprocal_bitcast():
-        from snaxc.transforms.phs.divf_to_reciprocal_bitcast import PhsDivfToReciprocalBitcastPass
-
-        return PhsDivfToReciprocalBitcastPass
-
-    def get_phs_schedule_separate_linalg():
-        from snaxc.transforms.phs.schedule_preset.separate_linalg import PhsScheduleSeparateLinalgPass
-
-        return PhsScheduleSeparateLinalgPass
-
-    def get_phs_expand_integer_minmax():
-        from snaxc.transforms.phs.expand_integer_minmax import ExpandIntegerMinMaxPass
-
-        return ExpandIntegerMinMaxPass
 
     def get_pipeline_canonicalize_for():
         from snaxc.transforms.pipeline.pipeline_canonicalize_for import (
@@ -375,17 +270,6 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "tosa-combine-rescale": get_tosa_combine_rescale,
         "construct-pipeline": construct_pipeline,
         "convert-accfg-to-csr": get_convert_accfg_to_csr,
-        "convert-pe-to-hw": get_convert_pe_to_hw,
-        "hw-scalarize-public-modules": get_hw_scalarize_public_modules,
-        "finalize-phs-to-hw": get_finalize_phs_to_hw,
-        "phs-keep-phs": get_phs_keep_phs,
-        "phs-remove-phs": get_phs_remove_phs,
-        "phs-convert-float-to-int": get_phs_convert_float_to_int,
-        "convert-float-to-hardfloat": get_convert_float_to_hardfloat,
-        "convert-hardfloat-to-hw": get_convert_hardfloat_to_hw,
-        "hardfloat-reconcile-recodes": get_hardfloat_reconcile_recodes,
-        "split-hardfloat-rounders": get_split_hardfloat_rounders,
-        "merge-across-array-get": get_merge_across_array_get,
         "cse": get_cse,
         "convert-dart-to-snax-stream": get_convert_dart_to_snax_stream,
         "convert-kernel-to-linalg": get_convert_kernel_to_linalg,
@@ -400,22 +284,12 @@ def get_all_snax_passes() -> dict[str, Callable[[], type[ModulePass]]]:
         "dart-layout-resolution": get_dart_layout_resolution,
         "dart_bufferize": get_dart_bufferize,
         "dart-scheduler": get_dart_scheduler,
-        "dispatch-linalg-phs": get_dispatch_linalg_phs,
         "dispatch-regions": get_dispatch_regions,
         "frontend-static-inline": get_frontend_static_inline,
         "frontend-transform": get_frontend_transform,
-        "instantiate-pe-array": get_instantiate_pe_array,
         "insert-accfg-op": get_insert_accfg_op,
         "insert-sync-barrier": get_insert_sync_barrier,
         "memref-to-snax": get_memref_to_snax,
-        "phs-encode": get_phs_encode,
-        "phs-export-phs": get_phs_export_phs,
-        "phs-prune-unused-carries": get_phs_prune_unused_carries,
-        "phs-remove-one-option-switches": get_phs_remove_one_option_switches,
-        "phs-divf-constant-to-mul": get_phs_divf_constant_to_mul,
-        "phs-divf-to-reciprocal-bitcast": get_phs_divf_to_reciprocal_bitcast,
-        "phs-schedule-separate-linalg": get_phs_schedule_separate_linalg,
-        "phs-expand-integer-minmax": get_phs_expand_integer_minmax,
         "pipeline-canonicalize-for": get_pipeline_canonicalize_for,
         "pipeline-duplicate-buffers": get_pipeline_duplicate_buffers,
         "postprocess": get_postprocess_mlir,

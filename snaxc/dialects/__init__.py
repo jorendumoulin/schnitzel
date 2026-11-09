@@ -21,20 +21,10 @@ def get_all_snax_dialects() -> dict[str, Callable[[], Dialect]]:
 
         return Debug
 
-    def get_hardfloat():
-        from snaxc.dialects.hardfloat import Hardfloat
-
-        return Hardfloat
-
     def get_kernel():
         from snaxc.dialects.kernel import Kernel
 
         return Kernel
-
-    def get_phs():
-        from snaxc.dialects.phs import Phs
-
-        return Phs
 
     def get_pipeline():
         from snaxc.dialects.pipeline import Pipeline
@@ -60,9 +50,7 @@ def get_all_snax_dialects() -> dict[str, Callable[[], Dialect]]:
         "accfg": get_accfg,
         "dart": get_dart,
         "debug": get_debug,
-        "hardfloat": get_hardfloat,
         "kernel": get_kernel,
-        "phs": get_phs,
         "pipeline": get_pipeline,
         "snax": get_snax,
         "snax_stream": get_snax_stream,

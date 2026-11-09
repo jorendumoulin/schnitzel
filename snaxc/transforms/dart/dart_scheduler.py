@@ -21,7 +21,6 @@ from xdsl.utils.hints import isa
 from snaxc.dialects import dart
 from snaxc.hw import AccContext
 from snaxc.hw.accelerators.tensorcore import TensorCore
-from snaxc.hw.phs_accelerator import PhsAccelerator
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
 from snaxc.ir.dart.scheduler import (
     is_memory_flexible_enough,
@@ -45,9 +44,9 @@ class AutoflowScheduler(RewritePattern):
     def match_and_rewrite(self, op: dart.OperationOp, rewriter: PatternRewriter):
         assert op.accelerator is not None
         accelerator = self.ctx.system.find_accelerator(op.accelerator)
-        # Both TensorCore and PhsAccelerator expose `get_template` and accept
-        # the schedule algorithm. Other accelerators have no template here.
-        if not isinstance(accelerator, TensorCore | PhsAccelerator):
+        # Only TensorCore exposes `get_template`; other accelerators have no
+        # template here.
+        if not isinstance(accelerator, TensorCore):
             return
         template = accelerator.get_template(op)
 

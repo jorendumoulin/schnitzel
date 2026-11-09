@@ -17,11 +17,6 @@ def get_all_accelerators() -> dict[str, Callable[[], type[Accelerator]]]:
 
         return Dma
 
-    def get_phs():
-        from snaxc.hw.accelerators.phs import Phs
-
-        return Phs
-
     def get_tensorcore():
         from snaxc.hw.accelerators.tensorcore import TensorCore
 
@@ -30,6 +25,5 @@ def get_all_accelerators() -> dict[str, Callable[[], type[Accelerator]]]:
     return {
         "alu": get_alu,
         "dma": get_dma,
-        "phs": get_phs,
         "tensorcore": get_tensorcore,
     }

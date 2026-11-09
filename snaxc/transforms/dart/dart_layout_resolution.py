@@ -17,7 +17,6 @@ from xdsl.pattern_rewriter import (
 from snaxc.dialects import dart
 from snaxc.hw.acc_context import AccContext
 from snaxc.hw.accelerators.tensorcore import TensorCore
-from snaxc.hw.phs_accelerator import PhsAccelerator
 from snaxc.ir.dart.access_pattern import Schedule, SchedulePattern
 from snaxc.ir.dart.affine_transform import AffineTransform
 
@@ -39,7 +38,7 @@ class LayoutResolution(RewritePattern):
 
         assert op.accelerator is not None
         accelerator = self.ctx.system.find_accelerator(op.accelerator)
-        assert isinstance(accelerator, TensorCore | PhsAccelerator)
+        assert isinstance(accelerator, TensorCore)
 
         schedule = accelerator.transform_schedule(schedule)
 
