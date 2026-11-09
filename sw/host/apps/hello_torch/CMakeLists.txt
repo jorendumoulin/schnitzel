@@ -24,6 +24,9 @@ endif()
 
 include(${EXECUTORCH_ROOT}/tools/cmake/Utils.cmake)
 include(${EXECUTORCH_ROOT}/tools/cmake/Codegen.cmake)
+# PYTHON_EXECUTABLE is only set inside executorch's own directory scope; without
+# it the codegen's torchgen lookup fails and globs '/*.py' over the whole disk.
+resolve_python_executable()
 set(ENV{PYTHONPATH} "${EXECUTORCH_ROOT}")
 
 set(_common_compile_options -Wno-deprecated-declarations -fPIC)
