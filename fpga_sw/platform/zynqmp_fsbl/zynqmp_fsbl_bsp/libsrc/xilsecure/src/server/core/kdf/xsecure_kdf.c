@@ -1,0 +1,162 @@
+/***************************************************************************************************
+* Copyright (c) 2025 - 2026 Advanced Micro Devices, Inc. All Rights Reserved.
+* SPDX-License-Identifier: MIT
+***************************************************************************************************/
+
+/**************************************************************************************************/
+/**
+*
+* @file server/core/kdf/xsecure_kdf.c
+* This file contains the implementation of the HMAC based Key Derivation Function (HKDF).
+*
+*
+* <pre>
+* MODIFICATION HISTORY:
+*
+* Ver   Who  Date        Changes
+* ----- ---- -------- ----------------------------------------------------------------------------
+* 5.5   tvp  05/13/25 Initial release
+* 5.7   tbk  03/27/26 Add fault injection protection for HKDF loop counter
+*       tbk  03/27/26 Set error code before goto on Hmac operations
+*
+* </pre>
+*
+***************************************************************************************************/
+/**
+* @addtogroup xsecure_kdf_server_apis Xilsecure KDF Server APIs
+* @{
+*/
+
+/*************************************** Include Files ********************************************/
+#include "xil_sutil.h"
+#include "xsecure_kdf.h"
+#include "xsecure_sha_common.h"
+#include "xsecure_hmac.h"
+#include "xsecure_init.h"
+
+/**************************************************************************************************/
+/**
+ *
+ * @brief
+ * This function performs the HMAC based KDF.
+ *
+ * @param	InDataPtr is a pointer to the XSecure_KdfParams instance.
+ *		one should initialize the structure with following parameters
+ *		before calling this API.
+ *		- Key - Is a pointer to the key
+ * 		- KeyLen - length of key pointer
+ * 		- Context - Is a pointer to the context for KDF
+ * 		- ContextLen - Specifies the length of the context pointer.
+ * @param	KdfOut is the pointer to output storage.
+ * @param	KdfOutLen is the size of output.
+ *
+ * @return
+ *		- XST_SUCCESS - On success
+ *		- XSECURE_ERR_HKDF_INVALID_PARAM - If input parameters are invalid
+ *		- XST_FAILURE - On failure
+ *
+ **************************************************************************************************/
+int XSecure_Hkdf(XSecure_KdfParams *InDataPtr, u8 *KdfOut, u32 KdfOutLen)
+{
+	volatile int Status = XST_FAILURE;
+	XSecure_Sha3 *Sha3InstPtr = XSecure_GetSha3Instance(XSECURE_SHA_0_DEVICE_ID);
+	XSecure_Hmac HmacInstance;
+	u32 KdfValue = 0U;
+	u32 Iterations = 0U;
+	volatile u32 KdfIndex = 0U;
+	XSecure_HmacRes Hmac;
+
+	/** - Validate input parameters. */
+	if (InDataPtr == NULL) {
+		Status = XSECURE_ERR_HKDF_INVALID_PARAM;
+		goto END;
+	}
+
+	/**
+	 * - Calculate number of iterations based on HKDF output key length and SHA hash length.
+	 */
+	Iterations = XIL_SCEILDIV(u32, KdfOutLen, XSECURE_SHA_384_HASH_SIZE_IN_BYTES);
+	if (Iterations == 0U) {
+		Status = XSECURE_ERR_HKDF_INVALID_PARAM;
+		goto END;
+	}
+
+	if (Iterations > XSECURE_HKDF_MAX_ITERATIONS) {
+		Status = XSECURE_ERR_HKDF_INVALID_PARAM;
+		goto END;
+	}
+
+	for(KdfIndex = 0U; KdfIndex < Iterations; KdfIndex++)
+	{
+		/** - Calculate HMAC and form KdfInput */
+		Status = XSecure_HmacInit(&HmacInstance, Sha3InstPtr, (u64)(UINTPTR)InDataPtr->Key,
+				InDataPtr->KeyLen);
+		if (Status != XST_SUCCESS) {
+			XSECURE_STATUS_CHK_GLITCH_DETECT(Status);
+			goto END;
+		}
+
+		/** - Update block index of 1 byte to HMAC. */
+		KdfValue = KdfIndex + XSECURE_HKDF_BLOCK_INDEX_LENGTH;
+
+		Status = XST_FAILURE;
+		Status = XSecure_HmacUpdate(&HmacInstance, (u64)(UINTPTR)&KdfValue,
+				XSECURE_WORD_SIZE);
+		if (Status != XST_SUCCESS) {
+			XSECURE_STATUS_CHK_GLITCH_DETECT(Status);
+			goto END;
+		}
+
+		/** - Update Context */
+		Status = XST_FAILURE;
+		Status = XSecure_HmacUpdate(&HmacInstance, (u64)(UINTPTR)InDataPtr->Context,
+				InDataPtr->ContextLen);
+		if (Status != XST_SUCCESS) {
+			XSECURE_STATUS_CHK_GLITCH_DETECT(Status);
+			goto END;
+		}
+
+		Status = XST_FAILURE;
+		/** - Get final HMAC */
+		Status = XSecure_HmacFinal(&HmacInstance, &Hmac);
+		if (Status != XST_SUCCESS) {
+			XSECURE_STATUS_CHK_GLITCH_DETECT(Status);
+			goto END;
+		}
+
+		Status = XST_FAILURE;
+		/**
+		 * - HMAC output size is the SHA algorithm hash length. HKDF key output can be any
+		 * length.
+		 * - In the last iteration, data to be copied to the destination can be less than or
+		 * equal to SHA algorithm hash length which varies based on the requested key
+		 * output length.
+		 */
+		if (KdfIndex == (Iterations - XSECURE_HKDF_BLOCK_INDEX_LENGTH)) {
+			Status = Xil_SMemCpy((u8 *)&KdfOut[XSECURE_SHA_384_HASH_SIZE_IN_BYTES * KdfIndex],
+					(KdfOutLen - (KdfIndex * XSECURE_SHA_384_HASH_SIZE_IN_BYTES)),
+					Hmac.Hash, XSECURE_SHA_384_HASH_SIZE_IN_BYTES,
+					KdfOutLen - (KdfIndex * XSECURE_SHA_384_HASH_SIZE_IN_BYTES));
+		} else {
+
+			/**
+			 * - Copy the final HMAC of each iteration to the destination key output
+			 *   buffer.
+			 */
+			Status = Xil_SMemCpy((u8 *)&KdfOut[XSECURE_SHA_384_HASH_SIZE_IN_BYTES * KdfIndex],
+					XSECURE_SHA_384_HASH_SIZE_IN_BYTES, Hmac.Hash,
+					XSECURE_SHA_384_HASH_SIZE_IN_BYTES,
+					XSECURE_SHA_384_HASH_SIZE_IN_BYTES);
+		}
+
+	}
+
+	/** - Verify loop index is within expected bounds */
+	if (KdfIndex != Iterations) {
+		XSECURE_STATUS_CHK_GLITCH_DETECT(Status);
+	}
+
+END:
+	return Status;
+}
+/** @} */

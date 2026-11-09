@@ -1,0 +1,351 @@
+psu_cortexa53_0:
+  standalone:
+    libmetal:
+      description: Provide runtime primitives APIs across heterogenous processors.
+      depends_libs:
+      - xiltimer
+      - libmetal_xlnx_extension
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/ThirdParty/sw_services/libmetal_v2_10
+      examples: {}
+    libmetal_xlnx_extension:
+      description: Provide runtime primitives APIs across heterogenous processors.
+      depends_libs:
+      - xiltimer
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/ThirdParty/sw_services/libmetal_xlnx_extension
+      examples: {}
+    lwip220:
+      description: lwip220 library lwIP (light weight IP) is an open source TCP/IP stack configured for AMD hard and soft Ethernet MACs.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/ThirdParty/sw_services/lwip220_v1_4
+      examples:
+        lwip_example_igmp_main.c:
+        - lwip_example_igmp_app.c
+        - lwip_example_igmp_app.h
+        - lwip_example_platform.c
+        - lwip_example_platform.h
+        - lwip_example_platform_config.h
+        - lwip_example_platform_mb.c
+        - lwip_example_platform_zynq.c
+        - lwip_example_platform_zynqmp.c
+        - lwip_example_i2c_access.c
+        - lwip_example_iic_phyreset.c
+        - lwip_example_sfp.c
+        - lwip_example_si5324.c
+        lwip_example_tftpclient_main.c:
+        - lwip_example_tftp_client.c
+        - lwip_example_tftpclient_common.h
+        - lwip_example_tftp_platform_fs.c
+        - lwip_example_tftp_platform_fs.h
+        - lwip_example_platform.c
+        - lwip_example_platform.h
+        - lwip_example_platform_config.h
+        - lwip_example_platform_mb.c
+        - lwip_example_platform_zynq.c
+        - lwip_example_platform_zynqmp.c
+        - lwip_example_i2c_access.c
+        - lwip_example_iic_phyreset.c
+        - lwip_example_sfp.c
+        - lwip_example_si5324.c
+        lwip_example_tftpserver_main.c:
+        - lwip_example_tftp_server.c
+        - lwip_example_tftpserver_common.h
+        - lwip_example_tftp_platform_fs.c
+        - lwip_example_tftp_platform_fs.h
+        - lwip_example_platform.c
+        - lwip_example_platform.h
+        - lwip_example_platform_config.h
+        - lwip_example_platform_mb.c
+        - lwip_example_platform_zynq.c
+        - lwip_example_platform_zynqmp.c
+        - lwip_example_i2c_access.c
+        - lwip_example_iic_phyreset.c
+        - lwip_example_sfp.c
+        - lwip_example_si5324.c
+        lwip_example_ws_main.c:
+        - lwip_example_webserver.c
+        - lwip_example_webserver.h
+        - lwip_example_web_utils.c
+        - lwip_example_ws_http_response.c
+        - lwip_example_ws_platform_fs.c
+        - lwip_example_tftp_platform_fs.h
+        - lwip_example_platform.c
+        - lwip_example_platform.h
+        - lwip_example_platform_config.h
+        - lwip_example_platform_mb.c
+        - lwip_example_platform_zynq.c
+        - lwip_example_platform_zynqmp.c
+        - lwip_example_i2c_access.c
+        - lwip_example_iic_phyreset.c
+        - lwip_example_sfp.c
+        - lwip_example_si5324.c
+        freertos_lwip_example_igmp_main.c:
+        - lwip_example_iic_phyreset.c
+        - lwip_example_platform_config.h
+        - freertos_lwip_example_igmp_app.c
+        - freertos_lwip_example_igmp_app.h
+        freertos_lwip_example_tftpclient_main.c:
+        - lwip_example_iic_phyreset.c
+        - lwip_example_platform_config.h
+        - freertos_lwip_example_tftp_platform_fs.c
+        - freertos_lwip_example_tftp_platform_fs.h
+        - freertos_lwip_example_tftp_client.c
+        - freertos_lwip_example_tftpclient_common.h
+        freertos_lwip_example_tftpserver_main.c:
+        - lwip_example_iic_phyreset.c
+        - lwip_example_platform_config.h
+        - freertos_lwip_example_tftp_platform_fs.c
+        - freertos_lwip_example_tftp_platform_fs.h
+        - freertos_lwip_example_tftp_server.c
+        - freertos_lwip_example_tftpserver_common.h
+        freertos_lwip_example_ws_main.c:
+        - lwip_example_iic_phyreset.c
+        - lwip_example_platform_config.h
+        - freertos_lwip_example_ws_platform_fs.c
+        - freertos_lwip_example_web_utils.c
+        - freertos_lwip_example_ws_http_response.c
+        - freertos_lwip_example_webserver.c
+        - freertos_lwip_example_webserver.h
+    xilffs:
+      description: Generic Fat File System Library.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilffs_v5_6
+      examples:
+        xilffs_polled_example.c: []
+    xilfpga:
+      description: XilFPGA library provides an interface to the Linux or bare-metal users for configuring the PL over PCAP from PS.
+      depends_libs:
+      - xilsecure
+      - xilmailbox
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilfpga_v6_10
+      examples:
+        xfpga_partialbitstream_load_example.c: []
+        xfpga_readback_example.c: []
+        xfpga_reg_readback_example.c: []
+        xfpga_load_bitstream_example.c: []
+    xilmailbox:
+      description: Xilinx IPI Mailbox Library.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilmailbox_v1_13
+      examples:
+        xilmailbox_example.c: []
+    xilpm:
+      description: Platform Management API Library for ZynqMP and Versal.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilpm_v7_0
+      examples:
+        xilpm_selfsuspend_example.c:
+        - timer.c
+        - timer.h
+        - gic_setup.c
+        - gic_setup.h
+    xilsecure:
+      description: Xilinx Secure Library provides interface to AES, RSA and SHA hardware engines on ZynqMP Soc and Versal.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilsecure_v5_7
+      examples:
+        xilsecure_aes_example.c: []
+        xilsecure_rsa_example.c: []
+        xilsecure_rsa_generic_example.c: []
+        xilsecure_sha_example.c: []
+        xilsecure_simple_aes_example.c: []
+    xilskey:
+      description: Xilinx Secure Key Library supports programming efuse and bbram.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilskey_v7_9
+      examples:
+        xilskey_efuseps_zynqmp_example.c:
+        - xilskey_efuseps_zynqmp_input.h
+        xilskey_bbramps_zynqmp_example.c: []
+        xilskey_puf_registration_example.c:
+        - xilskey_puf_registration.h
+        xilskey_puf_regeneration_example.c: []
+    xiltimer:
+      description: Xiltimer library provides generic timer interface for the timer IP's.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xiltimer_v2_4
+      examples: {}
+  freertos:
+    libmetal:
+      description: Provide runtime primitives APIs across heterogenous processors.
+      depends_libs:
+      - xiltimer
+      - libmetal_xlnx_extension
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/ThirdParty/sw_services/libmetal_v2_10
+      examples: {}
+    libmetal_xlnx_extension:
+      description: Provide runtime primitives APIs across heterogenous processors.
+      depends_libs:
+      - xiltimer
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/ThirdParty/sw_services/libmetal_xlnx_extension
+      examples: {}
+    lwip220:
+      description: lwip220 library lwIP (light weight IP) is an open source TCP/IP stack configured for AMD hard and soft Ethernet MACs.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/ThirdParty/sw_services/lwip220_v1_4
+      examples:
+        lwip_example_igmp_main.c:
+        - lwip_example_igmp_app.c
+        - lwip_example_igmp_app.h
+        - lwip_example_platform.c
+        - lwip_example_platform.h
+        - lwip_example_platform_config.h
+        - lwip_example_platform_mb.c
+        - lwip_example_platform_zynq.c
+        - lwip_example_platform_zynqmp.c
+        - lwip_example_i2c_access.c
+        - lwip_example_iic_phyreset.c
+        - lwip_example_sfp.c
+        - lwip_example_si5324.c
+        lwip_example_tftpclient_main.c:
+        - lwip_example_tftp_client.c
+        - lwip_example_tftpclient_common.h
+        - lwip_example_tftp_platform_fs.c
+        - lwip_example_tftp_platform_fs.h
+        - lwip_example_platform.c
+        - lwip_example_platform.h
+        - lwip_example_platform_config.h
+        - lwip_example_platform_mb.c
+        - lwip_example_platform_zynq.c
+        - lwip_example_platform_zynqmp.c
+        - lwip_example_i2c_access.c
+        - lwip_example_iic_phyreset.c
+        - lwip_example_sfp.c
+        - lwip_example_si5324.c
+        lwip_example_tftpserver_main.c:
+        - lwip_example_tftp_server.c
+        - lwip_example_tftpserver_common.h
+        - lwip_example_tftp_platform_fs.c
+        - lwip_example_tftp_platform_fs.h
+        - lwip_example_platform.c
+        - lwip_example_platform.h
+        - lwip_example_platform_config.h
+        - lwip_example_platform_mb.c
+        - lwip_example_platform_zynq.c
+        - lwip_example_platform_zynqmp.c
+        - lwip_example_i2c_access.c
+        - lwip_example_iic_phyreset.c
+        - lwip_example_sfp.c
+        - lwip_example_si5324.c
+        lwip_example_ws_main.c:
+        - lwip_example_webserver.c
+        - lwip_example_webserver.h
+        - lwip_example_web_utils.c
+        - lwip_example_ws_http_response.c
+        - lwip_example_ws_platform_fs.c
+        - lwip_example_tftp_platform_fs.h
+        - lwip_example_platform.c
+        - lwip_example_platform.h
+        - lwip_example_platform_config.h
+        - lwip_example_platform_mb.c
+        - lwip_example_platform_zynq.c
+        - lwip_example_platform_zynqmp.c
+        - lwip_example_i2c_access.c
+        - lwip_example_iic_phyreset.c
+        - lwip_example_sfp.c
+        - lwip_example_si5324.c
+        freertos_lwip_example_igmp_main.c:
+        - lwip_example_iic_phyreset.c
+        - lwip_example_platform_config.h
+        - freertos_lwip_example_igmp_app.c
+        - freertos_lwip_example_igmp_app.h
+        freertos_lwip_example_tftpclient_main.c:
+        - lwip_example_iic_phyreset.c
+        - lwip_example_platform_config.h
+        - freertos_lwip_example_tftp_platform_fs.c
+        - freertos_lwip_example_tftp_platform_fs.h
+        - freertos_lwip_example_tftp_client.c
+        - freertos_lwip_example_tftpclient_common.h
+        freertos_lwip_example_tftpserver_main.c:
+        - lwip_example_iic_phyreset.c
+        - lwip_example_platform_config.h
+        - freertos_lwip_example_tftp_platform_fs.c
+        - freertos_lwip_example_tftp_platform_fs.h
+        - freertos_lwip_example_tftp_server.c
+        - freertos_lwip_example_tftpserver_common.h
+        freertos_lwip_example_ws_main.c:
+        - lwip_example_iic_phyreset.c
+        - lwip_example_platform_config.h
+        - freertos_lwip_example_ws_platform_fs.c
+        - freertos_lwip_example_web_utils.c
+        - freertos_lwip_example_ws_http_response.c
+        - freertos_lwip_example_webserver.c
+        - freertos_lwip_example_webserver.h
+    xilffs:
+      description: Generic Fat File System Library.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilffs_v5_6
+      examples:
+        xilffs_polled_example.c: []
+    xilfpga:
+      description: XilFPGA library provides an interface to the Linux or bare-metal users for configuring the PL over PCAP from PS.
+      depends_libs:
+      - xilsecure
+      - xilmailbox
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilfpga_v6_10
+      examples:
+        xfpga_partialbitstream_load_example.c: []
+        xfpga_readback_example.c: []
+        xfpga_reg_readback_example.c: []
+        xfpga_load_bitstream_example.c: []
+    xilmailbox:
+      description: Xilinx IPI Mailbox Library.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilmailbox_v1_13
+      examples:
+        xilmailbox_example.c: []
+    xilpm:
+      description: Platform Management API Library for ZynqMP and Versal.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilpm_v7_0
+      examples:
+        xilpm_selfsuspend_example.c:
+        - timer.c
+        - timer.h
+        - gic_setup.c
+        - gic_setup.h
+    xilsecure:
+      description: Xilinx Secure Library provides interface to AES, RSA and SHA hardware engines on ZynqMP Soc and Versal.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilsecure_v5_7
+      examples:
+        xilsecure_aes_example.c: []
+        xilsecure_rsa_example.c: []
+        xilsecure_rsa_generic_example.c: []
+        xilsecure_sha_example.c: []
+        xilsecure_simple_aes_example.c: []
+    xilskey:
+      description: Xilinx Secure Key Library supports programming efuse and bbram.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xilskey_v7_9
+      examples:
+        xilskey_efuseps_zynqmp_example.c:
+        - xilskey_efuseps_zynqmp_input.h
+        xilskey_bbramps_zynqmp_example.c: []
+        xilskey_puf_registration_example.c:
+        - xilskey_puf_registration.h
+        xilskey_puf_regeneration_example.c: []
+    xiltimer:
+      description: Xiltimer library provides generic timer interface for the timer IP's.
+      depends_libs: []
+      path:
+      - /home/joren/vivado/2026.1/Vitis/data/embeddedsw/lib/sw_services/xiltimer_v2_4
+      examples: {}

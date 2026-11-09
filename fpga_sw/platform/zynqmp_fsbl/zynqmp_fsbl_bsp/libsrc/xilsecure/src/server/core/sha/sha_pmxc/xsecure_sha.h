@@ -1,0 +1,100 @@
+/******************************************************************************
+* Copyright (c) 2024-2026 Advanced Micro Devices, Inc.  All rights reserved.
+* SPDX-License-Identifier: MIT
+*******************************************************************************/
+/*****************************************************************************/
+/**
+*
+* @file server/core/sha/sha_pmxc/xsecure_sha.h
+* @cond xsecure_internal
+*
+* This file Contains the function prototypes, defines and macros for
+* the SHA2/3 hardware module.
+*
+* @note
+*
+* <pre>
+* MODIFICATION HISTORY:
+*
+* Ver   Who  Date        Changes
+* ----- ---- -------- -------------------------------------------------------
+* 5.4   kal  07/24/24 Initial release
+* 5.6   vss  06/17/25 Removed dead code
+* 5.6   aa   07/21/25 Removed unused macros
+*       tus  08/06/25 Add macro for disabling auto padding mode
+* 5.7   sd   11/21/25 Updated SHA Mode and Auto padding register offsets
+*                     for Versal_2vp_p devices
+*       tvp  02/23/26 Move SHA mode and auto padding offset to platform specific
+*                     files, Add XSecure_ShaPlatConfig for platform specific SHA
+*                     configurations
+*       tvp  02/23/26 Add XSecure_ExtendedShaFinish to support variable-length
+*                     hash output
+*
+* </pre>
+*
+* @note
+* @endcond
+*
+******************************************************************************/
+/**
+ * @addtogroup xsecure_apis XilSecure Server APIs
+ * @{
+ */
+#ifndef XSECURE_SHA_H_
+#define XSECURE_SHA_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/***************************** Include Files *********************************/
+#include "xsecure_sss.h"
+#include "xsecure_sha_common.h"
+#include "xsecure_sha_hw.h"
+#include "xpmcdma.h"
+
+/************************** Constant Definitions ****************************/
+/** @cond xsecure_internal
+ * @{
+ */
+#define XSECURE_SHA_RESET_OFFSET            	(0x04U) /**< Reset Register */
+#define XSECURE_SHA_DONE_OFFSET             	(0x08U) /**< SHA Done Register */
+#define	XSECURE_SHA_START_VALUE			(1U)	/**< SHA Start Value */
+#define	XSECURE_SHA_DONE_VALUE			(1U)	/**< SHA Done Value */
+#define	XSECURE_SHA_AUTO_MODE_ENABLE		(1U)	/**< SHA AUTO_MODE enable */
+#define XSECURE_SHA_AUTO_PADDING_MODE_DISABLE	(0U)	/** SHA Auto padding disable */
+#define XSECURE_SHA_TIMEOUT_MAX			(0x1FFFFU) /**< SHA Timeout max */
+#define XSECURE_SHA_DIGEST_OFFSET		(0x10U) /**< SHA Digest Register */
+/** @endcond */
+/***************************** Type Definitions******************************/
+/** SHA platform specific configuration */
+typedef struct{
+	u32 ShaMode; /**< ShaMode value to be configured in SHA_MODE register */
+	u32 ShaDigestSize; /**< Digest size in bytes for specific SHA Mode */
+	u32 ModeOffset; /**< SHA mode offset */
+	u32 AutoPaddingOffset; /**< SHA auto padding offset */
+	XSecure_ShaMode HashAlgo; /**< ShaMode input */
+} XSecure_ShaPlatConfig;
+
+/***************** Macros (Inline Functions) Definitions *********************/
+
+/***************************** Function Prototypes ******************************************/
+int XSecure_ShaInitialize(XSecure_Sha* const InstancePtr, XPmcDma* DmaPtr);
+int XSecure_ShaStart(XSecure_Sha* const InstancePtr, XSecure_ShaMode ShaMode);
+int XSecure_ShaUpdate(XSecure_Sha* const InstancePtr, u64 DataAddr, const u32 DataSize);
+int XSecure_ShaFinish(XSecure_Sha* const InstancePtr, u64 HashAddr, u32 HashBufSize);
+int XSecure_ShaDigest(XSecure_Sha* const InstancePtr, XSecure_ShaMode ShaMode, const u64 DataAddr,
+u32 DataSize, u64 HashAddr, u32 HashBufSize);
+int XSecure_ShaLastUpdate(XSecure_Sha *InstancePtr);
+int XSecure_ShaValidateModeAndCfgInstance(XSecure_Sha * const InstancePtr,
+	XSecure_ShaMode ShaMode);
+int XSecure_ExtendedShaFinish(XSecure_Sha* const InstancePtr, u64 HashAddr, u32 HashBufSize,
+			      u32 ReqHashSize);
+u32 XSecure_ShaGetBlockLen(XSecure_ShaMode HashAlgo);
+
+/** @} */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /** XSECURE_SHA_H_ */

@@ -1,0 +1,22 @@
+/******************************************************************************
+* Copyright (C) 2021 Xilinx, Inc.  All rights reserved.
+* Copyright (C) 2022 - 2026 Advanced Micro Devices, Inc.  All rights reserved.
+* SPDX-License-Identifier: MIT
+******************************************************************************/
+#ifndef _XPM_CONFIG_H
+#define _XPM_CONFIG_H
+
+#cmakedefine XPAR_XILPM_ENABLED	@XPAR_XILPM_ENABLED@
+#cmakedefine XCVP1902 @XCVP1902@
+#cmakedefine RAIL_CONTROL @RAIL_CONTROL@
+#cmakedefine VERSAL_DVS @VERSAL_DVS@
+#cmakedefine XCVR1602 @XCVR1602@
+#cmakedefine XCVR1652 @XCVR1652@
+#cmakedefine ENABLE_BULK_DEV_RELEASE_SUPPORT @ENABLE_BULK_DEV_RELEASE_SUPPORT@
+#cmakedefine ENABLE_UNREGISTER_ALL_NOTIFIER_SUPPORT @ENABLE_UNREGISTER_ALL_NOTIFIER_SUPPORT@
+#cmakedefine ENABLE_GPIO_PROC_HANDLER @ENABLE_GPIO_PROC_HANDLER@
+#cmakedefine XC2VP3202 @XC2VP3202@
+#cmakedefine XC2VP3602 @XC2VP3602@
+#cmakedefine XCVM2152 @XCVM2152@
+
+#endif /* XPM_CONFIG_H */
