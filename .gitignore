@@ -1,4 +1,8 @@
 # snax stuff
+.Xil
+*.jou
+*.str
+*.logfile
 Bender.lock
 .bloop
 .metals
